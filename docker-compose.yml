@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: xhs_growth_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: xhs_growth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - xhs_growth_pg_data:/var/lib/postgresql/data
+
+volumes:
+  xhs_growth_pg_data:
