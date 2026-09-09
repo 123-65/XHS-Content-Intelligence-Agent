@@ -96,8 +96,10 @@ def test_content_experiment_workflow_records_run_and_steps():
 
     steps_response = client.get(f"/api/agent-runs/{response.id}/steps")
     assert steps_response.status_code == 200
-    assert [step["status"] for step in steps_response.json()["data"]] == ["SUCCESS", "SUCCESS", "SUCCESS"]
-
+    steps = steps_response.json()["data"]
+    assert len(steps) == 3
+    assert [step["status"] for step in steps] == ["SUCCESS", "FALLBACK_USED", "SUCCESS"]
+    assert steps[1]["fallback_used"] is True
     with SessionLocal() as db:
         experiment_id = response.steps[-1].output_payload["data"]["experiment_id"]
         assert db.get(ContentExperiment, experiment_id).status == "CANDIDATE"
