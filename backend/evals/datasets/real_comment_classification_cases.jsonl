@@ -1,0 +1,2 @@
+{"case_id":"real-comment-resource-001","input":{"is_mock":false,"comment":"能不能分享一下完整资料清单和项目结构？"},"expected_behavior":{"demand_type":"RESOURCE"}}
+{"case_id":"real-comment-price-001","input":{"is_mock":false,"comment":"这个课程多少钱，适合零基础吗？"},"expected_behavior":{"demand_type":"PRICE"}}

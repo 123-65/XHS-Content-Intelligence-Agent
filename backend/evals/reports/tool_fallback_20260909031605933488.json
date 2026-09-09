@@ -1,0 +1,43 @@
+{
+  "eval_type": "tool_fallback",
+  "dataset_path": "evals\\datasets\\tool_fallback_cases.jsonl",
+  "total_cases": 3,
+  "passed_cases": 3,
+  "failed_cases": 0,
+  "pass_rate": "1.0000",
+  "failed_reasons": [],
+  "case_results": [
+    {
+      "case_id": "mcp-fallback-used",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "fallback_count": 1,
+        "fallback_name_ok": true,
+        "actual_pass": true
+      }
+    },
+    {
+      "case_id": "llm-fallback-used",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "fallback_count": 1,
+        "fallback_name_ok": true,
+        "actual_pass": true
+      }
+    },
+    {
+      "case_id": "missing-fallback-negative",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "fallback_count": 0,
+        "fallback_name_ok": true,
+        "actual_pass": false
+      }
+    }
+  ],
+  "report_path": "evals\\reports\\tool_fallback_20260909031605933488.json",
+  "eval_run_id": 37
+}

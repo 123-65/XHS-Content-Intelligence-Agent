@@ -1,0 +1,2 @@
+{"case_id":"provider-health-mock-ok","input":{"health":{"llm":{"available":true,"is_mock":true},"crawler":{"available":true,"fallback_provider":"seed_sample"},"embedding":{"available":true}}},"expected_behavior":{"available":true,"allow_mock":true}}
+{"case_id":"provider-health-real-ok","input":{"health":{"llm":{"available":true,"is_mock":false},"crawler":{"available":true,"fallback_provider":"seed_sample","is_mock":false},"embedding":{"available":true,"is_mock":false}}},"expected_behavior":{"available":true,"allow_mock":false}}

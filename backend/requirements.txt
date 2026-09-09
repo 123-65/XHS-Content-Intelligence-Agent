@@ -9,3 +9,6 @@ alembic
 pytest
 httpx
 loguru
+playwright
+openai
+tenacity

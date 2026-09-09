@@ -53,3 +53,20 @@ def get_note_snapshot(snapshot_id: int, db: Session = Depends(get_db)):
         return success(result)
     except ValueError as exc:
         return JSONResponse(status_code=404, content=fail(str(exc), code=404).model_dump())
+
+@router.post("/crawl")
+def crawl_note(
+    note_url: str = Query(...),
+    source_type: str = Query(default="MANUAL_LINK"),
+    keyword: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """采集单篇小红书公开笔记并保存快照。"""
+    service = XhsNoteSnapshotService(db)
+    snapshot = service.crawl_and_create_snapshot(note_url=note_url, source_type=source_type, keyword=keyword)
+    result = XhsNoteSnapshotResponse.model_validate(snapshot).model_dump(mode="json")
+
+    if snapshot.status == "FAILED":
+        return JSONResponse(status_code=400, content=fail("采集失败", code=400, data=result).model_dump())
+
+    return success(result)

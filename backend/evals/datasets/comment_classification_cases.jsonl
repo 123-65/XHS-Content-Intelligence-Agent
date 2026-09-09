@@ -1,0 +1,4 @@
+{"case_id":"comment-route-001","input":{"comment":"Do you have a roadmap for learning AI Agent from zero?"},"expected":{"demand_type":"ROUTE"},"metadata":{"source":"seed","risk":"low"}}
+{"case_id":"comment-source-code-001","input":{"comment":"Can you share the GitHub source code for this project?"},"expected":{"demand_type":"SOURCE_CODE"},"metadata":{"source":"seed","risk":"low"}}
+{"case_id":"comment-anxiety-001","input":{"comment":"I have zero foundation. Is it too late to start?"},"expected":{"demand_type":"ANXIETY"},"metadata":{"source":"seed","risk":"low"}}
+{"case_id":"comment-unknown-001","input":{"comment":"Nice post, thanks for sharing."},"expected":{"demand_type":"UNKNOWN"},"metadata":{"source":"seed","risk":"low"}}

@@ -37,7 +37,7 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
         result = AccountProfileResponse.model_validate(account).model_dump(mode="json")
         return success(result)
     except ValueError as exc:
-        return JSONResponse(status_code=404, content=fail(str(exc), code=404).model_dump())
+        return JSONResponse(status_code=404, content=fail(code=404, message=str(exc)).model_dump())
 
 
 @router.put("/{account_id}")
@@ -49,4 +49,4 @@ def update_account(account_id: int, data: AccountProfileUpdate, db: Session = De
         result = AccountProfileResponse.model_validate(account).model_dump(mode="json")
         return success(result)
     except ValueError as exc:
-        return JSONResponse(status_code=404, content=fail(str(exc), code=404).model_dump())
+        return JSONResponse(status_code=404, content=fail(code=404, message=str(exc)).model_dump())

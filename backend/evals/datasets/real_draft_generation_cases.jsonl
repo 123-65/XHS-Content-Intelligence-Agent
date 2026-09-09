@@ -1,0 +1,2 @@
+{"case_id":"real-draft-safe-001","input":{"is_mock":false,"draft":{"title":"AI Agent 项目怎么做得像业务闭环","body_text":"先跑通账号、采集、分析、实验、草稿和复盘，再补 Agent Runtime。","cta_text":"可以先收藏这条路线。"}},"expected_behavior":{"should_pass":true}}
+{"case_id":"real-draft-risk-001","input":{"is_mock":false,"draft":{"title":"保证涨粉的 Agent 项目","body_text":"照做保证成交。","cta_text":"必须评论区扣 1。"}},"expected_behavior":{"should_pass":false}}

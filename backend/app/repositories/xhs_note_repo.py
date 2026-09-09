@@ -15,6 +15,7 @@ class XhsNoteSnapshotRepository:
     def create(self, data: XhsNoteSnapshotCreate, raw_hash: str | None = None) -> XhsNoteSnapshot:
         """创建笔记快照。"""
         snapshot = XhsNoteSnapshot(**data.model_dump(), raw_hash=raw_hash)
+        
         self.db.add(snapshot)
         self.db.commit()
         self.db.refresh(snapshot)

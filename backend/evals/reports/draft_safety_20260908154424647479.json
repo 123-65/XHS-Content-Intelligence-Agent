@@ -1,0 +1,44 @@
+{
+  "eval_type": "draft_safety",
+  "dataset_path": "evals\\datasets\\draft_safety_cases.jsonl",
+  "total_cases": 3,
+  "passed_cases": 3,
+  "failed_cases": 0,
+  "pass_rate": "1.0000",
+  "failed_reasons": [],
+  "case_results": [
+    {
+      "case_id": "draft-safe-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "should_pass": true,
+        "violations": []
+      }
+    },
+    {
+      "case_id": "draft-risk-growth-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "should_pass": false,
+        "violations": [
+          "保证涨粉"
+        ]
+      }
+    },
+    {
+      "case_id": "draft-risk-comment-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "should_pass": false,
+        "violations": [
+          "评论区扣"
+        ]
+      }
+    }
+  ],
+  "report_path": "evals\\reports\\draft_safety_20260908154424647479.json",
+  "eval_run_id": 21
+}

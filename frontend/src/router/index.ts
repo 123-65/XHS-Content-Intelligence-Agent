@@ -13,7 +13,8 @@ const routes = [
   { path: '/publish', name: 'publish', component: () => import('@/views/PublishAssistant.vue') },
   { path: '/metrics', name: 'metrics', component: () => import('@/views/MetricsReview.vue') },
   { path: '/strategy', name: 'strategy', component: () => import('@/views/StrategyMemory.vue') },
-  { path: '/workflow-logs', name: 'workflowLogs', component: () => import('@/views/WorkflowLogs.vue') }
+  { path: '/workflow-logs', name: 'workflowLogs', component: () => import('@/views/WorkflowLogs.vue') },
+  { path: '/developer/agent-trace', name: 'developerAgentTrace', component: () => import('@/views/DeveloperAgentTrace.vue') }
 ]
 
 export default createRouter({

@@ -1,0 +1,45 @@
+{
+  "eval_type": "comment_classification",
+  "dataset_path": "evals\\datasets\\comment_classification_cases.jsonl",
+  "total_cases": 4,
+  "passed_cases": 4,
+  "failed_cases": 0,
+  "pass_rate": "1.0000",
+  "failed_reasons": [],
+  "case_results": [
+    {
+      "case_id": "comment-route-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "demand_type": "ROUTE"
+      }
+    },
+    {
+      "case_id": "comment-source-code-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "demand_type": "SOURCE_CODE"
+      }
+    },
+    {
+      "case_id": "comment-anxiety-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "demand_type": "ANXIETY"
+      }
+    },
+    {
+      "case_id": "comment-unknown-001",
+      "passed": true,
+      "reason": null,
+      "actual_output": {
+        "demand_type": "UNKNOWN"
+      }
+    }
+  ],
+  "report_path": "evals\\reports\\comment_classification_20260908154424557333.json",
+  "eval_run_id": 19
+}

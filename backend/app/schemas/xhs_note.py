@@ -35,6 +35,13 @@ class XhsNoteSnapshotCreate(BaseModel):
     publish_time: datetime | None = None
     status: str = Field(default="SUCCESS", max_length=32)
     error_message: str | None = None
+    content_type: str = Field(default="IMAGE_TEXT", max_length=32)
+    cover_url: str | None = Field(default=None, max_length=1024)
+    image_urls: list[str] = Field(default_factory=list)
+    image_count: int = Field(default=0, ge=0)
+    image_ocr_text: str | None = None
+    image_ocr_items: list[dict] = Field(default_factory=list)
+    merged_text: str | None = None
 
 
 class XhsNoteSnapshotResponse(BaseModel):
@@ -52,6 +59,13 @@ class XhsNoteSnapshotResponse(BaseModel):
     author_homepage: str | None
     title: str | None
     content: str | None
+    content_type: str
+    cover_url: str | None
+    image_urls: list[str]
+    image_count: int
+    image_ocr_text: str | None
+    image_ocr_items: list[dict]
+    merged_text: str | None
     tags: list[str]
     like_count: int | None
     collect_count: int | None
@@ -62,3 +76,29 @@ class XhsNoteSnapshotResponse(BaseModel):
     status: str
     error_message: str | None
     created_at: datetime
+
+
+class XhsNoteCrawlResult(BaseModel):
+    """小红书公开笔记采集结果。"""
+
+    source_type: SourceType = "MANUAL_LINK"
+    keyword: str | None = None
+    note_url: str
+    note_id: str | None = None
+    author_name: str | None = None
+    author_homepage: str | None = None
+    title: str | None = None
+    content: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    content_type: str = "IMAGE_TEXT"
+    cover_url: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
+    image_count: int = 0
+    image_ocr_text: str | None = None
+    image_ocr_items: list[dict] = Field(default_factory=list)
+    merged_text: str | None = None
+    like_count: int | None = None
+    collect_count: int | None = None
+    comment_count: int | None = None
+    status: str = "SUCCESS"
+    error_message: str | None = None

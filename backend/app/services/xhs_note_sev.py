@@ -6,6 +6,7 @@ from app.crawler.xhs_url import parse_xhs_note_url
 from app.models.xhs_note import XhsNoteSnapshot
 from app.repositories.xhs_note_repo import XhsNoteSnapshotRepository
 from app.schemas.xhs_note import XhsNoteSnapshotCreate, XhsNoteUrlParseResult
+from app.crawler.factory import get_xhs_crawler_provider
 
 
 class XhsNoteSnapshotService:
@@ -21,6 +22,12 @@ class XhsNoteSnapshotService:
 
     def create_snapshot(self, data: XhsNoteSnapshotCreate) -> XhsNoteSnapshot:
         """创建笔记快照。"""
+        if not data.image_count:
+            data.image_count = len(data.image_urls)
+
+        if not data.merged_text:
+            data.merged_text = self._build_merged_text(data)
+
         parse_result = parse_xhs_note_url(data.note_url)
         if not parse_result.valid:
             raise ValueError(parse_result.reason or "无效的小红书链接")
@@ -44,7 +51,41 @@ class XhsNoteSnapshotService:
             raise ValueError("笔记快照不存在")
         return snapshot
 
+    def crawl_and_create_snapshot(
+        self,
+        note_url: str,
+        source_type: str = "MANUAL_LINK",
+        keyword: str | None = None,
+    ) -> XhsNoteSnapshot:
+        """采集单篇公开笔记并创建快照。"""
+        provider = get_xhs_crawler_provider()
+        crawl_result = provider.crawl_note(note_url=note_url, source_type=source_type, keyword=keyword)
+
+        data = XhsNoteSnapshotCreate(**crawl_result.model_dump())
+        if crawl_result.status == "FAILED":
+            return self.repo.create(data, raw_hash=None)
+
+        return self.create_snapshot(data)
+
+#==========================================内部函数=================================================
+    def _build_merged_text(self, data: XhsNoteSnapshotCreate) -> str:
+        """合并标题、正文、标签和图片 OCR 文本，生成分析文本。"""
+        parts = [
+            data.title or "",
+            data.content or "",
+            " ".join(data.tags),
+            data.image_ocr_text or "",
+        ]
+        return "\n".join([part for part in parts if part.strip()])
+
     def _build_raw_hash(self, data: XhsNoteSnapshotCreate) -> str:
         """根据核心内容生成哈希，用于判断内容是否变化。"""
-        raw_text = "|".join([data.note_url, data.title or "", data.content or "", ",".join(data.tags)])
+        raw_text = "|".join([
+            data.note_url,
+            data.title or "",
+            data.content or "",
+            ",".join(data.tags),
+            ",".join(data.image_urls),
+            data.image_ocr_text or "",
+        ])
         return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()

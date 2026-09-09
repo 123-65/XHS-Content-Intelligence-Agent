@@ -28,6 +28,7 @@
         <el-menu-item index="/metrics"><LineChart :size="18" /><span>效果复盘</span></el-menu-item>
         <el-menu-item index="/strategy"><BrainCircuit :size="18" /><span>策略记忆</span></el-menu-item>
         <el-menu-item index="/workflow-logs"><TerminalSquare :size="18" /><span>运行日志</span></el-menu-item>
+        <el-menu-item index="/developer/agent-trace"><Bug :size="18" /><span>Trace 控制台</span></el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -52,6 +53,7 @@
 <script setup lang="ts">
 import {
   BrainCircuit,
+  Bug,
   ChartColumn,
   FlaskConical,
   Library,
