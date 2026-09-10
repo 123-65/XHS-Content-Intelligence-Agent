@@ -1,8 +1,56 @@
 from fastapi.testclient import TestClient
 
+from app.core.database import SessionLocal
+from app.llm.errors import LLMError, LLMOutputParseError, LLMSchemaValidationError
 from app.main import app
+from app.models.review_report import ReviewReport
+from app.schemas.llm import LLMStructuredResult, LLMUsage
+from app.schemas.provider_status import ProviderErrorCode
+from app.schemas.review_report import DraftReviewResult, ReviewIssue
 
 client = TestClient(app)
+
+
+def count_review_reports(draft_id: int) -> int:
+    with SessionLocal() as db:
+        return db.query(ReviewReport).filter(ReviewReport.draft_id == draft_id).count()
+
+
+def fake_review_result() -> DraftReviewResult:
+    return DraftReviewResult(
+        passed=True,
+        score=91,
+        quality_score=92,
+        conversion_score=88,
+        evidence_usage_score=90,
+        risk_level="LOW",
+        issues=[ReviewIssue(field="title", level="LOW", message="Title can be slightly shorter.")],
+        suggestions=["Keep the examples concrete.", "Make the CTA natural."],
+        summary="Real LLM review passed with minor suggestions.",
+    )
+
+
+class FakeReviewLLMClient:
+    def generate_structured(self, *args, **kwargs) -> LLMStructuredResult:
+        data = fake_review_result()
+        return LLMStructuredResult(
+            data=data,
+            text=data.model_dump_json(),
+            model="qwen-plus",
+            provider="qwen",
+            usage=LLMUsage(prompt_tokens=12, completion_tokens=18, total_tokens=30),
+            estimated_cost=0,
+            raw_response_id="fake-real-review-response",
+            is_mock=False,
+        )
+
+
+class FailingReviewLLMClient:
+    def __init__(self, exc: LLMError):
+        self.exc = exc
+
+    def generate_structured(self, *args, **kwargs):
+        raise self.exc
 
 
 def create_test_account() -> int:
@@ -69,6 +117,67 @@ def test_review_content_draft_with_mock():
 
     draft_response = client.get(f"/drafts/{draft_id}")
     assert draft_response.json()["data"]["status"] in {"REVIEW_PASSED", "REVIEW_FAILED"}
+
+
+def test_review_content_draft_default_uses_real_llm_schema(monkeypatch):
+    draft_id = create_test_draft()
+    monkeypatch.setattr("app.services.review_report_sev.LLMClient", FakeReviewLLMClient)
+
+    response = client.post("/reviews/draft", json={"draft_id": draft_id})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["draft_id"] == draft_id
+    assert data["summary"] == "Real LLM review passed with minor suggestions."
+    assert data["raw_response_id"] == "fake-real-review-response"
+    assert data["total_tokens"] == 30
+    assert count_review_reports(draft_id) == 1
+
+
+def test_review_content_draft_llm_config_missing_does_not_create_report(monkeypatch):
+    draft_id = create_test_draft()
+    monkeypatch.setattr(
+        "app.services.review_report_sev.LLMClient",
+        lambda: FailingReviewLLMClient(LLMError(f"{ProviderErrorCode.LLM_CONFIG_MISSING.value}: missing api key")),
+    )
+
+    response = client.post("/reviews/draft", json={"draft_id": draft_id})
+
+    assert response.status_code == 500
+    assert ProviderErrorCode.LLM_CONFIG_MISSING.value in response.json()["message"]
+    assert count_review_reports(draft_id) == 0
+
+
+def test_review_content_draft_invalid_json_does_not_create_report(monkeypatch):
+    draft_id = create_test_draft()
+    monkeypatch.setattr(
+        "app.services.review_report_sev.LLMClient",
+        lambda: FailingReviewLLMClient(
+            LLMOutputParseError(f"{ProviderErrorCode.LLM_OUTPUT_PARSE_FAILED.value}: LLM output is not valid JSON")
+        ),
+    )
+
+    response = client.post("/reviews/draft", json={"draft_id": draft_id})
+
+    assert response.status_code == 500
+    assert ProviderErrorCode.LLM_OUTPUT_PARSE_FAILED.value in response.json()["message"]
+    assert count_review_reports(draft_id) == 0
+
+
+def test_review_content_draft_schema_invalid_does_not_create_report(monkeypatch):
+    draft_id = create_test_draft()
+    monkeypatch.setattr(
+        "app.services.review_report_sev.LLMClient",
+        lambda: FailingReviewLLMClient(
+            LLMSchemaValidationError(f"{ProviderErrorCode.LLM_SCHEMA_INVALID.value}: LLM output does not match target schema")
+        ),
+    )
+
+    response = client.post("/reviews/draft", json={"draft_id": draft_id})
+
+    assert response.status_code == 500
+    assert ProviderErrorCode.LLM_SCHEMA_INVALID.value in response.json()["message"]
+    assert count_review_reports(draft_id) == 0
 
 
 def test_list_review_reports_by_draft():
