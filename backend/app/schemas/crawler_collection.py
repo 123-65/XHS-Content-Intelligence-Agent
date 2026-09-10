@@ -52,9 +52,9 @@ class CompetitorAccountCreate(BaseModel):
     bio: str | None = None
     follower_count: int | None = None
     note_count: int | None = None
-    source_type: str = "SEED_SAMPLE"
-    provider_name: str = "seed_sample"
-    is_mock: bool = True
+    source_type: str = "UNKNOWN"
+    provider_name: str = "unknown"
+    is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
     raw_snapshot: dict = Field(default_factory=dict)
 
@@ -73,9 +73,9 @@ class CompetitorNoteCreate(BaseModel):
     like_count: int | None = None
     collect_count: int | None = None
     comment_count: int | None = None
-    source_type: str = "SEED_SAMPLE"
-    provider_name: str = "seed_sample"
-    is_mock: bool = True
+    source_type: str = "UNKNOWN"
+    provider_name: str = "unknown"
+    is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
     raw_snapshot: dict = Field(default_factory=dict)
 
@@ -89,9 +89,9 @@ class CompetitorCommentCreate(BaseModel):
     user_name: str | None = None
     content: str
     like_count: int | None = None
-    source_type: str = "SEED_SAMPLE"
-    provider_name: str = "seed_sample"
-    is_mock: bool = True
+    source_type: str = "UNKNOWN"
+    provider_name: str = "unknown"
+    is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
     raw_snapshot: dict = Field(default_factory=dict)
 
@@ -172,8 +172,8 @@ class CrawlerProviderResult(BaseModel):
     accounts: list[CompetitorAccountCreate] = Field(default_factory=list)
     notes: list[CompetitorNoteCreate] = Field(default_factory=list)
     comments: list[CompetitorCommentCreate] = Field(default_factory=list)
-    provider_name: str = "seed_sample"
-    source_type: str = "SEED_SAMPLE"
-    is_mock: bool = True
+    provider_name: str = "UNKNOWN"
+    source_type: str = "unknown"
+    is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
     error_message: str | None = None

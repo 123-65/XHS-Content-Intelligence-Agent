@@ -206,3 +206,44 @@ def test_manual_provider_crawl_task_flow():
     assert accounts[0]["source_type"] == "MANUAL"
     assert notes[0]["source_type"] == "MANUAL"
     assert notes[0]["raw_snapshot"]["note_id"] == "manual-note-1"
+
+
+def test_competitor_create_schema_defaults_are_not_seed_sample():
+    """测试竞品采集创建对象默认不再标记为 SeedSample。"""
+    from app.schemas.crawler_collection import CompetitorNoteCreate
+
+    data = CompetitorNoteCreate(
+        account_id=1,
+        note_id="note-default-source-001",
+        note_url="https://www.xiaohongshu.com/explore/default-source",
+        title="默认来源测试",
+        content="测试缺省来源字段不应是 seed_sample。",
+    )
+
+    assert data.source_type != "SEED_SAMPLE"
+    assert data.provider_name != "seed_sample"
+    assert data.is_mock is False
+
+
+def test_competitor_account_and_comment_defaults_are_not_seed_sample():
+    """测试账号和评论默认来源不再是 SeedSample。"""
+    from app.schemas.crawler_collection import CompetitorAccountCreate, CompetitorCommentCreate
+
+    account = CompetitorAccountCreate(
+        account_id=1,
+        xhs_user_id="user-default-source-001",
+        nickname="默认来源账号",
+    )
+    comment = CompetitorCommentCreate(
+        account_id=1,
+        note_id="note-default-source-001",
+        comment_id="comment-default-source-001",
+        content="默认来源评论测试",
+    )
+
+    assert account.source_type != "SEED_SAMPLE"
+    assert account.provider_name != "seed_sample"
+    assert account.is_mock is False
+    assert comment.source_type != "SEED_SAMPLE"
+    assert comment.provider_name != "seed_sample"
+    assert comment.is_mock is False
