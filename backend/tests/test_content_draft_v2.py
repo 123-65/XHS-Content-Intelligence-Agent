@@ -1,7 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.database import SessionLocal
 from app.llm.client import LLMClient
+from app.llm.errors import LLMError
 from app.models.competitor_account import CompetitorAccount
 from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
@@ -189,16 +191,12 @@ def create_experiment(account_id: int) -> int:
     return response.json()["data"]["experiments"][0]["id"]
 
 
-def test_llm_client_uses_mock_without_api_key(monkeypatch):
-    """Ensure the default no-key path uses MockLLMClient."""
+def test_llm_client_requires_real_config_without_api_key(monkeypatch):
+    """Ensure the default no-key path does not implicitly use MockLLMClient."""
     monkeypatch.setattr("app.llm.client.settings.llm_api_key", None)
 
-    result = LLMClient().generate_structured("generate a draft", DraftGenerateV2Result)
-
-    assert result.provider == "mock"
-    assert result.model.startswith("mock-")
-    assert result.data.recommended_title in result.data.title_candidates
-    assert len(result.data.image_script) >= 4
+    with pytest.raises(LLMError, match="LLM_CONFIG_MISSING"):
+        LLMClient().generate_structured("generate a draft", DraftGenerateV2Result)
 
 
 def test_generate_draft_requires_approved_experiment():
@@ -215,6 +213,7 @@ def test_generate_draft_requires_approved_experiment():
 def test_generate_regenerate_and_version_draft(monkeypatch):
     """Generate a draft, regenerate title fields, and create a manual version."""
     monkeypatch.setattr("app.llm.client.settings.llm_api_key", None)
+    monkeypatch.setattr("app.llm.client.settings.llm_provider", "mock")
     account_id = create_account()
     experiment_id = create_experiment(account_id)
     approve_response = client.post(f"/api/experiments/{experiment_id}/approve")

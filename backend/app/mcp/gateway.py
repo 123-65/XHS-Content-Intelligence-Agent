@@ -16,22 +16,44 @@ MCP_DEFAULT_BINDINGS = {
 
 
 class MCPToolGateway:
-    """MCP 工具网关的 Mock 适配实现。"""
+    """MCP 工具网关；默认不返回 Mock 数据，只有显式 demo/test 才允许模拟结果。"""
 
-    def __init__(self, db: Session):
-        """初始化 MCP 工具网关。"""
+    def __init__(self, db: Session, allow_mock: bool = False):
+        """初始化 MCP 工具网关。allow_mock=True 仅用于测试/演示。"""
         self.repo = AgentRunRepository(db)
+        self.allow_mock = allow_mock
 
     def invoke(self, tool_name: str, payload: dict, agent_run_id: int | None = None, agent_step_id: int | None = None) -> ToolResult:
-        """调用白名单内的 Mock MCP 工具。"""
+        """调用 MCP 工具；未接入真实 MCP 时返回结构化失败，不伪装成功。"""
         started_at = datetime.now(UTC)
         binding = self.repo.get_mcp_binding(tool_name)
         config = MCP_DEFAULT_BINDINGS.get(tool_name)
         if not binding and not config:
-            return ToolResult(False, tool_name, error="MCP tool is not whitelisted", metadata={"risk_blocked": True})
+            metadata = self._blocked_metadata(tool_name)
+            result = ToolResult(False, tool_name, error="MCP_TOOL_NOT_WHITELISTED", metadata=metadata)
+            self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, metadata, binding)
+            return result
+
         metadata = self._metadata(tool_name, binding, config)
-        result = ToolResult(True, tool_name, self._mock_payload(tool_name, payload), metadata=metadata)
-        self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, metadata, binding)
+        if self.allow_mock:
+            result = ToolResult(True, tool_name, self._mock_payload(tool_name, payload), metadata={**metadata, "mock": True, "mock_used": True, "run_mode": "DEMO"})
+            self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, result.metadata, binding)
+            return result
+
+        result = ToolResult(
+            False,
+            tool_name,
+            {
+                "error_code": "MCP_NOT_CONFIGURED",
+                "data_status": "NOT_PROVIDED",
+                "warning_message": "MCP 数据源未配置，当前没有可用真实工具调用结果。",
+                "suggestion": "请配置真实 MCP 服务，或改用手动录入真实公开样本。",
+                "can_continue": False,
+            },
+            error="MCP_NOT_CONFIGURED",
+            metadata={**metadata, "mock": False, "mock_used": False, "data_status": "NOT_PROVIDED"},
+        )
+        self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, result.metadata, binding)
         return result
 
     def _metadata(self, tool_name: str, binding, config: dict | None) -> dict:
@@ -42,11 +64,22 @@ class MCPToolGateway:
             "risk_level": getattr(binding, "risk_level", None) or source.get("risk_level", "LOW"),
             "requires_confirmation": getattr(binding, "requires_confirmation", None) if binding else source.get("requires_confirmation", False),
             "fallback_tool_name": getattr(binding, "fallback_tool_name", None) or source.get("fallback_tool_name"),
-            "mock": True,
+        }
+
+    def _blocked_metadata(self, tool_name: str) -> dict:
+        """构造 MCP 工具未授权时的元数据。"""
+        return {
+            "tool_name": tool_name,
+            "risk_level": "HIGH",
+            "requires_confirmation": True,
+            "fallback_tool_name": None,
+            "mock": False,
+            "mock_used": False,
+            "risk_blocked": True,
         }
 
     def _mock_payload(self, tool_name: str, payload: dict) -> dict:
-        """生成 Mock MCP 工具输出。"""
+        """生成测试/演示专用的 Mock MCP 工具输出，生产默认链路不会调用。"""
         builders = {
             "web_search": lambda item: {"query": item.get("query"), "results": [{"title": "mock result", "url": "mock://web-search", "summary": "Mock search result"}]},
             "page_reader": lambda item: {"url": item.get("url"), "text": "Mock page reader content"},

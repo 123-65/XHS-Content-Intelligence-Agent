@@ -8,6 +8,7 @@ from app.agent.tools.registry import ToolRegistry
 from app.agent.workflows.content_experiment import ContentExperimentWorkflow
 from app.core.database import SessionLocal
 from app.main import app
+from app.mcp.gateway import MCPToolGateway
 from app.models.account import AccountProfile
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
@@ -177,24 +178,31 @@ def test_mcp_tool_requires_confirmation_stops_run():
 
 def test_mcp_mock_tool_records_call_log():
     """测试 MCP Mock 工具成功调用会写入调用日志。"""
-    account_id = create_account()
-    request = WorkflowRunRequest(
-        workflow_name="MCPSearchWorkflow",
-        account_id=account_id,
-        steps=[WorkflowStepSpec(tool_name="web_search", payload={"query": "AI Agent content experiment"})],
-        max_steps=3,
-        max_retry=1,
-    )
-
     with SessionLocal() as db:
-        response = AgentRuntime(db).run(request)
-        log = db.query(MCPToolCallLog).filter(MCPToolCallLog.agent_run_id == response.id).one()
+        result = MCPToolGateway(db, allow_mock=True).invoke("web_search", {"query": "AI Agent content experiment"})
+        log = db.query(MCPToolCallLog).filter(MCPToolCallLog.tool_name == "web_search").order_by(MCPToolCallLog.id.desc()).first()
 
-    assert response.status == "SUCCESS"
-    assert response.steps[0].tool_type == "MCP"
+    assert result.ok is True
+    assert result.metadata["mock"] is True
+    assert result.metadata["mock_used"] is True
+    assert result.metadata["run_mode"] == "DEMO"
+    assert result.data["results"][0]["url"] == "mock://web-search"
     assert log.tool_name == "web_search"
     assert log.status == "SUCCESS"
-    assert log.agent_step_id == response.steps[0].id
+    assert log.output_payload["metadata"]["mock_used"] is True
+
+
+def test_mcp_gateway_default_returns_not_configured_without_mock():
+    """测试 MCP 网关默认不返回 Mock 数据。"""
+    with SessionLocal() as db:
+        result = MCPToolGateway(db).invoke("web_search", {"query": "AI Agent"})
+
+    assert result.ok is False
+    assert result.error == "MCP_NOT_CONFIGURED"
+    assert result.metadata["mock_used"] is False
+    assert result.metadata["mock"] is False
+    assert result.data["data_status"] == "NOT_PROVIDED"
+    assert "mock://web-search" not in str(result.model_dump()).lower()
 
 
 def test_strategy_memory_usage_is_recorded_by_tool():
