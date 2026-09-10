@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 from app.crawler.providers.factory import PROVIDER_ORDER, get_collection_provider, get_provider_chain
 from app.crawler.providers.manual_snapshot_provider import ManualSnapshotProvider
 from app.crawler.providers.mcp_xhs_provider import MCPXhsProvider
+from app.crawler.providers.readonly_xhs_provider import ReadOnlyXhsProvider
+from app.crawler.providers.seed_sample import SeedSampleProvider
 from app.main import app
+from app.schemas.provider_status import ProviderSourceType
 from app.services.provider_health_sev import ProviderHealthService
 
 client = TestClient(app)
@@ -101,13 +104,28 @@ def test_seed_sample_provider_requires_explicit_selection():
     assert get_collection_provider("seed_sample").name == "seed_sample"
 
 
-def test_provider_health_does_not_recommend_seed_sample_fallback():
+def test_seed_sample_provider_keeps_explicit_mock_source_type():
+    """SeedSampleProvider 显式标记为测试样本数据。"""
+    task = SimpleNamespace(id=1, account_id=1, keyword="AI Agent", input_payload={})
+
+    result = SeedSampleProvider().collect(task)
+
+    assert result.provider_name == "seed_sample"
+    assert result.source_type == ProviderSourceType.SEED_SAMPLE.value
+    assert result.is_mock is True
+
+
+def test_provider_health_does_not_recommend_seed_sample_fallback(monkeypatch):
     """Provider health 不再把 seed_sample 作为生产兜底。"""
+    from app.schemas.provider_status import ProviderErrorCode
+
+    monkeypatch.setattr("app.services.provider_health_sev.settings.xhs_crawler_provider", "mcp_xhs")
     crawler_health = ProviderHealthService().health()["crawler"]
 
     assert crawler_health["fallback_provider"] == "manual_snapshot"
     assert "seed_sample" not in crawler_health["provider_order"]
     assert "seed_sample" not in crawler_health["suggestion"]
+    assert ProviderErrorCode.MCP_NOT_CONFIGURED.value in crawler_health["status_codes"]
 
 
 def test_mcp_provider_not_configured_does_not_return_mock_data():
@@ -124,6 +142,38 @@ def test_manual_snapshot_empty_input_requires_real_sample():
 
     with pytest.raises(ValueError, match="MANUAL_SNAPSHOT_REQUIRED"):
         ManualSnapshotProvider().collect(task)
+
+
+def test_manual_snapshot_provider_uses_manual_source_type():
+    """manual_snapshot 返回手动真实样本来源。"""
+    task = SimpleNamespace(
+        id=1,
+        account_id=1,
+        keyword="AI Agent",
+        input_payload={"notes": [{"title": "手动样本", "content": "真实公开样本"}]},
+    )
+
+    result = ManualSnapshotProvider().collect(task)
+
+    assert result.source_type == ProviderSourceType.MANUAL.value
+    assert result.is_mock is False
+    assert result.notes[0].source_type == ProviderSourceType.MANUAL.value
+
+
+def test_readonly_provider_uses_public_readonly_source_type():
+    """ReadOnlyXhsProvider 返回公开只读来源。"""
+    task = SimpleNamespace(
+        id=1,
+        account_id=1,
+        keyword="AI Agent",
+        input_payload={"public_snapshot": {"notes": [{"title": "公开样本", "content": "真实公开笔记"}]}},
+    )
+
+    result = ReadOnlyXhsProvider().collect(task)
+
+    assert result.source_type == ProviderSourceType.XHS_PUBLIC_READONLY.value
+    assert result.is_mock is False
+    assert result.notes[0].source_type == ProviderSourceType.XHS_PUBLIC_READONLY.value
 
 
 def test_default_crawler_task_without_real_input_does_not_use_seed_sample():
@@ -257,6 +307,11 @@ def test_provider_status_enums_keep_expected_values():
     assert DataStatus.NOT_PROVIDED.value == "NOT_PROVIDED"
     assert ProviderSourceType.SEED_SAMPLE.value == "SEED_SAMPLE"
     assert ProviderSourceType.UNKNOWN.value == "UNKNOWN"
+    assert ProviderSourceType.XHS_PUBLIC_READONLY.value == "XHS_PUBLIC_READONLY"
+    assert ProviderSourceType.MANUAL.value == "MANUAL"
     assert ProviderErrorCode.MCP_NOT_CONFIGURED.value == "MCP_NOT_CONFIGURED"
+    assert ProviderErrorCode.MCP_CALL_FAILED.value == "MCP_CALL_FAILED"
+    assert ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value == "LLM_PROVIDER_UNAVAILABLE"
+    assert ProviderErrorCode.MANUAL_SNAPSHOT_REQUIRED.value == "MANUAL_SNAPSHOT_REQUIRED"
     assert ProviderErrorCode.COLLECTION_FAILED.value == "COLLECTION_FAILED"
     assert ProviderErrorCode.LLM_CONFIG_MISSING.value == "LLM_CONFIG_MISSING"

@@ -1,6 +1,7 @@
 from app.core.config import settings
 from app.crawler.providers.factory import DEMO_PROVIDER_NAMES, PROVIDERS, PROVIDER_ORDER
 from app.llm.router import llm_health
+from app.schemas.provider_status import ProviderErrorCode
 
 
 class ProviderHealthService:
@@ -25,9 +26,9 @@ class ProviderHealthService:
         is_demo_provider = active in DEMO_PROVIDER_NAMES
         status_codes = []
         if active == "mcp_xhs":
-            status_codes.append("MCP_NOT_CONFIGURED")
+            status_codes.append(ProviderErrorCode.MCP_NOT_CONFIGURED.value)
         if is_demo_provider:
-            status_codes.append("MANUAL_SNAPSHOT_REQUIRED")
+            status_codes.append(ProviderErrorCode.MANUAL_SNAPSHOT_REQUIRED.value)
         return {
             "active_provider": provider.name,
             "available": not is_demo_provider,

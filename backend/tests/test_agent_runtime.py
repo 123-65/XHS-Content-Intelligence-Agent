@@ -4,9 +4,12 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from app.agent.runtime import AgentRuntime
+from app.agent.policies.fallback import FallbackPolicy
+from app.agent.tools.base import ToolDefinition
 from app.agent.tools.registry import ToolRegistry
 from app.agent.workflows.content_experiment import ContentExperimentWorkflow
 from app.core.database import SessionLocal
+from app.enums.agent import ToolType
 from app.main import app
 from app.mcp.gateway import MCPToolGateway
 from app.models.account import AccountProfile
@@ -17,6 +20,7 @@ from app.models.mcp_tool_call_log import MCPToolCallLog
 from app.models.strategy_memory import StrategyMemory
 from app.models.strategy_memory_usage import StrategyMemoryUsage
 from app.schemas.agent import WorkflowRunRequest, WorkflowStepSpec
+from app.schemas.provider_status import ProviderErrorCode
 
 client = TestClient(app)
 
@@ -153,6 +157,22 @@ def test_tool_registry_contains_local_mcp_and_fallback_tools():
         names = {tool.name for tool in ToolRegistry(db).list_tools()}
 
     assert required_tools <= names
+
+
+def test_fallback_policy_matches_provider_error_codes():
+    """测试 fallback 策略可以识别统一 ProviderErrorCode。"""
+    tool = ToolDefinition(
+        name="list_competitor_notes",
+        tool_type=ToolType.LOCAL.value,
+        handler=lambda payload: None,
+        description="测试工具",
+        fallback_tool_name=None,
+    )
+    policy = FallbackPolicy()
+
+    assert policy.fallback_for(tool, ValueError(ProviderErrorCode.COLLECTION_FAILED.value)) == "collection_failed_fallback"
+    assert policy.fallback_for(tool, ValueError(ProviderErrorCode.LLM_OUTPUT_FAILED.value)) == "llm_output_failed_fallback"
+    assert policy.fallback_for(tool, ValueError(ProviderErrorCode.MCP_CALL_FAILED.value)) == "mcp_call_failed_fallback"
 
 
 def test_mcp_tool_requires_confirmation_stops_run():
