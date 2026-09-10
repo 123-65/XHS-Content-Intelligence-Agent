@@ -13,6 +13,7 @@ from app.repositories.crawler_collection_repo import CrawlerCollectionRepository
 from app.repositories.post_publish_repo import PostPublishRepository
 from app.schemas.confirmation import ConfirmationTaskCreate
 from app.schemas.content_draft_v2 import ContentDraftV2Create
+from app.schemas.provider_status import DataStatus, ProviderErrorCode
 from app.schemas.post_publish import CollectMetricsRequest, ReviewCreate
 from app.services.confirmation_sev import ConfirmationService
 from app.services.content_draft_v2_sev import ContentDraftV2Service
@@ -81,17 +82,17 @@ class LocalToolRegistry:
                     "notes": [],
                     "data_quality": "EMPTY",
                     "reason": "NO_COMPETITOR_NOTES",
-                    "error_code": "COLLECTION_FAILED",
-                    "data_status": "NOT_PROVIDED",
+                    "error_code": ProviderErrorCode.COLLECTION_FAILED.value,
+                    "data_status": DataStatus.NOT_PROVIDED.value,
                     "can_continue": False,
                     "action": "COLLECT_COMPETITOR_NOTES",
                     "hint": "当前账号暂无竞品笔记，请先通过 MCP 采集或手动录入真实样本后再做竞品分析。",
                     "suggestion": "请先通过 MCP 采集或手动录入 10-30 条真实公开笔记样本。",
                 },
-                error="COLLECTION_FAILED",
+                error=ProviderErrorCode.COLLECTION_FAILED.value,
                 metadata={
                     "business_state": True,
-                    "data_status": "NOT_PROVIDED",
+                    "data_status": DataStatus.NOT_PROVIDED.value,
                     "mock_used": False,
                 },
             )
@@ -101,7 +102,7 @@ class LocalToolRegistry:
             {
                 "count": len(notes),
                 "notes": [self._snapshot(item) for item in notes],
-                "data_status": "REAL",
+                "data_status": DataStatus.REAL.value,
             },
             metadata={"mock_used": False},
         )

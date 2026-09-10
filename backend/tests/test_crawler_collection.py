@@ -247,3 +247,16 @@ def test_competitor_account_and_comment_defaults_are_not_seed_sample():
     assert comment.source_type != "SEED_SAMPLE"
     assert comment.provider_name != "seed_sample"
     assert comment.is_mock is False
+
+
+def test_provider_status_enums_keep_expected_values():
+    """测试 Provider 状态枚举值保持稳定，避免错误码被随意改名。"""
+    from app.schemas.provider_status import DataStatus, ProviderErrorCode, ProviderSourceType
+
+    assert DataStatus.REAL.value == "REAL"
+    assert DataStatus.NOT_PROVIDED.value == "NOT_PROVIDED"
+    assert ProviderSourceType.SEED_SAMPLE.value == "SEED_SAMPLE"
+    assert ProviderSourceType.UNKNOWN.value == "UNKNOWN"
+    assert ProviderErrorCode.MCP_NOT_CONFIGURED.value == "MCP_NOT_CONFIGURED"
+    assert ProviderErrorCode.COLLECTION_FAILED.value == "COLLECTION_FAILED"
+    assert ProviderErrorCode.LLM_CONFIG_MISSING.value == "LLM_CONFIG_MISSING"

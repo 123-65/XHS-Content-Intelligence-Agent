@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.provider_status import ProviderSourceType
+
 
 CrawlTaskStatus = Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"]
 CrawlerProviderName = Literal["readonly_xhs", "mcp_xhs", "manual_snapshot", "seed_sample", "manual"]
@@ -52,7 +54,7 @@ class CompetitorAccountCreate(BaseModel):
     bio: str | None = None
     follower_count: int | None = None
     note_count: int | None = None
-    source_type: str = "UNKNOWN"
+    source_type: str = ProviderSourceType.UNKNOWN.value
     provider_name: str = "unknown"
     is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
@@ -73,7 +75,7 @@ class CompetitorNoteCreate(BaseModel):
     like_count: int | None = None
     collect_count: int | None = None
     comment_count: int | None = None
-    source_type: str = "UNKNOWN"
+    source_type: str = ProviderSourceType.UNKNOWN.value
     provider_name: str = "unknown"
     is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
@@ -89,7 +91,7 @@ class CompetitorCommentCreate(BaseModel):
     user_name: str | None = None
     content: str
     like_count: int | None = None
-    source_type: str = "UNKNOWN"
+    source_type: str = ProviderSourceType.UNKNOWN.value
     provider_name: str = "unknown"
     is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
@@ -173,7 +175,7 @@ class CrawlerProviderResult(BaseModel):
     notes: list[CompetitorNoteCreate] = Field(default_factory=list)
     comments: list[CompetitorCommentCreate] = Field(default_factory=list)
     provider_name: str = "UNKNOWN"
-    source_type: str = "unknown"
+    source_type: str = ProviderSourceType.UNKNOWN.value
     is_mock: bool = False
     confidence: float = Field(default=0.8, ge=0, le=1)
     error_message: str | None = None

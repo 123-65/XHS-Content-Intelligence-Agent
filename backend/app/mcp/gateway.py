@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.agent.tools.base import ToolResult
 from app.repositories.agent_run_repo import AgentRunRepository
+from app.schemas.provider_status import DataStatus, ProviderErrorCode
 
 
 MCP_DEFAULT_BINDINGS = {
@@ -30,7 +31,7 @@ class MCPToolGateway:
         config = MCP_DEFAULT_BINDINGS.get(tool_name)
         if not binding and not config:
             metadata = self._blocked_metadata(tool_name)
-            result = ToolResult(False, tool_name, error="MCP_TOOL_NOT_WHITELISTED", metadata=metadata)
+            result = ToolResult(False, tool_name, error=ProviderErrorCode.MCP_TOOL_NOT_WHITELISTED.value, metadata=metadata)
             self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, metadata, binding)
             return result
 
@@ -44,14 +45,14 @@ class MCPToolGateway:
             False,
             tool_name,
             {
-                "error_code": "MCP_NOT_CONFIGURED",
-                "data_status": "NOT_PROVIDED",
+                "error_code": ProviderErrorCode.MCP_NOT_CONFIGURED.value,
+                "data_status": DataStatus.NOT_PROVIDED.value,
                 "warning_message": "MCP 数据源未配置，当前没有可用真实工具调用结果。",
                 "suggestion": "请配置真实 MCP 服务，或改用手动录入真实公开样本。",
                 "can_continue": False,
             },
-            error="MCP_NOT_CONFIGURED",
-            metadata={**metadata, "mock": False, "mock_used": False, "data_status": "NOT_PROVIDED"},
+            error=ProviderErrorCode.MCP_NOT_CONFIGURED.value,
+            metadata={**metadata, "mock": False, "mock_used": False, "data_status": DataStatus.NOT_PROVIDED.value},
         )
         self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, result.metadata, binding)
         return result
