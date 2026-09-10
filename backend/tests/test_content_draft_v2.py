@@ -9,11 +9,52 @@ from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
 from app.models.prompt_run_log import PromptRunLog
 from app.models.prompt_template import PromptTemplate
+from app.schemas.llm import LLMStructuredResult, LLMUsage
 from app.schemas.content_draft_v2 import DraftGenerateV2Result
 from app.services.content_draft_v2_sev import ContentDraftV2Service
 from app.main import app
 
 client = TestClient(app)
+
+
+def fake_draft_v2_result() -> DraftGenerateV2Result:
+    return DraftGenerateV2Result.model_validate(
+        {
+            "title_candidates": [
+                "Real LLM title one",
+                "Real LLM title two",
+                "Real LLM title three",
+            ],
+            "recommended_title": "Real LLM title one",
+            "cover_text": "Real LLM cover",
+            "cover_subtitle": "Real LLM subtitle",
+            "body_text": "Real LLM generated body with concrete project advice.",
+            "image_script": [
+                {"index": 1, "title": "Problem", "content": "Explain the learner pain point.", "visual_hint": "Cover"},
+                {"index": 2, "title": "Path", "content": "Show the implementation path.", "visual_hint": "Flow"},
+                {"index": 3, "title": "Proof", "content": "Connect evidence to the draft.", "visual_hint": "Evidence list"},
+                {"index": 4, "title": "Next", "content": "Close with a practical next step.", "visual_hint": "Checklist"},
+            ],
+            "tag_list": ["AI Agent", "project"],
+            "keyword_list": ["content draft", "real llm"],
+            "cta_text": "Save this and compare it with your project plan.",
+        }
+    )
+
+
+class FakeDraftV2LLMClient:
+    def generate_structured_with_context(self, *args, **kwargs) -> LLMStructuredResult:
+        data = fake_draft_v2_result()
+        return LLMStructuredResult(
+            data=data,
+            text=data.model_dump_json(),
+            model="qwen-plus",
+            provider="qwen",
+            usage=LLMUsage(prompt_tokens=11, completion_tokens=22, total_tokens=33),
+            estimated_cost=0,
+            raw_response_id="fake-real-draft-v2-response",
+            is_mock=False,
+        )
 
 
 def create_account() -> int:
@@ -212,8 +253,7 @@ def test_generate_draft_requires_approved_experiment():
 
 def test_generate_regenerate_and_version_draft(monkeypatch):
     """Generate a draft, regenerate title fields, and create a manual version."""
-    monkeypatch.setattr("app.llm.client.settings.llm_api_key", None)
-    monkeypatch.setattr("app.llm.client.settings.llm_provider", "mock")
+    monkeypatch.setattr("app.services.content_draft_v2_sev.LLMClient", FakeDraftV2LLMClient)
     account_id = create_account()
     experiment_id = create_experiment(account_id)
     approve_response = client.post(f"/api/experiments/{experiment_id}/approve")
@@ -235,6 +275,7 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
     assert draft["tag_list"]
     assert draft["keyword_list"]
     assert draft["cta_text"]
+    assert draft["raw_response_id"] == "fake-real-draft-v2-response"
     assert draft["generation_context_record"]["account_id"] == account_id
     assert draft["generation_context_record"]["experiment_id"] == experiment_id
     assert draft["versions"][0]["regenerate_scope"] == "all"
@@ -249,6 +290,14 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
         assert template.template_path == "backend/app/prompts/xhs_draft_v2.py"
         log_count = db.query(PromptRunLog).filter(PromptRunLog.prompt_name == "xhs_draft_generation").count()
         assert log_count >= 1
+        latest_log = (
+            db.query(PromptRunLog)
+            .filter(PromptRunLog.prompt_name == "xhs_draft_generation")
+            .order_by(PromptRunLog.id.desc())
+            .first()
+        )
+        assert latest_log.provider == "qwen"
+        assert latest_log.is_mock is False
 
     regenerate_response = client.post(
         f"/api/drafts/{draft_id}/regenerate",
