@@ -1,4 +1,6 @@
-from sqlalchemy import select
+import re
+
+from sqlalchemy import Text, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.account import AccountProfile
@@ -27,12 +29,52 @@ class CompetitorReportRepository:
         return list(self.db.execute(stmt).scalars().all())
 
     def list_competitor_notes(self, account_id: int, keyword: str | None, limit: int) -> list[CompetitorNote]:
-        """查询账号下的竞品笔记快照。"""
-        stmt = select(CompetitorNote).where(CompetitorNote.account_id == account_id)
-        if keyword:
-            stmt = stmt.where(CompetitorNote.title.ilike(f"%{keyword}%") | CompetitorNote.content.ilike(f"%{keyword}%"))
-        stmt = stmt.order_by(CompetitorNote.id.desc()).limit(limit)
+        """查询用于竞品报告的非 Mock 竞品笔记，支持 MCP、ReadOnly 和手动录入来源。"""
+        stmt = select(CompetitorNote).where(
+            CompetitorNote.account_id == account_id,
+            CompetitorNote.is_mock.is_(False),
+        )
+
+        stmt = self._apply_keyword_filter(stmt, keyword)
+
+        stmt = stmt.order_by(
+            CompetitorNote.collect_count.desc().nullslast(),
+            CompetitorNote.like_count.desc().nullslast(),
+            CompetitorNote.id.desc(),
+        ).limit(limit)
+
         return list(self.db.execute(stmt).scalars().all())
+
+    def count_competitor_notes(self, account_id: int, keyword: str | None = None, is_mock: bool | None = None) -> int:
+        """统计账号下竞品笔记数量，用于区分不同空数据原因。"""
+        stmt = select(func.count()).select_from(CompetitorNote).where(CompetitorNote.account_id == account_id)
+        if is_mock is not None:
+            stmt = stmt.where(CompetitorNote.is_mock.is_(is_mock))
+        stmt = self._apply_keyword_filter(stmt, keyword)
+        return int(self.db.execute(stmt).scalar_one())
+
+    def _apply_keyword_filter(self, stmt, keyword: str | None):
+        """按关键词分词过滤标题、正文和标签。"""
+        keyword_terms = self._keyword_terms(keyword)
+        if not keyword_terms:
+            return stmt
+        searchable_fields = (
+            CompetitorNote.title,
+            CompetitorNote.content,
+            cast(CompetitorNote.tags, Text),
+        )
+        return stmt.where(and_(*(self._matches_keyword_term(term, searchable_fields) for term in keyword_terms)))
+
+    def _keyword_terms(self, keyword: str | None) -> list[str]:
+        """拆分关键词，支持类似 'AI Agent' 的多词搜索。"""
+        if not keyword:
+            return []
+        return [term for term in re.split(r"\s+", keyword.strip()) if term]
+
+    def _matches_keyword_term(self, term: str, searchable_fields) -> object:
+        """任一可搜索字段命中关键词分词即可。"""
+        pattern = f"%{term}%"
+        return or_(*(field.ilike(pattern) for field in searchable_fields))
 
     def list_comments_for_notes(self, account_id: int, note_ids: list[int]) -> list[CompetitorComment]:
         """查询竞品笔记下的评论样本。"""

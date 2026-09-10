@@ -14,6 +14,14 @@ from app.repositories.competitor_report_repo import CompetitorReportRepository
 from app.schemas.competitor_report import CompetitorReportCreate
 
 
+class DataAvailabilityError(ValueError):
+    """结构化表达业务数据不可用原因。"""
+
+    def __init__(self, message: str, payload: dict):
+        super().__init__(message)
+        self.payload = payload
+
+
 COMMENT_DEMAND_RULES: dict[CommentDemandType, tuple[str, ...]] = {
     CommentDemandType.ROUTE: ("路线", "顺序", "路径", "怎么学", "从哪开始"),
     CommentDemandType.RESOURCE: ("资料", "资源", "清单", "文档", "书单"),
@@ -70,10 +78,12 @@ class CompetitorReportService:
         accounts = self.repo.list_competitor_accounts(data.account_id)
         notes = self.repo.list_competitor_notes(data.account_id, data.keyword, data.limit)
         if not notes:
-            raise ValueError("没有可用于分析的竞品笔记，请先运行采集任务")
+            state = self._empty_note_state(data.account_id, data.keyword)
+            raise DataAvailabilityError(state["message"], state)
 
         comments = self.repo.list_comments_for_notes(data.account_id, [note.id for note in notes])
         analyses = self._analyze_notes(notes, comments)
+        sample_state = self._sample_state(notes, comments)
         report = CompetitorAnalysisReport(
             account_id=data.account_id,
             name=data.name,
@@ -93,17 +103,91 @@ class CompetitorReportService:
             content_structures=analyses["content_structures"],
             comment_demands=analyses["comment_demands"],
             conversion_signals=analyses["conversion_signals"],
-            replicability_summary=analyses["replicability_summary"],
+            replicability_summary={**analyses["replicability_summary"], **sample_state},
             risk_points=analyses["risk_points"],
             high_performance_notes=analyses["high_performance_notes"],
             content_insights=self._build_insights(analyses),
-            suggestions=self._build_suggestions(analyses),
+            suggestions=[sample_state["hint"], *self._build_suggestions(analyses)] if sample_state["reason"] != "READY" else self._build_suggestions(analyses),
             summary=self._build_summary(notes, comments, analyses),
             status="SUCCESS",
         )
         breakdowns = self._build_breakdowns(notes, comments, analyses)
         opportunities = self._build_opportunities(data, analyses)
         return self.repo.create_report_bundle(report, breakdowns, opportunities)
+
+    def _empty_note_state(self, account_id: int, keyword: str | None) -> dict:
+        """区分报告入口下没有可用笔记的具体业务原因。"""
+        total_count = self.repo.count_competitor_notes(account_id)
+        real_count = self.repo.count_competitor_notes(account_id, is_mock=False)
+        keyword_total_count = self.repo.count_competitor_notes(account_id, keyword=keyword) if keyword else total_count
+        keyword_real_count = self.repo.count_competitor_notes(account_id, keyword=keyword, is_mock=False) if keyword else real_count
+
+        if total_count == 0:
+            reason = "NO_COMPETITOR_NOTES"
+            message = "当前账号暂无竞品笔记，请先采集或手动录入真实样本"
+            action = "COLLECT_COMPETITOR_NOTES"
+            hint = "请先通过真实采集链路或手动录入公开笔记，再创建竞品分析报告。"
+        elif real_count == 0:
+            reason = "ONLY_MOCK_COMPETITOR_NOTES"
+            message = "当前只有 Mock 竞品笔记，不能用于真实竞品分析"
+            action = "REPLACE_WITH_REAL_NOTES"
+            hint = "请补充 MCP、ReadOnly 或手动录入的真实公开笔记样本。"
+        elif keyword and keyword_total_count > 0 and keyword_real_count == 0:
+            reason = "KEYWORD_MATCHED_ONLY_MOCK"
+            message = "当前关键词只命中 Mock 笔记，不能用于真实竞品分析"
+            action = "COLLECT_REAL_NOTES_FOR_KEYWORD"
+            hint = "请围绕该关键词补充真实笔记，或移除关键词查看账号下其他真实样本。"
+        elif keyword:
+            reason = "KEYWORD_NO_MATCH"
+            message = "当前关键词没有命中可用于分析的真实竞品笔记"
+            action = "RELAX_KEYWORD_OR_COLLECT_MORE"
+            hint = "请换一个更宽的关键词，或先采集/录入该关键词下的真实样本。"
+        else:
+            reason = "NO_USABLE_REAL_NOTES"
+            message = "当前没有可用于分析的真实竞品笔记"
+            action = "COLLECT_COMPETITOR_NOTES"
+            hint = "请补充真实公开笔记样本后重试。"
+
+        return {
+            "data_quality": "EMPTY",
+            "reason": reason,
+            "action": action,
+            "message": message,
+            "hint": hint,
+            "can_continue": False,
+            "counts": {
+                "total_count": total_count,
+                "real_count": real_count,
+                "keyword_total_count": keyword_total_count,
+                "keyword_real_count": keyword_real_count,
+            },
+        }
+
+    def _sample_state(self, notes: list[CompetitorNote], comments: list[CompetitorComment]) -> dict:
+        """给可继续分析的样本打质量标记。"""
+        if len(notes) < 3:
+            return {
+                "data_quality": "PARTIAL",
+                "reason": "INSUFFICIENT_SAMPLE",
+                "action": "CONTINUE_WITH_LOW_CONFIDENCE",
+                "hint": "真实竞品笔记少于 3 条，本次报告可生成，但建议补充样本后再做运营决策。",
+                "can_continue": True,
+            }
+        if len(comments) < 3:
+            return {
+                "data_quality": "PARTIAL",
+                "reason": "INSUFFICIENT_COMMENT_SAMPLE",
+                "action": "CONTINUE_WITH_LOW_CONFIDENCE",
+                "hint": "评论样本偏少，评论需求分类只能作为低置信参考。",
+                "can_continue": True,
+            }
+        return {
+            "data_quality": "READY",
+            "reason": "READY",
+            "action": "CONTINUE",
+            "hint": "",
+            "can_continue": True,
+        }
 
     def get_report(self, report_id: int) -> CompetitorAnalysisReport:
         """查询竞品分析报告详情。"""
