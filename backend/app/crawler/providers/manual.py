@@ -21,6 +21,8 @@ class ManualProvider(BaseCrawlerProvider):
         accounts = [self._with_defaults(CompetitorAccountCreate, task.account_id, item) for item in payload.get("accounts", [])]
         notes = [self._with_defaults(CompetitorNoteCreate, task.account_id, item) for item in payload.get("notes", [])]
         comments = [self._with_defaults(CompetitorCommentCreate, task.account_id, item) for item in payload.get("comments", [])]
+        if not accounts and not notes and not comments:
+            raise ValueError("MANUAL_SNAPSHOT_REQUIRED")
         return CrawlerProviderResult(accounts=accounts, notes=notes, comments=comments, provider_name=self.name, source_type=self.source_type, is_mock=self.is_mock, confidence=0.9)
 
     def _with_defaults(self, schema_model, account_id: int, item: dict):

@@ -13,7 +13,7 @@ class CrawlTaskCreate(BaseModel):
 
     account_id: int
     task_type: str = Field(default="COMPETITOR_SEED", max_length=64)
-    provider_name: CrawlerProviderName = "readonly_xhs"
+    provider_name: CrawlerProviderName = "mcp_xhs"
     keyword: str | None = Field(default=None, max_length=128)
     input_payload: dict = Field(default_factory=dict)
 

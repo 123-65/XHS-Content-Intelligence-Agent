@@ -1,6 +1,13 @@
+from types import SimpleNamespace
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app.crawler.providers.factory import PROVIDER_ORDER, get_collection_provider, get_provider_chain
+from app.crawler.providers.manual_snapshot_provider import ManualSnapshotProvider
+from app.crawler.providers.mcp_xhs_provider import MCPXhsProvider
 from app.main import app
+from app.services.provider_health_sev import ProviderHealthService
 
 client = TestClient(app)
 
@@ -74,6 +81,79 @@ def test_seed_sample_crawl_task_flow():
     assert all(note["account_id"] == account_id for note in notes)
     assert all(note["source_type"] == "SEED_SAMPLE" for note in notes)
     assert any("AI Agent" in (note["title"] or "") for note in notes)
+
+
+def test_provider_factory_keeps_seed_sample_out_of_default_chain():
+    """生产默认链路不自动使用 SeedSampleProvider。"""
+    provider_names = [provider.name for provider in get_provider_chain()]
+
+    assert list(PROVIDER_ORDER) == ["mcp_xhs", "readonly_xhs", "manual_snapshot"]
+    assert provider_names == ["mcp_xhs", "readonly_xhs", "manual_snapshot"]
+    assert "seed_sample" not in provider_names
+    assert get_collection_provider().name == "mcp_xhs"
+
+
+def test_seed_sample_provider_requires_explicit_selection():
+    """seed_sample 仅保留给 demo/test 显式指定。"""
+    provider_names = [provider.name for provider in get_provider_chain("seed_sample")]
+
+    assert provider_names == ["seed_sample"]
+    assert get_collection_provider("seed_sample").name == "seed_sample"
+
+
+def test_provider_health_does_not_recommend_seed_sample_fallback():
+    """Provider health 不再把 seed_sample 作为生产兜底。"""
+    crawler_health = ProviderHealthService().health()["crawler"]
+
+    assert crawler_health["fallback_provider"] == "manual_snapshot"
+    assert "seed_sample" not in crawler_health["provider_order"]
+    assert "seed_sample" not in crawler_health["suggestion"]
+
+
+def test_mcp_provider_not_configured_does_not_return_mock_data():
+    """MCP 未配置时返回不可用错误，不生成 mock notes。"""
+    task = SimpleNamespace(id=1, account_id=1, keyword="AI Agent", input_payload={})
+
+    with pytest.raises(ValueError, match="MCP_NOT_CONFIGURED"):
+        MCPXhsProvider().collect(task)
+
+
+def test_manual_snapshot_empty_input_requires_real_sample():
+    """manual_snapshot 空输入属于样本缺失，不视为成功采集。"""
+    task = SimpleNamespace(id=1, account_id=1, keyword="AI Agent", input_payload={})
+
+    with pytest.raises(ValueError, match="MANUAL_SNAPSHOT_REQUIRED"):
+        ManualSnapshotProvider().collect(task)
+
+
+def test_default_crawler_task_without_real_input_does_not_use_seed_sample():
+    """未指定 provider 且缺少真实样本时，不自动落到 seed_sample。"""
+    account_id = create_test_account("默认生产链路测试账号")
+    create_response = client.post(
+        "/api/crawler/tasks",
+        json={
+            "account_id": account_id,
+            "task_type": "COMPETITOR_COLLECTION",
+            "keyword": "AI Agent",
+        },
+    )
+    assert create_response.status_code == 200
+    task_id = create_response.json()["data"]["id"]
+    assert create_response.json()["data"]["provider_name"] == "mcp_xhs"
+
+    run_response = client.post(f"/api/crawler/tasks/{task_id}/run")
+
+    assert run_response.status_code == 200
+    task = run_response.json()["data"]
+    assert task["status"] == "FAILED"
+    assert task["failed_count"] == 1
+    assert task["provider_name"] != "seed_sample"
+    assert "MCP_NOT_CONFIGURED" in task["error_message"]
+    assert "MANUAL_SNAPSHOT_REQUIRED" in task["error_message"]
+    assert "seed_sample" not in task["error_message"]
+
+    notes = client.get(f"/api/competitor/notes?account_id={account_id}").json()["data"]
+    assert notes == []
 
 
 def test_manual_provider_crawl_task_flow():

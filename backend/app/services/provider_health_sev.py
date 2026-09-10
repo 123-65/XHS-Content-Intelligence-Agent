@@ -1,5 +1,5 @@
 from app.core.config import settings
-from app.crawler.providers.factory import PROVIDERS, PROVIDER_ORDER
+from app.crawler.providers.factory import DEMO_PROVIDER_NAMES, PROVIDERS, PROVIDER_ORDER
 from app.llm.router import llm_health
 
 
@@ -22,13 +22,20 @@ class ProviderHealthService:
         """返回 Crawler Provider 健康状态。"""
         active = settings.xhs_crawler_provider if settings.xhs_crawler_provider in PROVIDERS else PROVIDER_ORDER[0]
         provider = PROVIDERS[active]
-        is_mock = active in {"seed_sample", "mcp_xhs"}
+        is_demo_provider = active in DEMO_PROVIDER_NAMES
+        status_codes = []
+        if active == "mcp_xhs":
+            status_codes.append("MCP_NOT_CONFIGURED")
+        if is_demo_provider:
+            status_codes.append("MANUAL_SNAPSHOT_REQUIRED")
         return {
             "active_provider": provider.name,
-            "available": True,
-            "fallback_provider": "seed_sample",
+            "available": not is_demo_provider,
+            "fallback_provider": "manual_snapshot",
             "provider_order": list(PROVIDER_ORDER),
-            "is_mock": is_mock,
+            "is_mock": is_demo_provider,
+            "status_codes": status_codes,
+            "suggestion": "请配置 MCP 数据源，或手动录入真实公开笔记样本。",
             "guardrails": [
                 "no_auto_like",
                 "no_auto_comment",
