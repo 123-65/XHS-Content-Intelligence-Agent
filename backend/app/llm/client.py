@@ -3,28 +3,27 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.context.context_slots import BuiltContext
 from app.llm.errors import LLMError
-from app.llm.providers.mock_provider import MockLLMProvider
 from app.llm.router import build_llm_provider, configured_provider_name
 from app.schemas.llm import LLMResult, LLMStructuredResult
+from app.schemas.provider_status import ProviderErrorCode
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class LLMClient:
-    """Unified LLM client. Business code must call this class only."""
+    """统一 LLM 客户端。业务代码只允许调用此类。"""
 
     def __init__(self, provider_name: str | None = None):
-        """Initialize and select the configured provider, with Mock fallback."""
+        """初始化并选择 LLM Provider；Mock 只能显式指定，真实 Provider 不可用时不自动兜底。"""
         self.requested_provider = configured_provider_name(provider_name)
         self.provider_impl = build_llm_provider(self.requested_provider)
-        self.initial_fallback_from: str | None = None
         if self.provider_impl.is_mock and self.requested_provider != "mock":
-            self.initial_fallback_from = self.requested_provider
+            raise LLMError(f"{ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value}: mock provider cannot be used as implicit fallback")
         if not self.provider_impl.available():
-            self.initial_fallback_from = self.requested_provider
-            self.provider_impl = MockLLMProvider()
+            raise LLMError(f"{ProviderErrorCode.LLM_CONFIG_MISSING.value}: provider {self.requested_provider} is not configured")
         self.model = self.provider_impl.model
         self.provider = self.provider_impl.name
         self.is_mock = self.provider_impl.is_mock
@@ -37,16 +36,15 @@ class LLMClient:
         prompt_key: str | None = None,
         prompt_version: str | None = None,
     ) -> LLMResult:
-        """Generate text and fall back to Mock when the real provider fails."""
+        """生成文本；真实 Provider 失败时抛出错误，不自动回退 Mock。"""
         started_at = perf_counter()
-        fallback_used = self.provider_impl.is_mock and self.requested_provider != "mock"
         try:
             result = self.provider_impl.generate_text(prompt, system_prompt, model)
-            return self._with_metadata(result, started_at, prompt_key, prompt_version, fallback_used, self.initial_fallback_from)
-        except LLMError as exc:
-            return self._mock_text(prompt, system_prompt, model, started_at, prompt_key, prompt_version, str(exc))
+            return self._with_metadata(result, started_at, prompt_key, prompt_version, False)
+        except LLMError:
+            raise
         except Exception as exc:
-            return self._mock_text(prompt, system_prompt, model, started_at, prompt_key, prompt_version, str(exc))
+            raise LLMError(f"{ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value}: {exc}") from exc
 
     def generate_structured(
         self,
@@ -57,17 +55,15 @@ class LLMClient:
         prompt_key: str | None = None,
         prompt_version: str | None = None,
     ) -> LLMStructuredResult:
-        """Generate structured JSON and fall back to Mock when the real provider fails."""
+        """生成结构化 JSON；真实 Provider 失败时抛出错误，不自动回退 Mock。"""
         started_at = perf_counter()
-        fallback_used = self.provider_impl.is_mock and self.requested_provider != "mock"
         try:
             result = self.provider_impl.generate_structured(prompt, schema_model, system_prompt, model)
-            return self._with_metadata(result, started_at, prompt_key, prompt_version, fallback_used, self.initial_fallback_from)
-        except LLMError as exc:
-            return self._mock_structured(prompt, schema_model, system_prompt, model, started_at, prompt_key, prompt_version, str(exc))
+            return self._with_metadata(result, started_at, prompt_key, prompt_version, False)
+        except LLMError:
+            raise
         except Exception as exc:
-            return self._mock_structured(prompt, schema_model, system_prompt, model, started_at, prompt_key, prompt_version, str(exc))
-
+            raise LLMError(f"{ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value}: {exc}") from exc
     def generate_text_with_context(
         self,
         context: BuiltContext,
@@ -75,7 +71,7 @@ class LLMClient:
         prompt_key: str | None = None,
         prompt_version: str | None = None,
     ) -> LLMResult:
-        """Generate text using a governed context snapshot."""
+        """基于受治理的上下文快照生成文本。"""
         return self.generate_text(context.user_prompt, context.system_prompt, model, prompt_key, prompt_version)
 
     def generate_structured_with_context(
@@ -86,39 +82,12 @@ class LLMClient:
         prompt_key: str | None = None,
         prompt_version: str | None = None,
     ) -> LLMStructuredResult:
-        """Generate structured output using a governed context snapshot."""
+        """基于受治理的上下文快照生成结构化输出。"""
         return self.generate_structured(context.user_prompt, schema_model, context.system_prompt, model, prompt_key, prompt_version)
 
     def health(self) -> dict:
-        """Return current active provider health."""
+        """返回当前生效 Provider 的健康状态。"""
         return self.provider_impl.health()
-
-    def _mock_text(
-        self,
-        prompt: str,
-        system_prompt: str | None,
-        model: str | None,
-        started_at: float,
-        prompt_key: str | None,
-        prompt_version: str | None,
-        error_message: str,
-    ) -> LLMResult:
-        result = MockLLMProvider().generate_text(prompt, system_prompt, model)
-        return self._with_metadata(result, started_at, prompt_key, prompt_version, True, self.provider_impl.name, error_message)
-
-    def _mock_structured(
-        self,
-        prompt: str,
-        schema_model: type[T],
-        system_prompt: str | None,
-        model: str | None,
-        started_at: float,
-        prompt_key: str | None,
-        prompt_version: str | None,
-        error_message: str,
-    ) -> LLMStructuredResult:
-        result = MockLLMProvider().generate_structured(prompt, schema_model, system_prompt, model)
-        return self._with_metadata(result, started_at, prompt_key, prompt_version, True, self.provider_impl.name, error_message)
 
     def _with_metadata(
         self,
@@ -126,10 +95,11 @@ class LLMClient:
         started_at: float,
         prompt_key: str | None,
         prompt_version: str | None,
-        fallback_used: bool,
+        fallback_used: bool = False,
         fallback_from: str | None = None,
         error_message: str | None = None,
     ):
+        """为 LLM 结果补充元数据：耗时、prompt 标识、Provider 信息。"""
         latency_ms = max(0, int((perf_counter() - started_at) * 1000))
         return result.model_copy(
             update={

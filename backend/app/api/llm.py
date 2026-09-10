@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.core.response import fail, success
 from app.llm.client import LLMClient
 from app.llm.errors import LLMError
+from app.llm.router import llm_health
 from app.schemas.llm_test import LLMTestAnalysisResult
 
 router = APIRouter(prefix="/llm", tags=["大模型调用"])
@@ -12,6 +13,12 @@ router = APIRouter(prefix="/llm", tags=["大模型调用"])
 def _llm_error(exc: LLMError) -> JSONResponse:
     """返回模型调用错误响应。"""
     return JSONResponse(status_code=500, content=fail(code=500, message=str(exc)).model_dump())
+
+
+@router.get("/health")
+def get_llm_health():
+    """获取 LLM Provider 健康状态。"""
+    return success(llm_health())
 
 
 @router.post("/test-text")
