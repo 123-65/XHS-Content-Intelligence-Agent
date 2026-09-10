@@ -37,15 +37,18 @@ class FallbackToolRegistry:
         }
 
     def _llm_output_failed(self, payload: dict) -> ToolResult:
-        """返回 LLM 输出失败错误，不使用 Mock 文案兜底。"""
+        """返回 LLM 输出失败错误。"""
         return ToolResult(
             False,
             "llm_output_failed_fallback",
             {
+                "fallback_level": "L3",
                 "fallback_reason": "LLM_OUTPUT_FAILED",
                 "error_code": "LLM_OUTPUT_PARSE_FAILED",
                 "data_status": "FAILED",
+                "data_quality": "UNUSABLE",
                 "confidence": "LOW",
+                "hint": "LLM 输出不可用，请检查 Prompt、Schema 或真实 Provider 配置后重试。",
                 "warning_message": "LLM 输出解析失败，系统未生成可用结果。",
                 "suggestion": "请检查 Prompt、输出 Schema 或更换真实 LLM Provider 后重试。",
             },
@@ -63,10 +66,11 @@ class FallbackToolRegistry:
                 "error_code": "MANUAL_SNAPSHOT_REQUIRED",
                 "data_status": "NOT_PROVIDED",
                 "confidence": "LOW",
-                "warning_message": "当前没有可用的真实小红书样本，请手动录入公开笔记快照后再分析。",
-                "suggestion": "请先补充 10-30 条真实小红书公开笔记，包括标题、正文摘要、点赞数、收藏数、评论数和高赞评论。",
+                "warning_message": "当前没有可用的真实小红书样本，系统不会生成模拟数据。",
+                "suggestion": "请先通过 MCP 采集或手动录入 10-30 条真实公开笔记样本。",
+                "can_continue": False,
             },
-            metadata={"fallback_used": True, "mock_used": False},
+            metadata={"fallback_used": True, "mock_used": False, "data_status": "NOT_PROVIDED"},
         )
 
     def _comment_sample_insufficient(self, payload: dict) -> ToolResult:
@@ -75,11 +79,14 @@ class FallbackToolRegistry:
             True,
             "comment_sample_insufficient_fallback",
             {
+                "fallback_level": "L1",
                 "fallback_reason": "COMMENT_SAMPLE_INSUFFICIENT",
                 "error_code": "COMMENT_SAMPLE_MISSING",
                 "data_status": "PARTIAL",
+                "data_quality": "PARTIAL",
                 "demand_type": "UNKNOWN",
                 "confidence": "LOW",
+                "hint": "评论样本不足，需求分类只能作为低置信参考。",
                 "warning_message": "评论样本不足，无法可靠识别用户需求，相关结论仅供参考。",
                 "suggestion": "建议补充至少 10 条真实评论样本后重新分析。",
             },
@@ -92,10 +99,13 @@ class FallbackToolRegistry:
             True,
             "mcp_call_failed_fallback",
             {
+                "fallback_level": "L3",
                 "fallback_reason": "MCP_CALL_FAILED",
                 "error_code": "MCP_PROVIDER_FAILED",
                 "data_status": "FAILED",
+                "data_quality": "UNUSABLE",
                 "confidence": "LOW",
+                "hint": "外部 MCP 数据源调用失败，请稍后重试或检查 Provider 配置。",
                 "warning_message": "MCP 数据源暂时不可用，系统不会生成模拟数据。",
                 "suggestion": "请稍后重试 MCP 数据源，或手动录入真实公开笔记快照。",
             },

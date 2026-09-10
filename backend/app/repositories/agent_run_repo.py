@@ -10,6 +10,7 @@ from app.models.mcp_server_config import MCPServerConfig
 from app.models.mcp_tool_binding import MCPToolBinding
 from app.models.mcp_tool_call_log import MCPToolCallLog
 from app.models.strategy_memory_usage import StrategyMemoryUsage
+from app.enums.agent import AgentStepStatus
 from app.schemas.agent import AgentRunCreate, AgentStepCreate
 
 
@@ -83,6 +84,9 @@ class AgentRunRepository:
         started_at = step.started_at or finished_at
         step.status = status
         step.output_payload = self.trace_governor.govern_payload(output_payload, "agent_step")
+        if status == AgentStepStatus.FALLBACK_USED.value:
+            metadata = output_payload.get("metadata") or {}
+            step.fallback_tool_name = metadata.get("fallback_tool_name") or step.fallback_tool_name
         step.retry_count = retry_count
         step.error_message = self.trace_governor.govern_text(error_message, "agent_step")
         step.finished_at = finished_at

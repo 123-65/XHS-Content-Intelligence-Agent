@@ -74,6 +74,7 @@ def test_content_experiment_workflow_records_run_and_steps():
     assert response.failed_steps == 0
     assert response.llm_call_count == 0
     assert len(response.steps) == 3
+    assert [step.status for step in response.steps] == ["SUCCESS", "FALLBACK_USED", "SUCCESS"]
     assert response.steps[-1].tool_name == "create_content_experiment"
     assert response.steps[-1].step_order == 3
     assert response.steps[-1].step_name == "3. create_content_experiment"
@@ -100,6 +101,25 @@ def test_content_experiment_workflow_records_run_and_steps():
     assert len(steps) == 3
     assert [step["status"] for step in steps] == ["SUCCESS", "FALLBACK_USED", "SUCCESS"]
     assert steps[1]["fallback_used"] is True
+    assert steps[1]["fallback_tool_name"] == "collection_failed_fallback"
+    assert steps[1]["tool_name"] == "list_competitor_notes"
+    assert steps[1]["tool_type"] == "LOCAL"
+    assert steps[1]["requires_confirmation"] is False
+    assert steps[1]["output_payload"]["ok"] is True
+    assert steps[1]["output_payload"]["error"] is None
+    assert steps[1]["error_code"] == "COLLECTION_FAILED"
+    assert steps[1]["output_payload"]["tool_name"] == "collection_failed_fallback"
+    assert steps[1]["output_payload"]["data"]["data_status"] == "NOT_PROVIDED"
+    assert steps[1]["output_payload"]["data"]["fallback_reason"] == "COLLECTION_FAILED"
+    assert steps[1]["output_payload"]["data"]["error_code"] == "MANUAL_SNAPSHOT_REQUIRED"
+    assert steps[1]["output_payload"]["data"]["warning_message"]
+    assert steps[1]["output_payload"]["data"]["suggestion"]
+    assert steps[1]["output_payload"]["data"]["can_continue"] is False
+    assert steps[1]["output_payload"]["metadata"]["fallback_used"] is True
+    assert steps[1]["output_payload"]["metadata"]["mock_used"] is False
+    assert steps[1]["output_payload"]["metadata"]["data_status"] == "NOT_PROVIDED"
+    assert "seed_sample" not in str(steps[1]["output_payload"]).lower()
+    assert "mock_result" not in str(steps[1]["output_payload"]).lower()
     with SessionLocal() as db:
         experiment_id = response.steps[-1].output_payload["data"]["experiment_id"]
         assert db.get(ContentExperiment, experiment_id).status == "CANDIDATE"

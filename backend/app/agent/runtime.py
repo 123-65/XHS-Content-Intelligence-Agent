@@ -106,11 +106,15 @@ class AgentRuntime:
                 if result.ok:
                     return result, retry_count, AgentStepStatus.SUCCESS.value
                 fallback = self.fallback_policy.fallback_for(tool, ValueError(result.error or "tool failed"))
-                return self._fallback_result(fallback, payload, retry_count, result.error)
+                if fallback:
+                    return self._fallback_result(fallback, payload, retry_count, result.error)
+                return result, retry_count, AgentStepStatus.FAILED.value
             except Exception as exc:
                 fallback = self.fallback_policy.fallback_for(tool, exc)
                 if retry_count == max_retry or fallback:
-                    return self._fallback_result(fallback, payload, retry_count, str(exc))
+                    if fallback:
+                        return self._fallback_result(fallback, payload, retry_count, str(exc))
+                    return ToolResult(False, tool.name, error=str(exc)), retry_count, AgentStepStatus.FAILED.value
         return ToolResult(False, tool.name, error="tool failed"), 1, AgentStepStatus.FAILED.value
 
     def _fallback_result(self, fallback_tool_name: str | None, payload: dict, retry_count: int, error: str | None) -> tuple[ToolResult, int, str]:
@@ -120,6 +124,13 @@ class AgentRuntime:
         fallback_tool = self.registry.get_tool(fallback_tool_name)
         fallback_payload = {"original_payload": payload, "error": error}
         result = fallback_tool.handler(fallback_payload)
+        result = ToolResult(
+            result.ok,
+            result.tool_name,
+            result.data,
+            result.error,
+            {"original_error": error, "fallback_tool_name": fallback_tool_name, **(result.metadata or {})},
+        )
         status = AgentStepStatus.FALLBACK_USED.value if result.ok else AgentStepStatus.FAILED.value
         return result, retry_count, status
 

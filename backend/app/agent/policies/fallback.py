@@ -13,7 +13,13 @@ class FallbackPolicy:
             "MCP_CALL_FAILED": "mcp_call_failed_fallback",
         }
         error_key = self._error_key(error)
-        return mapped.get(error_key) or tool.fallback_tool_name
+        if error_key:
+            return mapped.get(error_key)
+        return tool.fallback_tool_name if self._is_technical_failure(error) else None
+
+    def _is_technical_failure(self, error: Exception | None) -> bool:
+        """业务状态不降级，只有未预期的技术异常才走工具默认降级。"""
+        return error is not None and not isinstance(error, ValueError)
 
     def _error_key(self, error: Exception | None) -> str | None:
         """从错误信息中提取降级类型。"""

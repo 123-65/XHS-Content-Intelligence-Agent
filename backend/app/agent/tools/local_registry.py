@@ -72,7 +72,39 @@ class LocalToolRegistry:
     def _list_competitor_notes(self, payload: dict) -> ToolResult:
         """查询竞品笔记快照。"""
         notes = CrawlerCollectionRepository(self.db).list_competitor_notes(int(payload["account_id"]))
-        return ToolResult(True, "list_competitor_notes", {"count": len(notes), "notes": [self._snapshot(item) for item in notes]})
+        if not notes:
+            return ToolResult(
+                False,
+                "list_competitor_notes",
+                {
+                    "count": 0,
+                    "notes": [],
+                    "data_quality": "EMPTY",
+                    "reason": "NO_COMPETITOR_NOTES",
+                    "error_code": "COLLECTION_FAILED",
+                    "data_status": "NOT_PROVIDED",
+                    "can_continue": False,
+                    "action": "COLLECT_COMPETITOR_NOTES",
+                    "hint": "当前账号暂无竞品笔记，请先通过 MCP 采集或手动录入真实样本后再做竞品分析。",
+                    "suggestion": "请先通过 MCP 采集或手动录入 10-30 条真实公开笔记样本。",
+                },
+                error="COLLECTION_FAILED",
+                metadata={
+                    "business_state": True,
+                    "data_status": "NOT_PROVIDED",
+                    "mock_used": False,
+                },
+            )
+        return ToolResult(
+            True,
+            "list_competitor_notes",
+            {
+                "count": len(notes),
+                "notes": [self._snapshot(item) for item in notes],
+                "data_status": "REAL",
+            },
+            metadata={"mock_used": False},
+        )
 
     def _create_content_experiment(self, payload: dict) -> ToolResult:
         """创建候选内容实验。"""

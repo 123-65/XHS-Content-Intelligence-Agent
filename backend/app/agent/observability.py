@@ -31,7 +31,7 @@ class AgentObservabilityBuilder:
                 "tool_output_summary": self._tool_output_summary(step.output_payload),
                 "error_code": self._error_code(step),
                 "latency_ms": step.duration_ms,
-                "fallback_used": step.status == AgentStepStatus.FALLBACK_USED.value,
+                "fallback_used": self._fallback_used(step),
             }
         )
 
@@ -62,9 +62,24 @@ class AgentObservabilityBuilder:
 
     def _error_code(self, step) -> str | None:
         """从工具输出中提取错误码。"""
-        metadata = (step.output_payload or {}).get("metadata") or {}
+        output_payload = step.output_payload or {}
+        metadata = output_payload.get("metadata") or {}
+        data = output_payload.get("data") or {}
         codes = metadata.get("codes") or []
-        return codes[0] if codes else None
+        return (
+            codes[0]
+            if codes
+            else metadata.get("original_error")
+            or output_payload.get("error")
+            or data.get("fallback_reason")
+            or data.get("error_code")
+        )
+
+    def _fallback_used(self, step) -> bool:
+        """兼容 status 和 metadata 两种 fallback 标记来源。"""
+        output_payload = step.output_payload or {}
+        metadata = output_payload.get("metadata") or {}
+        return step.status == AgentStepStatus.FALLBACK_USED.value or metadata.get("fallback_used") is True
 
     def _step_name(self, step) -> str:
         """生成步骤名称。"""
