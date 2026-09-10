@@ -1,6 +1,10 @@
 from fastapi.testclient import TestClient
 
+from app.core.database import SessionLocal
 from app.main import app
+from app.models.competitor_account import CompetitorAccount
+from app.models.competitor_comment import CompetitorComment
+from app.models.competitor_note import CompetitorNote
 
 client = TestClient(app)
 
@@ -35,18 +39,7 @@ def create_test_account() -> int:
 
 def create_content_opportunities(account_id: int) -> int:
     """通过采集和竞品分析创建内容机会并返回报告 ID。"""
-    task_response = client.post(
-        "/api/crawler/tasks",
-        json={
-            "account_id": account_id,
-            "task_type": "COMPETITOR_SEED",
-            "provider_name": "seed_sample",
-            "keyword": "AI Agent",
-        },
-    )
-    assert task_response.status_code == 200
-    task_id = task_response.json()["data"]["id"]
-    assert client.post(f"/api/crawler/tasks/{task_id}/run").status_code == 200
+    create_manual_competitor_data(account_id)
 
     report_response = client.post(
         "/api/competitor/reports",
@@ -54,6 +47,130 @@ def create_content_opportunities(account_id: int) -> int:
     )
     assert report_response.status_code == 200
     return report_response.json()["data"]["id"]
+
+
+def create_manual_competitor_data(account_id: int) -> None:
+    """写入非 Mock 竞品数据，匹配 V2 报告入口的数据契约。"""
+    with SessionLocal() as db:
+        competitor_account = CompetitorAccount(
+            account_id=account_id,
+            platform_account_id=f"manual-experiment-account-{account_id}",
+            nickname="AI Agent 项目学姐",
+            homepage_url="https://www.xiaohongshu.com/user/profile/manual-experiment-agent",
+            bio="专注分享 AI Agent 学习路线、项目实战和求职经验。",
+            follower_count=18000,
+            note_count=96,
+            source_type="MANUAL",
+            provider_name="manual_snapshot",
+            is_mock=False,
+            confidence=0.9,
+            raw_snapshot={"source": "manual_test_fixture"},
+        )
+        db.add(competitor_account)
+        db.flush()
+
+        notes = [
+            CompetitorNote(
+                account_id=account_id,
+                competitor_account_id=competitor_account.id,
+                note_id=f"manual-experiment-note-{account_id}-001",
+                note_url="https://www.xiaohongshu.com/explore/manual-experiment-agent-001",
+                author_name="AI求职经验分享",
+                title="双非本科怎么做一个能写进简历的 Agent 项目",
+                content="围绕普通本科生如何从后端项目转向 Agent 应用开发，拆解项目选题、技术栈、简历表达和面试准备。",
+                tags=["AI Agent", "双非求职", "简历项目", "Python"],
+                like_count=128,
+                collect_count=96,
+                comment_count=18,
+                source_type="MANUAL",
+                provider_name="manual_snapshot",
+                is_mock=False,
+                confidence=0.9,
+                raw_snapshot={"source": "manual_test_fixture"},
+            ),
+            CompetitorNote(
+                account_id=account_id,
+                competitor_account_id=competitor_account.id,
+                note_id=f"manual-experiment-note-{account_id}-002",
+                note_url="https://www.xiaohongshu.com/explore/manual-experiment-agent-002",
+                author_name="AI Agent 项目学姐",
+                title="AI Agent 学习路线：从 API 调用到业务闭环",
+                content="拆解普通学生可落地的 AI Agent 项目路径，包含需求分析、工具调用、记忆模块和效果复盘。",
+                tags=["AI Agent", "学习路线", "项目实战", "后端开发"],
+                like_count=168,
+                collect_count=118,
+                comment_count=25,
+                source_type="MANUAL",
+                provider_name="manual_snapshot",
+                is_mock=False,
+                confidence=0.9,
+                raw_snapshot={"source": "manual_test_fixture"},
+            ),
+            CompetitorNote(
+                account_id=account_id,
+                competitor_account_id=competitor_account.id,
+                note_id=f"manual-experiment-note-{account_id}-003",
+                note_url="https://www.xiaohongshu.com/explore/manual-experiment-agent-003",
+                author_name="AI Agent 项目学姐",
+                title="能写进简历的 AI Agent 项目应该长什么样",
+                content="用小红书内容运营场景说明 Agent 工作流设计、评估指标、人工确认和转化复盘。",
+                tags=["AI Agent", "简历项目", "求职项目", "Python"],
+                like_count=196,
+                collect_count=132,
+                comment_count=31,
+                source_type="MANUAL",
+                provider_name="manual_snapshot",
+                is_mock=False,
+                confidence=0.9,
+                raw_snapshot={"source": "manual_test_fixture"},
+            ),
+        ]
+        db.add_all(notes)
+        db.flush()
+        db.add_all(
+            [
+                CompetitorComment(
+                    account_id=account_id,
+                    competitor_note_id=notes[0].id,
+                    comment_id=f"manual-experiment-comment-{account_id}-001",
+                    user_name="普通本科生",
+                    content="双非没有实习，做 Agent 项目真的有用吗？",
+                    like_count=12,
+                    source_type="MANUAL",
+                    provider_name="manual_snapshot",
+                    is_mock=False,
+                    confidence=0.9,
+                    raw_snapshot={"source": "manual_test_fixture"},
+                ),
+                CompetitorComment(
+                    account_id=account_id,
+                    competitor_note_id=notes[1].id,
+                    comment_id=f"manual-experiment-comment-{account_id}-002",
+                    user_name="27届学生",
+                    content="想知道这种项目怎么写到简历里，面试官会不会觉得是套壳？",
+                    like_count=8,
+                    source_type="MANUAL",
+                    provider_name="manual_snapshot",
+                    is_mock=False,
+                    confidence=0.9,
+                    raw_snapshot={"source": "manual_test_fixture"},
+                ),
+                CompetitorComment(
+                    account_id=account_id,
+                    competitor_note_id=notes[2].id,
+                    comment_id=f"manual-experiment-comment-{account_id}-003",
+                    user_name="转码新手",
+                    content="想看完整项目结构和源码，尤其是工具调用和复盘模块怎么拆。",
+                    like_count=10,
+                    source_type="MANUAL",
+                    provider_name="manual_snapshot",
+                    is_mock=False,
+                    confidence=0.9,
+                    raw_snapshot={"source": "manual_test_fixture"},
+                ),
+            ]
+        )
+        db.commit()
 
 
 def test_generate_experiment_cards_from_opportunities():

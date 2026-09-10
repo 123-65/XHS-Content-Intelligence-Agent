@@ -34,7 +34,7 @@ class ReviewDraftRequest(BaseModel):
     """审核草稿请求。"""
 
     draft_id: int
-    use_mock: bool = Field(default=True, description="开发阶段默认使用模拟审核")
+    use_mock: bool = Field(default=False, description="是否使用模拟结果，仅测试/演示场景显式开启审核")
 
 
 class ReviewReportCreate(BaseModel):

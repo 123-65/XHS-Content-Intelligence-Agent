@@ -29,7 +29,7 @@ class GenerateDraftRequest(BaseModel):
 
     experiment_id: int
     user_requirement: str | None = Field(default=None, description="用户额外要求")
-    use_mock: bool = Field(default=True, description="是否使用模拟生成，开发阶段默认 True")
+    use_mock: bool = Field(default=False, description="是否使用模拟结果，仅测试/演示场景显式开启生成草稿")
 
 
 class ContentDraftCreate(BaseModel):
