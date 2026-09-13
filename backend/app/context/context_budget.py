@@ -164,6 +164,9 @@ SOURCE_LABELS = {
     "manual_input": "用户人工输入",
     "schema_model": "结构化输出模型",
     "strategy_memory": "策略记忆",
+    "competitor_report": "竞品报告",
+    "competitor_analysis": "竞品分析",
+    "rule_based": "规则输出",
 }
 
 DATA_STATUS_LABELS = {

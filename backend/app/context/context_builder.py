@@ -2,7 +2,7 @@ import hashlib
 from typing import Any
 
 from app.context.context_budget import ContextBudgetManager, build_slot_budget_meta, estimate_tokens, trim_to_token_budget
-from app.context.context_compressor import ToolResultCompressor
+from app.context.context_compressor import ToolResultCompressor, select_competitor_evidence_top_k
 from app.context.context_sanitizer import ContextSanitizer
 from app.context.context_slots import BuiltContext, BuiltContextSlot, ContextRole, ContextSlot, ContextSlotName, ContextTrustLevel
 
@@ -65,6 +65,18 @@ class ContextManager:
         )
 
     def _prepare_slot(self, slot: ContextSlot) -> BuiltContextSlot:
+        if slot.slot_name == ContextSlotName.COMPETITOR_EVIDENCE.value and isinstance(slot.content, list):
+            selected, compression_meta = select_competitor_evidence_top_k(
+                slot.content,
+                top_k=slot.metadata.get("top_k", 5),
+                query_context=slot.metadata.get("query_context"),
+            )
+            slot.content = selected
+            slot.metadata = {
+                **slot.metadata,
+                "compression_meta": compression_meta,
+            }
+
         if slot.slot_name == ContextSlotName.TOOL_RESULT.value:
             compressed = self.compressor.compress(
                 slot.content,
@@ -101,6 +113,8 @@ class ContextManager:
             source_version=metadata.get("source_version"),
             data_status=metadata.get("data_status"),
         )
+        if metadata.get("compression_meta"):
+            metadata["budget_meta"].update(metadata["compression_meta"])
         if was_truncated:
             metadata["budget_meta"]["truncated"] = True
         return BuiltContextSlot(

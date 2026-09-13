@@ -43,6 +43,35 @@ def test_token_budget_trims_lower_priority_slots_first():
     assert "task_instruction" in built.injected_slot_names
 
 
+def test_competitor_evidence_slot_applies_deterministic_top_k_metadata():
+    manager = ContextManager(task_name="unit", token_budget=2000)
+    manager.add_slot(
+        ContextSlot(
+            ContextSlotName.COMPETITOR_EVIDENCE,
+            [
+                {"title": "AI Agent 项目复盘", "data_status": "REAL", "collect_count": 20},
+                {"title": "模拟样本", "is_mock": True, "collect_count": 999},
+                {"title": "高风险样本", "data_status": "REAL", "risk_level": "HIGH", "collect_count": 888},
+            ],
+            priority=80,
+            source_type="competitor_report",
+            metadata={"top_k": 1, "query_context": {"selected_topic": "AI Agent 项目"}},
+        )
+    )
+
+    built = manager.build()
+    slot = built.slots[0]
+    budget_meta = slot.metadata["budget_meta"]
+
+    assert "AI Agent 项目复盘" in slot.content
+    assert "模拟样本" not in slot.content
+    assert budget_meta["compressed"] is True
+    assert budget_meta["compression_method"] == "deterministic_top_k"
+    assert budget_meta["selected_count"] == 1
+    assert budget_meta["dropped_count"] == 2
+    assert budget_meta["top_k"] == 1
+
+
 def test_external_tool_content_is_never_promoted_to_system_instruction():
     manager = ContextManager(task_name="unit", token_budget=500)
     manager.add_slot(
