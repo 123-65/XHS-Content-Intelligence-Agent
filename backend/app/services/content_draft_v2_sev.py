@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.context.context_builder import ContextManager
-from app.context.context_slots import ContextRole, ContextSlot, ContextSlotName
+from app.context.context_slots import ContextRole, ContextSlot, ContextSlotName, ContextTrustLevel
 from app.context.context_usage_logger import ContextUsageLogger
 from app.llm.client import LLMClient
 from app.llm.errors import LLMError
@@ -165,68 +165,166 @@ class ContentDraftV2Service:
         task_name = "draft_generation" if scope == "all" else "draft_regeneration"
         context = context_payload.model_dump()
         manager = ContextManager(task_name=task_name)
-        manager.extend(
-            [
+        competitor_evidence = self._build_competitor_evidence_items(context_payload)
+        slots = [
+            ContextSlot(
+                ContextSlotName.SYSTEM_RULES,
+                prompt.system_prompt,
+                role=ContextRole.SYSTEM,
+                priority=100,
+                source_type="prompt_template",
+                metadata={"source_version": prompt.prompt_version},
+            ),
+            ContextSlot(
+                ContextSlotName.RISK_CONSTRAINTS,
+                context_payload.risk_constraints,
+                role=ContextRole.SYSTEM,
+                priority=95,
+                source_type="risk_constraints",
+            ),
+            ContextSlot(
+                ContextSlotName.TASK_INSTRUCTION,
+                {
+                    "prompt_name": prompt.prompt_name,
+                    "prompt_version": prompt.prompt_version,
+                    "regenerate_scope": scope,
+                    "instruction": "生成符合输出 schema 的完整 JSON 草稿，不生成图片文件。",
+                },
+                priority=90,
+                source_type="prompt_template",
+                metadata={"source_version": prompt.prompt_version},
+            ),
+            ContextSlot(ContextSlotName.ACCOUNT_PROFILE, context_payload.account_snapshot, priority=85, source_type="account_profile"),
+            ContextSlot(
+                ContextSlotName.WORKFLOW_STATE,
+                {
+                    "account_id": context_payload.account_id,
+                    "experiment_id": context_payload.experiment_id,
+                    "content_opportunity_id": context_payload.content_opportunity_id,
+                    "experiment": context_payload.experiment_snapshot,
+                    "opportunity": context_payload.opportunity_snapshot,
+                },
+                priority=80,
+                source_type="content_experiment_v2",
+            ),
+            ContextSlot(ContextSlotName.USER_INPUT, context_payload.user_requirement or "", priority=75, source_type="manual_input"),
+            ContextSlot(
+                ContextSlotName.OUTPUT_SCHEMA,
+                DraftGenerateV2Result.model_json_schema(),
+                priority=70,
+                token_limit=1200,
+                source_type="schema_model",
+                metadata={"source_version": "DraftGenerateV2Result"},
+            ),
+            ContextSlot(
+                ContextSlotName.STRATEGY_MEMORY,
+                context.get("strategy_memory_snapshot") or {},
+                priority=60,
+                token_limit=1000,
+                source_type="strategy_memory",
+                metadata={"data_status": "NOT_PROVIDED" if not context.get("strategy_memory_snapshot") else "PARTIAL"},
+            ),
+        ]
+        if competitor_evidence:
+            slots.insert(
+                5,
                 ContextSlot(
-                    ContextSlotName.SYSTEM_RULES,
-                    prompt.system_prompt,
-                    role=ContextRole.SYSTEM,
-                    priority=100,
-                    source_type="prompt_template",
-                    metadata={"source_version": prompt.prompt_version},
-                ),
-                ContextSlot(
-                    ContextSlotName.RISK_CONSTRAINTS,
-                    context_payload.risk_constraints,
-                    role=ContextRole.SYSTEM,
-                    priority=95,
-                    source_type="risk_constraints",
-                ),
-                ContextSlot(
-                    ContextSlotName.TASK_INSTRUCTION,
-                    {
-                        "prompt_name": prompt.prompt_name,
-                        "prompt_version": prompt.prompt_version,
-                        "regenerate_scope": scope,
-                        "instruction": "生成符合输出 schema 的完整 JSON 草稿，不生成图片文件。",
-                    },
-                    priority=90,
-                    source_type="prompt_template",
-                    metadata={"source_version": prompt.prompt_version},
-                ),
-                ContextSlot(ContextSlotName.ACCOUNT_PROFILE, context_payload.account_snapshot, priority=85, source_type="account_profile"),
-                ContextSlot(
-                    ContextSlotName.WORKFLOW_STATE,
-                    {
-                        "account_id": context_payload.account_id,
-                        "experiment_id": context_payload.experiment_id,
-                        "content_opportunity_id": context_payload.content_opportunity_id,
-                        "experiment": context_payload.experiment_snapshot,
-                        "opportunity": context_payload.opportunity_snapshot,
-                    },
-                    priority=80,
-                    source_type="content_experiment_v2",
-                ),
-                ContextSlot(ContextSlotName.USER_INPUT, context_payload.user_requirement or "", priority=75, source_type="manual_input"),
-                ContextSlot(
-                    ContextSlotName.OUTPUT_SCHEMA,
-                    DraftGenerateV2Result.model_json_schema(),
-                    priority=70,
+                    ContextSlotName.COMPETITOR_EVIDENCE,
+                    competitor_evidence,
+                    priority=78,
                     token_limit=1200,
-                    source_type="schema_model",
-                    metadata={"source_version": "DraftGenerateV2Result"},
+                    trust_level=ContextTrustLevel.UNTRUSTED,
+                    source_type="competitor_report",
+                    metadata={
+                        "top_k": 5,
+                        "query_context": self._competitor_evidence_query_context(context_payload),
+                        "data_status": self._competitor_evidence_data_status(competitor_evidence),
+                    },
                 ),
-                ContextSlot(
-                    ContextSlotName.STRATEGY_MEMORY,
-                    context.get("strategy_memory_snapshot") or {},
-                    priority=60,
-                    token_limit=1000,
-                    source_type="strategy_memory",
-                    metadata={"data_status": "NOT_PROVIDED" if not context.get("strategy_memory_snapshot") else "PARTIAL"},
-                ),
-            ]
-        )
+            )
+        manager.extend(slots)
         return manager.build()
+
+    def _build_competitor_evidence_items(self, context_payload: DraftGenerationContextCreate) -> list[dict[str, Any]]:
+        opportunity = context_payload.opportunity_snapshot or {}
+        experiment = context_payload.experiment_snapshot or {}
+        items: list[dict[str, Any]] = []
+
+        primary = self._compact_dict(
+            {
+                "source": "content_opportunity",
+                "source_type": "competitor_report",
+                "data_status": "REAL",
+                "title": opportunity.get("opportunity_title"),
+                "summary": opportunity.get("suggested_angle"),
+                "evidence_summary": opportunity.get("evidence_summary"),
+                "content_pillar": opportunity.get("content_pillar") or experiment.get("content_pillar"),
+                "target_audience": opportunity.get("target_audience"),
+                "comment_demand_type": opportunity.get("comment_demand_type"),
+                "confidence": self._score_to_confidence(opportunity.get("replicability_score")),
+                "risk_level": opportunity.get("risk_level"),
+            }
+        )
+        if primary.get("title") or primary.get("summary") or primary.get("evidence_summary"):
+            items.append(primary)
+
+        secondary = self._compact_dict(
+            {
+                "source": "content_experiment",
+                "source_type": "content_experiment_v2",
+                "data_status": "PARTIAL",
+                "title": experiment.get("experiment_name"),
+                "summary": experiment.get("hypothesis"),
+                "content_pillar": experiment.get("content_pillar"),
+                "content_format": experiment.get("content_format"),
+                "risk_level": experiment.get("risk_level"),
+            }
+        )
+        if secondary.get("title") or secondary.get("summary"):
+            items.append(secondary)
+
+        return items
+
+    def _competitor_evidence_query_context(self, context_payload: DraftGenerationContextCreate) -> dict[str, Any]:
+        account = context_payload.account_snapshot or {}
+        experiment = context_payload.experiment_snapshot or {}
+        opportunity = context_payload.opportunity_snapshot or {}
+        return self._compact_dict(
+            {
+                "selected_topic": opportunity.get("opportunity_title") or experiment.get("experiment_name"),
+                "content_pillar": experiment.get("content_pillar") or opportunity.get("content_pillar"),
+                "account_keywords": self._non_empty_values(
+                    account.get("content_domain"),
+                    account.get("positioning"),
+                    account.get("target_audience"),
+                ),
+                "domain_keywords": self._non_empty_values(account.get("content_domain")),
+            }
+        )
+
+    def _competitor_evidence_data_status(self, items: list[dict[str, Any]]) -> str:
+        if any(item.get("data_status") == "REAL" for item in items):
+            return "REAL"
+        if items:
+            return "PARTIAL"
+        return "NOT_PROVIDED"
+
+    def _score_to_confidence(self, value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if number > 1:
+            number = number / 100
+        return max(0.0, min(1.0, number))
+
+    def _compact_dict(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
+
+    def _non_empty_values(self, *values: Any) -> list[Any]:
+        return [value for value in values if value not in (None, "", [], {})]
 
     def _call_llm(self, prompt: RenderedPrompt, built_context):
         """调用 LLM 并校验结构化草稿输出。"""
@@ -428,9 +526,13 @@ class ContentDraftV2Service:
         return {
             "opportunity_title": getattr(opportunity, "opportunity_title", None),
             "suggested_angle": getattr(opportunity, "suggested_angle", None),
+            "target_audience": getattr(opportunity, "target_audience", None),
+            "content_pillar": getattr(opportunity, "content_pillar", None),
+            "comment_demand_type": getattr(opportunity, "comment_demand_type", None),
             "evidence_summary": getattr(opportunity, "evidence_summary", None),
             "replicability_score": getattr(opportunity, "replicability_score", None),
             "risk_level": getattr(opportunity, "risk_level", None),
+            "risk_points": getattr(opportunity, "risk_points", None),
             "opportunity_score": getattr(opportunity, "opportunity_score", None),
         }
 

@@ -12,7 +12,7 @@ from app.models.context_slot_log import ContextSlotLog
 from app.models.prompt_run_log import PromptRunLog
 from app.models.prompt_template import PromptTemplate
 from app.schemas.llm import LLMStructuredResult, LLMUsage
-from app.schemas.content_draft_v2 import DraftGenerateV2Result
+from app.schemas.content_draft_v2 import DraftGenerateV2Result, DraftGenerationContextCreate
 from app.services.content_draft_v2_sev import ContentDraftV2Service
 from app.main import app
 
@@ -310,6 +310,18 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
         budget_meta_by_slot = {item.slot_name: item.metadata_payload["budget_meta"] for item in slot_logs}
         assert "system_rules" in budget_meta_by_slot
         assert budget_meta_by_slot["system_rules"]["source_label"] == "提示词模板"
+        assert "competitor_evidence" in budget_breakdown_by_slot
+        assert "competitor_evidence" in budget_meta_by_slot
+        competitor_budget_meta = budget_meta_by_slot["competitor_evidence"]
+        assert competitor_budget_meta["source"] == "competitor_report"
+        assert competitor_budget_meta["data_status"] == "REAL"
+        assert competitor_budget_meta["compressed"] is True
+        assert competitor_budget_meta["compression_method"] == "deterministic_top_k"
+        assert competitor_budget_meta["top_k"] == 5
+        assert competitor_budget_meta["selected_count"] >= 1
+        competitor_slot_log = next(item for item in slot_logs if item.slot_name == "competitor_evidence")
+        assert competitor_slot_log.trust_level == "untrusted"
+        assert "content_opportunity" in competitor_slot_log.content_preview
         assert all("budget_tokens" in meta for meta in budget_meta_by_slot.values())
         assert any(meta["contains_hardcoded_domain_terms"] for meta in budget_meta_by_slot.values())
 
@@ -359,3 +371,22 @@ def test_baseline_risk_check_blocks_prohibited_phrases():
         assert "\u4e0d\u5141\u8bb8\u4fdd\u8bc1\u6da8\u7c89" in str(exc)
     else:
         raise AssertionError("risk check should reject prohibited phrases")
+
+
+def test_competitor_evidence_slot_does_not_fabricate_empty_data():
+    """Ensure empty upstream evidence stays empty instead of inventing competitor facts."""
+    context_payload = DraftGenerationContextCreate(
+        account_id=1,
+        experiment_id=1,
+        content_opportunity_id=None,
+        account_snapshot={},
+        experiment_snapshot={},
+        opportunity_snapshot={},
+        strategy_memory_snapshot={},
+        risk_constraints=[],
+        user_requirement=None,
+    )
+
+    service = ContentDraftV2Service.__new__(ContentDraftV2Service)
+
+    assert service._build_competitor_evidence_items(context_payload) == []
