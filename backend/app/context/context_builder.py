@@ -2,7 +2,12 @@ import hashlib
 from typing import Any
 
 from app.context.context_budget import ContextBudgetManager, build_slot_budget_meta, estimate_tokens, trim_to_token_budget
-from app.context.context_compressor import ToolResultCompressor, select_competitor_evidence_top_k, select_strategy_memory_items
+from app.context.context_compressor import (
+    ToolResultCompressor,
+    select_competitor_evidence_top_k,
+    select_strategy_memory_items,
+    summarize_comment_insights,
+)
 from app.context.context_sanitizer import ContextSanitizer
 from app.context.context_slots import BuiltContext, BuiltContextSlot, ContextRole, ContextSlot, ContextSlotName, ContextTrustLevel
 
@@ -88,6 +93,17 @@ class ContextManager:
                 query_context=slot.metadata.get("query_context"),
             )
             slot.content = selected
+            slot.metadata = {
+                **slot.metadata,
+                "compression_meta": compression_meta,
+            }
+
+        if slot.slot_name == ContextSlotName.COMMENT_INSIGHT.value and isinstance(slot.content, list):
+            summary, compression_meta = summarize_comment_insights(
+                slot.content,
+                top_k=slot.metadata.get("top_k", 6),
+            )
+            slot.content = summary
             slot.metadata = {
                 **slot.metadata,
                 "compression_meta": compression_meta,

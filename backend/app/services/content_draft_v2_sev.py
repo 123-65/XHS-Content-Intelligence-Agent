@@ -8,7 +8,10 @@ from app.context.context_slots import ContextRole, ContextSlot, ContextSlotName,
 from app.context.context_usage_logger import ContextUsageLogger
 from app.llm.client import LLMClient
 from app.llm.errors import LLMError
+from app.models.competitor_comment import CompetitorComment
+from app.models.competitors_analysis import CompetitorAnalysisReport
 from app.models.content_draft import ContentDraft
+from app.models.strategy_memory import StrategyMemory
 from app.prompts.manager import PromptManager, RenderedPrompt
 from app.repositories.content_draft_v2_repo import ContentDraftV2Repository
 from app.services.confirmation_sev import ConfirmationService
@@ -163,9 +166,10 @@ class ContentDraftV2Service:
     def _build_llm_context(self, prompt: RenderedPrompt, context_payload: DraftGenerationContextCreate, scope: str):
         """按显式插槽构建受治理的 LLM 上下文。"""
         task_name = "draft_generation" if scope == "all" else "draft_regeneration"
-        context = context_payload.model_dump()
         manager = ContextManager(task_name=task_name)
         competitor_evidence = self._build_competitor_evidence_items(context_payload)
+        comment_insight = self._comment_insight_slot_items(context_payload)
+        strategy_memory_items = self._strategy_memory_slot_items(context_payload)
         slots = [
             ContextSlot(
                 ContextSlotName.SYSTEM_RULES,
@@ -218,11 +222,15 @@ class ContentDraftV2Service:
             ),
             ContextSlot(
                 ContextSlotName.STRATEGY_MEMORY,
-                context.get("strategy_memory_snapshot") or {},
+                strategy_memory_items,
                 priority=60,
                 token_limit=1000,
                 source_type="strategy_memory",
-                metadata={"data_status": "NOT_PROVIDED" if not context.get("strategy_memory_snapshot") else "PARTIAL"},
+                metadata={
+                    "top_k": 5,
+                    "query_context": self._strategy_memory_query_context(context_payload),
+                    "data_status": self._strategy_memory_data_status(strategy_memory_items),
+                },
             ),
         ]
         if competitor_evidence:
@@ -239,6 +247,26 @@ class ContentDraftV2Service:
                         "top_k": 5,
                         "query_context": self._competitor_evidence_query_context(context_payload),
                         "data_status": self._competitor_evidence_data_status(competitor_evidence),
+                    },
+                ),
+            )
+        if comment_insight:
+            counts = self._comment_insight_counts(comment_insight)
+            slots.insert(
+                6,
+                ContextSlot(
+                    ContextSlotName.COMMENT_INSIGHT,
+                    comment_insight,
+                    priority=76,
+                    token_limit=800,
+                    trust_level=ContextTrustLevel.UNTRUSTED,
+                    source_type="comment_insight",
+                    metadata={
+                        "top_k": 6,
+                        "data_status": self._comment_insight_data_status(comment_insight),
+                        "sample_count": counts["sample_count"],
+                        "demand_count": counts["demand_count"],
+                        "risk_count": counts["risk_count"],
                     },
                 ),
             )
@@ -325,6 +353,68 @@ class ContentDraftV2Service:
 
     def _non_empty_values(self, *values: Any) -> list[Any]:
         return [value for value in values if value not in (None, "", [], {})]
+
+    def _strategy_memory_slot_items(self, context_payload: DraftGenerationContextCreate) -> list[dict[str, Any]]:
+        snapshot = context_payload.strategy_memory_snapshot or {}
+        if isinstance(snapshot, list):
+            return [dict(item) for item in snapshot if isinstance(item, dict)]
+        items = snapshot.get("items") if isinstance(snapshot, dict) else None
+        if not isinstance(items, list):
+            return []
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def _strategy_memory_query_context(self, context_payload: DraftGenerationContextCreate) -> dict[str, Any]:
+        account = context_payload.account_snapshot or {}
+        experiment = context_payload.experiment_snapshot or {}
+        opportunity = context_payload.opportunity_snapshot or {}
+        return self._compact_dict(
+            {
+                "selected_topic": opportunity.get("opportunity_title") or experiment.get("experiment_name"),
+                "content_pillar": experiment.get("content_pillar") or opportunity.get("content_pillar"),
+                "target_audience": account.get("target_audience") or opportunity.get("target_audience"),
+                "account_profile": account,
+                "account_keywords": self._non_empty_values(
+                    account.get("content_domain"),
+                    account.get("positioning"),
+                    account.get("target_audience"),
+                ),
+                "domain_keywords": self._non_empty_values(account.get("content_domain")),
+            }
+        )
+
+    def _strategy_memory_data_status(self, items: list[dict[str, Any]]) -> str:
+        if not items:
+            return "NOT_PROVIDED"
+        statuses = {item.get("data_status") for item in items}
+        if "REAL" in statuses:
+            return "REAL"
+        if "PARTIAL" in statuses:
+            return "PARTIAL"
+        return "UNKNOWN"
+
+    def _comment_insight_slot_items(self, context_payload: DraftGenerationContextCreate) -> list[dict[str, Any]]:
+        opportunity = context_payload.opportunity_snapshot or {}
+        items = opportunity.get("comment_insight_items")
+        if not isinstance(items, list):
+            return []
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def _comment_insight_counts(self, items: list[dict[str, Any]]) -> dict[str, int]:
+        return {
+            "sample_count": sum(1 for item in items if item.get("item_type") == "comment"),
+            "demand_count": sum(1 for item in items if item.get("item_type") == "demand"),
+            "risk_count": sum(1 for item in items if item.get("item_type") == "risk_point"),
+        }
+
+    def _comment_insight_data_status(self, items: list[dict[str, Any]]) -> str:
+        if not items:
+            return "NOT_PROVIDED"
+        counts = self._comment_insight_counts(items)
+        if counts["sample_count"] < 3:
+            return "DATA_INSUFFICIENT"
+        if any(item.get("data_status") == "REAL" for item in items):
+            return "REAL"
+        return "PARTIAL"
 
     def _call_llm(self, prompt: RenderedPrompt, built_context):
         """调用 LLM 并校验结构化草稿输出。"""
@@ -483,9 +573,16 @@ class ContentDraftV2Service:
 
     def _build_context(self, account, experiment, opportunity, user_requirement: str | None, draft: ContentDraft | None = None) -> DraftGenerationContextCreate:
         """构建发送给提示词的上下文快照。"""
-        strategy_memory: dict[str, Any] = {"status": "NOT_IMPLEMENTED_IN_ROUND_6"}
+        strategy_memory_items = self._build_strategy_memory_items(self._list_strategy_memories(account.id))
+        strategy_memory: dict[str, Any] = {
+            "status": self._strategy_memory_data_status(strategy_memory_items),
+            "count": len(strategy_memory_items),
+            "items": strategy_memory_items,
+        }
         if draft:
             strategy_memory["previous_draft"] = self._draft_snapshot(draft)
+        opportunity_snapshot = self._opportunity_snapshot(opportunity)
+        opportunity_snapshot["comment_insight_items"] = self._build_comment_insight_items(opportunity)
 
         return DraftGenerationContextCreate(
             account_id=account.id,
@@ -515,11 +612,167 @@ class ContentDraftV2Service:
                 "fallback_strategy": experiment.fallback_strategy,
                 "risk_level": experiment.risk_level,
             },
-            opportunity_snapshot=self._opportunity_snapshot(opportunity),
+            opportunity_snapshot=opportunity_snapshot,
             strategy_memory_snapshot=strategy_memory,
             risk_constraints=RISK_CONSTRAINTS,
             user_requirement=user_requirement,
         )
+
+    def _list_strategy_memories(self, account_id: int, limit: int = 20) -> list[StrategyMemory]:
+        """查询当前账号可用于草稿生成的策略记忆。"""
+        return (
+            self.repo.db.query(StrategyMemory)
+            .filter(StrategyMemory.account_id == account_id, StrategyMemory.status.in_(["CANDIDATE", "VALIDATED"]))
+            .order_by(StrategyMemory.updated_at.desc(), StrategyMemory.id.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def _build_strategy_memory_items(self, memories: list[StrategyMemory]) -> list[dict[str, Any]]:
+        """从已有策略记忆快照中提取 STRATEGY_MEMORY slot 列表。"""
+        items: list[dict[str, Any]] = []
+        for memory in memories:
+            metadata = memory.metadata_payload or {}
+            item = self._compact_dict(
+                {
+                    "id": memory.id,
+                    "memory_type": memory.memory_type,
+                    "status": memory.status,
+                    "summary": memory.summary,
+                    "pattern": memory.pattern,
+                    "confidence": self._score_to_confidence(memory.confidence),
+                    "source": metadata.get("source") or "strategy_memory",
+                    "source_type": "strategy_memory",
+                    "source_review_report_id": memory.source_review_report_id,
+                    "support_count": memory.support_count,
+                    "evidence_count": memory.evidence_count,
+                    "risk_level": memory.risk_level,
+                    "usage_snapshot": metadata.get("usage_snapshot"),
+                    "usage_reason": metadata.get("usage_reason"),
+                    "domain_profile_version": metadata.get("domain_profile_version"),
+                    "content_pillar": metadata.get("content_pillar"),
+                    "tags": metadata.get("tags"),
+                    "success_or_failure": metadata.get("success_or_failure") or metadata.get("result_status"),
+                    "result_metric": metadata.get("result_metric"),
+                    "result_value": metadata.get("result_value"),
+                    "verified": metadata.get("verified"),
+                    "is_mock": metadata.get("is_mock") if isinstance(metadata.get("is_mock"), bool) else None,
+                    "data_status": self._strategy_memory_item_data_status(memory),
+                    "created_at": memory.created_at.isoformat() if memory.created_at else None,
+                    "updated_at": memory.updated_at.isoformat() if memory.updated_at else None,
+                }
+            )
+            if item.get("summary") or item.get("pattern"):
+                items.append(item)
+        return items
+
+    def _strategy_memory_item_data_status(self, memory: StrategyMemory) -> str:
+        if memory.status == "VALIDATED":
+            return "REAL"
+        if memory.status == "CANDIDATE":
+            return "PARTIAL"
+        return "UNKNOWN"
+
+    def _build_comment_insight_items(self, opportunity) -> list[dict[str, Any]]:
+        """从已有竞品报告、内容机会和评论样本中提取 COMMENT_INSIGHT 原始项。"""
+        if not opportunity or not getattr(opportunity, "report_id", None):
+            return []
+        report = self.repo.db.get(CompetitorAnalysisReport, opportunity.report_id)
+        if not report:
+            return []
+
+        data_status = "REAL" if report.comment_count >= 3 else "DATA_INSUFFICIENT"
+        items: list[dict[str, Any]] = []
+        for demand in report.comment_demands or []:
+            items.append(
+                self._compact_dict(
+                    {
+                        "item_type": "demand",
+                        "type": demand.get("type") or demand.get("name"),
+                        "count": demand.get("count"),
+                        "examples": demand.get("examples"),
+                        "source": "competitor_report",
+                        "source_type": "comment_insight",
+                        "data_status": data_status,
+                    }
+                )
+            )
+        if getattr(opportunity, "comment_demand_type", None):
+            items.append(
+                self._compact_dict(
+                    {
+                        "item_type": "demand",
+                        "type": opportunity.comment_demand_type,
+                        "count": 1,
+                        "examples": [],
+                        "source": "content_opportunity",
+                        "source_type": "comment_insight",
+                        "data_status": "PARTIAL",
+                    }
+                )
+            )
+        for signal in report.conversion_signals or []:
+            items.append(
+                self._compact_dict(
+                    {
+                        "item_type": "conversion_signal",
+                        "name": signal.get("name") or signal.get("type"),
+                        "count": signal.get("count"),
+                        "source": "competitor_report",
+                        "source_type": "comment_insight",
+                        "data_status": data_status,
+                    }
+                )
+            )
+        for risk in [*(report.risk_points or []), *self._opportunity_risk_items(opportunity)]:
+            items.append(
+                self._compact_dict(
+                    {
+                        "item_type": "risk_point",
+                        "name": risk.get("name") if isinstance(risk, dict) else risk,
+                        "count": risk.get("count") if isinstance(risk, dict) else 1,
+                        "source": "competitor_report" if isinstance(risk, dict) else "content_opportunity",
+                        "source_type": "comment_insight",
+                        "data_status": data_status if isinstance(risk, dict) else "PARTIAL",
+                    }
+                )
+            )
+        items.extend(self._comment_sample_items(report, opportunity, data_status))
+        return [item for item in items if item]
+
+    def _comment_sample_items(self, report: CompetitorAnalysisReport, opportunity, data_status: str) -> list[dict[str, Any]]:
+        note_ids = report.competitor_note_ids or []
+        if not note_ids:
+            return []
+        comments = (
+            self.repo.db.query(CompetitorComment)
+            .filter(CompetitorComment.account_id == report.account_id, CompetitorComment.competitor_note_id.in_(note_ids))
+            .order_by(CompetitorComment.like_count.desc(), CompetitorComment.id.desc())
+            .limit(20)
+            .all()
+        )
+        return [
+            self._compact_dict(
+                {
+                    "item_type": "comment",
+                    "demand_type": (comment.raw_snapshot or {}).get("demand_type") or getattr(opportunity, "comment_demand_type", None),
+                    "content": comment.content,
+                    "like_count": comment.like_count,
+                    "source": "competitor_comment",
+                    "source_type": comment.source_type,
+                    "provider_name": comment.provider_name,
+                    "is_mock": comment.is_mock,
+                    "confidence": comment.confidence,
+                    "data_status": data_status,
+                    "collected_at": comment.collected_at.isoformat() if comment.collected_at else None,
+                }
+            )
+            for comment in comments
+        ]
+
+    def _opportunity_risk_items(self, opportunity) -> list[Any]:
+        risk_points = getattr(opportunity, "risk_points", None)
+        return risk_points if isinstance(risk_points, list) else []
 
     def _opportunity_snapshot(self, opportunity) -> dict:
         """构建关联内容机会的快照。"""

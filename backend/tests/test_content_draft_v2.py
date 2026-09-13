@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,6 +13,7 @@ from app.models.context_snapshot import ContextSnapshot
 from app.models.context_slot_log import ContextSlotLog
 from app.models.prompt_run_log import PromptRunLog
 from app.models.prompt_template import PromptTemplate
+from app.models.strategy_memory import StrategyMemory
 from app.schemas.llm import LLMStructuredResult, LLMUsage
 from app.schemas.content_draft_v2 import DraftGenerateV2Result, DraftGenerationContextCreate
 from app.services.content_draft_v2_sev import ContentDraftV2Service
@@ -223,6 +226,75 @@ def create_manual_competitor_data(account_id: int) -> None:
         db.commit()
 
 
+def create_strategy_memories(account_id: int) -> None:
+    """Create real strategy memory rows for draft context tests."""
+    with SessionLocal() as db:
+        db.add_all(
+            [
+                StrategyMemory(
+                    account_id=account_id,
+                    memory_type="TOPIC_MEMORY",
+                    status="VALIDATED",
+                    summary="AI Agent project path titles bring stronger save intent.",
+                    pattern="Use concrete project path framing before implementation details.",
+                    confidence=Decimal("0.9000"),
+                    support_count=2,
+                    evidence_count=3,
+                    risk_level="LOW",
+                    metadata_payload={
+                        "source": "post_publish",
+                        "content_pillar": "AI Agent",
+                        "tags": ["AI Agent", "project"],
+                        "success_or_failure": "success",
+                        "result_metric": "collect_count",
+                        "result_value": 35,
+                        "verified": True,
+                        "usage_snapshot": {"review_result": "SUCCESS"},
+                        "usage_reason": "build next draft context",
+                        "is_mock": False,
+                    },
+                ),
+                StrategyMemory(
+                    account_id=account_id,
+                    memory_type="NEGATIVE_MEMORY",
+                    status="CANDIDATE",
+                    summary="Avoid vague AI tool list posts without a project outcome.",
+                    pattern="Do not lead with a generic tool list when the audience needs project proof.",
+                    confidence=Decimal("0.7000"),
+                    support_count=1,
+                    evidence_count=2,
+                    risk_level="LOW",
+                    metadata_payload={
+                        "source": "post_publish",
+                        "content_pillar": "AI Agent",
+                        "tags": ["AI Agent", "negative"],
+                        "success_or_failure": "failure",
+                        "result_metric": "collect_count",
+                        "result_value": 8,
+                        "usage_snapshot": {"review_result": "FAILED"},
+                    },
+                ),
+                StrategyMemory(
+                    account_id=account_id,
+                    memory_type="TITLE_MEMORY",
+                    status="CANDIDATE",
+                    summary="Low confidence title memory should not enter the core strategy context.",
+                    pattern="Use a broad curiosity title.",
+                    confidence=Decimal("0.1000"),
+                    support_count=1,
+                    evidence_count=1,
+                    risk_level="LOW",
+                    metadata_payload={
+                        "source": "post_publish",
+                        "content_pillar": "AI Agent",
+                        "tags": ["AI Agent"],
+                    },
+                ),
+            ]
+        )
+        db.commit()
+
+
 def create_experiment(account_id: int) -> int:
     """Create a candidate content experiment."""
     report_id = create_report(account_id)
@@ -257,6 +329,7 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
     """Generate a draft, regenerate title fields, and create a manual version."""
     monkeypatch.setattr("app.services.content_draft_v2_sev.LLMClient", FakeDraftV2LLMClient)
     account_id = create_account()
+    create_strategy_memories(account_id)
     experiment_id = create_experiment(account_id)
     approve_response = client.post(f"/api/experiments/{experiment_id}/approve")
     assert approve_response.status_code == 200
@@ -280,6 +353,13 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
     assert draft["raw_response_id"] == "fake-real-draft-v2-response"
     assert draft["generation_context_record"]["account_id"] == account_id
     assert draft["generation_context_record"]["experiment_id"] == experiment_id
+    strategy_memory_snapshot = draft["generation_context_record"]["strategy_memory_snapshot"]
+    assert strategy_memory_snapshot["count"] == 3
+    assert strategy_memory_snapshot["items"][0]["source_type"] == "strategy_memory"
+    assert any(item.get("is_mock") is False for item in strategy_memory_snapshot["items"])
+    comment_insight_items = draft["generation_context_record"]["opportunity_snapshot"]["comment_insight_items"]
+    assert any(item["item_type"] == "comment" for item in comment_insight_items)
+    assert any(item["item_type"] == "demand" for item in comment_insight_items)
     assert draft["versions"][0]["regenerate_scope"] == "all"
 
     with SessionLocal() as db:
@@ -322,6 +402,34 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
         competitor_slot_log = next(item for item in slot_logs if item.slot_name == "competitor_evidence")
         assert competitor_slot_log.trust_level == "untrusted"
         assert "content_opportunity" in competitor_slot_log.content_preview
+        assert "comment_insight" in budget_breakdown_by_slot
+        assert "comment_insight" in budget_meta_by_slot
+        comment_budget_meta = budget_meta_by_slot["comment_insight"]
+        assert comment_budget_meta["source"] == "comment_insight"
+        assert comment_budget_meta["data_status"] == "REAL"
+        assert comment_budget_meta["compressed"] is True
+        assert comment_budget_meta["compression_method"] == "deterministic_comment_insight_summary"
+        assert comment_budget_meta["summary_generated"] is True
+        assert comment_budget_meta["top_k"] == 6
+        assert comment_budget_meta["selected_count"] >= 1
+        assert comment_budget_meta["sample_count"] >= 3
+        comment_slot_log = next(item for item in slot_logs if item.slot_name == "comment_insight")
+        assert comment_slot_log.trust_level == "untrusted"
+        assert "untrusted_text" in comment_slot_log.content_preview
+        assert "strategy_memory" in budget_breakdown_by_slot
+        assert "strategy_memory" in budget_meta_by_slot
+        strategy_budget_meta = budget_meta_by_slot["strategy_memory"]
+        assert strategy_budget_meta["source"] == "strategy_memory"
+        assert strategy_budget_meta["data_status"] == "REAL"
+        assert strategy_budget_meta["compressed"] is True
+        assert strategy_budget_meta["compression_method"] == "deterministic_strategy_memory_filter"
+        assert strategy_budget_meta["top_k"] == 5
+        assert strategy_budget_meta["selected_count"] == 2
+        assert strategy_budget_meta["dropped_count"] == 1
+        assert strategy_budget_meta["drop_reason"]["low_confidence"] == 1
+        strategy_slot_log = next(item for item in slot_logs if item.slot_name == "strategy_memory")
+        assert "AI Agent project path titles bring stronger save intent" in strategy_slot_log.content_preview
+        assert "Low confidence title memory" not in strategy_slot_log.content_preview
         assert all("budget_tokens" in meta for meta in budget_meta_by_slot.values())
         assert any(meta["contains_hardcoded_domain_terms"] for meta in budget_meta_by_slot.values())
 
@@ -390,3 +498,22 @@ def test_competitor_evidence_slot_does_not_fabricate_empty_data():
     service = ContentDraftV2Service.__new__(ContentDraftV2Service)
 
     assert service._build_competitor_evidence_items(context_payload) == []
+
+
+def test_strategy_memory_slot_does_not_fabricate_empty_data():
+    """Ensure empty strategy memory snapshots stay empty."""
+    context_payload = DraftGenerationContextCreate(
+        account_id=1,
+        experiment_id=1,
+        content_opportunity_id=None,
+        account_snapshot={},
+        experiment_snapshot={},
+        opportunity_snapshot={},
+        strategy_memory_snapshot={},
+        risk_constraints=[],
+        user_requirement=None,
+    )
+
+    service = ContentDraftV2Service.__new__(ContentDraftV2Service)
+
+    assert service._strategy_memory_slot_items(context_payload) == []

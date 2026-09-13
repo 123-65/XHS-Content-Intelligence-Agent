@@ -1,5 +1,6 @@
 import hashlib
 import json
+from collections import Counter
 from typing import Any
 
 from app.context.context_budget import estimate_tokens, rough_token_count, trim_to_token_budget
@@ -144,6 +145,96 @@ def select_strategy_memory_items(
         "warning": warning,
     }
     return selected, compression_meta
+
+
+def summarize_comment_insights(items: list[dict], top_k: int = 6) -> tuple[dict, dict]:
+    """对评论洞察做规则摘要，保留高频需求、代表评论、转化信号和风险点。"""
+    safe_top_k = max(0, int(top_k or 0))
+    before_items = [dict(item) for item in items if isinstance(item, dict)]
+    before_text = _stable_json(before_items)
+    demand_counts: Counter[str] = Counter()
+    demand_examples: dict[str, list[dict[str, Any]]] = {}
+    conversion_counts: Counter[str] = Counter()
+    risk_counts: Counter[str] = Counter()
+    sample_count = 0
+
+    for index, item in enumerate(before_items):
+        item_type = str(item.get("item_type") or item.get("kind") or "").lower()
+        if item_type == "demand":
+            demand_name = _comment_demand_name(item)
+            count = _comment_count_value(item.get("count"))
+            demand_counts[demand_name] += count
+            for example in item.get("examples") or []:
+                _record_comment_example(demand_examples, demand_name, {"content": example, "source": item.get("source")}, index)
+            continue
+        if item_type == "conversion_signal":
+            conversion_counts[_comment_signal_name(item)] += _comment_count_value(item.get("count"))
+            continue
+        if item_type == "risk_point":
+            risk_counts[_comment_signal_name(item)] += _comment_count_value(item.get("count"))
+            continue
+
+        comment_text = item.get("content") or item.get("comment") or item.get("untrusted_text")
+        if comment_text:
+            sample_count += 1
+            demand_name = _comment_demand_name(item)
+            demand_counts[demand_name] += 1
+            _record_comment_example(demand_examples, demand_name, item, index)
+        for signal in item.get("conversion_signals") or []:
+            conversion_counts[str(signal)] += 1
+        for risk in item.get("risk_points") or []:
+            risk_counts[str(risk)] += 1
+
+    demand_summary = [
+        {"type": demand_type, "count": count}
+        for demand_type, count in demand_counts.most_common(5)
+    ]
+    representative_comments = _select_representative_comments(demand_summary, demand_examples, safe_top_k)
+    conversion_signal_summary = [
+        {"name": name, "count": count}
+        for name, count in conversion_counts.most_common(5)
+    ]
+    risk_summary = [
+        {"name": name, "count": count}
+        for name, count in risk_counts.most_common(5)
+    ]
+    data_status = _comment_insight_data_status(before_items, sample_count, demand_summary)
+    warning = "COMMENT_SAMPLE_INSUFFICIENT" if data_status in {"DATA_INSUFFICIENT", "NOT_PROVIDED"} else None
+    summary = {
+        "demand_summary": demand_summary,
+        "representative_comments": representative_comments,
+        "conversion_signal_summary": conversion_signal_summary,
+        "risk_summary": risk_summary,
+        "data_status": data_status,
+    }
+    after_text = _stable_json(summary)
+    dropped_count = max(0, sample_count - len(representative_comments))
+    drop_reason: dict[str, int] = {}
+    if dropped_count:
+        drop_reason["representative_comment_limit"] = dropped_count
+    if warning:
+        drop_reason["comment_sample_insufficient"] = 1
+
+    compression_meta = {
+        "compressed": True,
+        "truncated": False,
+        "compression_method": "deterministic_comment_insight_summary",
+        "before_chars": len(before_text),
+        "after_chars": len(after_text),
+        "before_rough_tokens": rough_token_count(before_text),
+        "after_rough_tokens": rough_token_count(after_text),
+        "selected_count": len(representative_comments),
+        "dropped_count": dropped_count,
+        "drop_reason": drop_reason,
+        "top_k": safe_top_k,
+        "summary_generated": True,
+        "warning": warning,
+        "sample_count": sample_count,
+        "demand_count": len(demand_summary),
+        "risk_count": len(risk_summary),
+        "conversion_signal_count": len(conversion_signal_summary),
+    }
+    return summary, compression_meta
 
 
 class ToolResultCompressor:
@@ -405,6 +496,78 @@ def _add_keywords(keywords: set[str], value: Any) -> None:
     text = str(value)
     keywords.add(text)
     keywords.update(text.split())
+
+
+def _comment_demand_name(item: dict) -> str:
+    return str(item.get("demand_type") or item.get("type") or item.get("name") or "UNKNOWN").strip() or "UNKNOWN"
+
+
+def _comment_signal_name(item: dict) -> str:
+    return str(item.get("name") or item.get("type") or item.get("text") or "UNKNOWN").strip() or "UNKNOWN"
+
+
+def _comment_count_value(value: Any) -> int:
+    if value is None:
+        return 1
+    return max(0, int(_number(value)))
+
+
+def _record_comment_example(
+    demand_examples: dict[str, list[dict[str, Any]]],
+    demand_name: str,
+    item: dict[str, Any],
+    index: int,
+) -> None:
+    text = item.get("content") or item.get("comment") or item.get("untrusted_text")
+    if not text:
+        return
+    examples = demand_examples.setdefault(demand_name, [])
+    examples.append(
+        {
+            "untrusted_text": str(text),
+            "like_count": _number(item.get("like_count")),
+            "source": item.get("source") or "comment_insight",
+            "source_type": item.get("source_type"),
+            "demand_type": demand_name,
+            "_index": index,
+        }
+    )
+
+
+def _select_representative_comments(
+    demand_summary: list[dict],
+    demand_examples: dict[str, list[dict[str, Any]]],
+    top_k: int,
+) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    per_demand_limit = 2
+    for demand in demand_summary:
+        demand_type = demand["type"]
+        examples = sorted(
+            demand_examples.get(demand_type, []),
+            key=lambda item: (item.get("like_count") or 0, -item.get("_index", 0)),
+            reverse=True,
+        )
+        for example in examples[:per_demand_limit]:
+            if len(selected) >= top_k:
+                break
+            selected.append({key: value for key, value in example.items() if key != "_index" and value not in (None, "", [], {})})
+        if len(selected) >= top_k:
+            break
+    return selected
+
+
+def _comment_insight_data_status(items: list[dict], sample_count: int, demand_summary: list[dict]) -> str:
+    if not items:
+        return "NOT_PROVIDED"
+    if sample_count < 3:
+        return "DATA_INSUFFICIENT"
+    statuses = {str(item.get("data_status") or "").upper() for item in items}
+    if "REAL" in statuses:
+        return "REAL"
+    if demand_summary:
+        return "PARTIAL"
+    return "DATA_INSUFFICIENT"
 
 
 def _trust_score(item: dict) -> int:
