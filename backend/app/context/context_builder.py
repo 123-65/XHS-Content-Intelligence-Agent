@@ -1,14 +1,14 @@
 import hashlib
 from typing import Any
 
-from app.context.context_budget import ContextBudgetManager, estimate_tokens, trim_to_token_budget
+from app.context.context_budget import ContextBudgetManager, build_slot_budget_meta, estimate_tokens, trim_to_token_budget
 from app.context.context_compressor import ToolResultCompressor
 from app.context.context_sanitizer import ContextSanitizer
 from app.context.context_slots import BuiltContext, BuiltContextSlot, ContextRole, ContextSlot, ContextSlotName, ContextTrustLevel
 
 
 class ContextManager:
-    """Build governed context for an LLM call."""
+    """为一次 LLM 调用构建受治理的上下文。"""
 
     def __init__(
         self,
@@ -24,17 +24,17 @@ class ContextManager:
         self.slots: list[ContextSlot] = []
 
     def add_slot(self, slot: ContextSlot) -> "ContextManager":
-        """Add a slot to the context manager."""
+        """向上下文管理器添加一个 slot。"""
         self.slots.append(slot)
         return self
 
     def extend(self, slots: list[ContextSlot]) -> "ContextManager":
-        """Add multiple slots."""
+        """批量添加多个 slot。"""
         self.slots.extend(slots)
         return self
 
     def build(self) -> BuiltContext:
-        """Return final system and user prompts plus snapshot metadata."""
+        """生成最终 system/user prompt，并附带快照所需元数据。"""
         built_slots = [self._prepare_slot(slot) for slot in self.slots]
         budgeted_slots, report = self.budget_manager.apply(built_slots, self.token_budget)
         system_sections = [self._format_slot(slot) for slot in budgeted_slots if slot.role == ContextRole.SYSTEM.value and slot.injected_tokens > 0]
@@ -94,6 +94,15 @@ class ContextManager:
 
         role = sanitized.slot.role.value if isinstance(sanitized.slot.role, ContextRole) else str(sanitized.slot.role)
         trust_level = sanitized.slot.trust_level.value if isinstance(sanitized.slot.trust_level, ContextTrustLevel) else str(sanitized.slot.trust_level)
+        metadata["budget_meta"] = build_slot_budget_meta(
+            sanitized.slot.slot_name,
+            injected,
+            source=sanitized.slot.source_type,
+            source_version=metadata.get("source_version"),
+            data_status=metadata.get("data_status"),
+        )
+        if was_truncated:
+            metadata["budget_meta"]["truncated"] = True
         return BuiltContextSlot(
             name=sanitized.slot.slot_name,
             role=role,
@@ -110,7 +119,7 @@ class ContextManager:
         )
 
     def _format_slot(self, slot: BuiltContextSlot) -> str:
-        return f"## Context Slot: {slot.name}\n{slot.content}"
+        return f"## 上下文槽位：{slot.name}\n{slot.content}"
 
     def _sanitizer_summary(self, slots: list[BuiltContextSlot]) -> dict[str, Any]:
         warnings = []

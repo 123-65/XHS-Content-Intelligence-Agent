@@ -26,26 +26,29 @@ from app.schemas.content_draft_v2 import (
 )
 
 
+# 风险约束：必须以 SYSTEM 角色注入提示词，约束模型不得输出违规承诺
 RISK_CONSTRAINTS = [
-    "\u4e0d\u5141\u8bb8\u4fdd offer",
-    "\u4e0d\u5141\u8bb8\u4fdd\u8bc1\u6da8\u7c89",
-    "\u4e0d\u5141\u8bb8\u4fdd\u8bc1\u6210\u4ea4",
-    "\u4e0d\u5141\u8bb8\u5938\u5927\u6536\u76ca",
-    "\u4e0d\u5141\u8bb8\u5f3a\u8bf1\u5bfc\u8bc4\u8bba",
-    "\u4e0d\u5141\u8bb8\u865a\u6784\u7528\u6237\u7ecf\u5386",
+    "不允许保 offer",
+    "不允许保证涨粉",
+    "不允许保证成交",
+    "不允许夸大收益",
+    "不允许强诱导评论",
+    "不允许虚构用户经历",
 ]
 
+# 风险短语 → 对应违规类别，用于生成后的关键词扫描
 RISK_PHRASES = {
-    "\u4fdd offer": "\u4e0d\u5141\u8bb8\u4fdd offer",
-    "\u4fdd\u8bc1\u6da8\u7c89": "\u4e0d\u5141\u8bb8\u4fdd\u8bc1\u6da8\u7c89",
-    "\u4fdd\u8bc1\u6210\u4ea4": "\u4e0d\u5141\u8bb8\u4fdd\u8bc1\u6210\u4ea4",
-    "\u7a33\u8d5a": "\u4e0d\u5141\u8bb8\u5938\u5927\u6536\u76ca",
-    "\u6708\u5165": "\u4e0d\u5141\u8bb8\u5938\u5927\u6536\u76ca",
-    "\u5fc5\u987b\u8bc4\u8bba": "\u4e0d\u5141\u8bb8\u5f3a\u8bf1\u5bfc\u8bc4\u8bba",
-    "\u8bc4\u8bba\u533a\u6263": "\u4e0d\u5141\u8bb8\u5f3a\u8bf1\u5bfc\u8bc4\u8bba",
-    "\u771f\u5b9e\u5b66\u5458\u6848\u4f8b": "\u4e0d\u5141\u8bb8\u865a\u6784\u7528\u6237\u7ecf\u5386",
-}
+    "保 offer": "不允许保 offer",
+    "保证涨粉": "不允许保证涨粉",
+    "保证成交": "不允许保证成交",
+    "稳赚": "不允许夸大收益",
+    "月入": "不允许夸大收益",
+    "必须评论": "不允许强诱导评论",
+    "评论区扣": "不允许强诱导评论",
+    "真实学员案例": "不允许虚构用户经历",
+}  
 
+# 局部重生成时的字段范围映射
 SCOPED_FIELDS = {
     "title": {"title_candidates", "recommended_title", "title"},
     "cover": {"cover_text", "cover_subtitle"},
@@ -57,10 +60,10 @@ SCOPED_FIELDS = {
 
 
 class ContentDraftV2Service:
-    """Service that orchestrates prompt rendering, LLM calls, and draft persistence."""
+    """编排提示词渲染、LLM 调用与草稿落库的服务。"""
 
     def __init__(self, db: Session):
-        """Initialize the V2 draft service."""
+        """初始化 V2 草稿服务。"""
         self.repo = ContentDraftV2Repository(db)
         self.prompt_manager = PromptManager(db)
 
@@ -70,7 +73,7 @@ class ContentDraftV2Service:
         agent_run_id: int | None = None,
         agent_step_id: int | None = None,
     ) -> ContentDraftV2Response:
-        """Generate a draft from an approved content experiment."""
+        """基于已批准的内容实验生成草稿。"""
         experiment = self._get_experiment_or_raise(data.experiment_id)
         self._ensure_experiment_approved(experiment)
 
@@ -100,12 +103,12 @@ class ContentDraftV2Service:
         return self.get_draft(draft.id)
 
     def get_draft(self, draft_id: int) -> ContentDraftV2Response:
-        """Return a draft with its generation context and versions."""
+        """返回草稿详情，包含生成上下文和版本列表。"""
         draft = self._get_draft_or_raise(draft_id)
         return self._build_response(draft)
 
     def regenerate_draft(self, draft_id: int, data: RegenerateDraftRequest) -> ContentDraftV2Response:
-        """Regenerate a draft partially or fully."""
+        """按指定 scope 局部或整体重生成草稿。"""
         draft = self._get_draft_or_raise(draft_id)
         experiment = self._get_experiment_or_raise(draft.experiment_id)
         account = self._get_account_or_raise(experiment.account_id)
@@ -128,6 +131,7 @@ class ContentDraftV2Service:
                 prompt_run_log_id=prompt_log.id,
             )
         )
+        # 草稿更新后，之前针对旧版本的发布确认全部失效
         ConfirmationService(self.repo.db).invalidate_publish_confirmations_for_draft(
             updated_draft.id,
             updated_draft.version,
@@ -136,7 +140,7 @@ class ContentDraftV2Service:
         return self.get_draft(updated_draft.id)
 
     def create_version(self, draft_id: int) -> ContentDraftVersionResponse:
-        """Create a manual version snapshot for the current draft."""
+        """为当前草稿创建一个手动版本快照。"""
         draft = self._get_draft_or_raise(draft_id)
         version = self.repo.create_version(
             ContentDraftVersionCreate(
@@ -149,7 +153,7 @@ class ContentDraftV2Service:
         return ContentDraftVersionResponse.model_validate(version)
 
     def _render_prompt(self, context_payload: DraftGenerationContextCreate, scope: str) -> RenderedPrompt:
-        """Render the draft generation prompt."""
+        """渲染草稿生成提示词。"""
         return self.prompt_manager.render(
             "app.prompts.xhs_draft_v2",
             {"context": context_payload.model_dump(), "regenerate_scope": scope},
@@ -157,25 +161,40 @@ class ContentDraftV2Service:
         )
 
     def _build_llm_context(self, prompt: RenderedPrompt, context_payload: DraftGenerationContextCreate, scope: str):
-        """Build governed LLM context from explicit slots."""
+        """按显式插槽构建受治理的 LLM 上下文。"""
         task_name = "draft_generation" if scope == "all" else "draft_regeneration"
         context = context_payload.model_dump()
         manager = ContextManager(task_name=task_name)
         manager.extend(
             [
-                ContextSlot(ContextSlotName.SYSTEM_RULES, prompt.system_prompt, role=ContextRole.SYSTEM, priority=100),
-                ContextSlot(ContextSlotName.RISK_CONSTRAINTS, context_payload.risk_constraints, role=ContextRole.SYSTEM, priority=95),
+                ContextSlot(
+                    ContextSlotName.SYSTEM_RULES,
+                    prompt.system_prompt,
+                    role=ContextRole.SYSTEM,
+                    priority=100,
+                    source_type="prompt_template",
+                    metadata={"source_version": prompt.prompt_version},
+                ),
+                ContextSlot(
+                    ContextSlotName.RISK_CONSTRAINTS,
+                    context_payload.risk_constraints,
+                    role=ContextRole.SYSTEM,
+                    priority=95,
+                    source_type="risk_constraints",
+                ),
                 ContextSlot(
                     ContextSlotName.TASK_INSTRUCTION,
                     {
                         "prompt_name": prompt.prompt_name,
                         "prompt_version": prompt.prompt_version,
                         "regenerate_scope": scope,
-                        "instruction": "Generate a complete JSON draft matching the output schema. Do not generate image files.",
+                        "instruction": "生成符合输出 schema 的完整 JSON 草稿，不生成图片文件。",
                     },
                     priority=90,
+                    source_type="prompt_template",
+                    metadata={"source_version": prompt.prompt_version},
                 ),
-                ContextSlot(ContextSlotName.ACCOUNT_PROFILE, context_payload.account_snapshot, priority=85),
+                ContextSlot(ContextSlotName.ACCOUNT_PROFILE, context_payload.account_snapshot, priority=85, source_type="account_profile"),
                 ContextSlot(
                     ContextSlotName.WORKFLOW_STATE,
                     {
@@ -186,16 +205,31 @@ class ContentDraftV2Service:
                         "opportunity": context_payload.opportunity_snapshot,
                     },
                     priority=80,
+                    source_type="content_experiment_v2",
                 ),
-                ContextSlot(ContextSlotName.USER_INPUT, context_payload.user_requirement or "", priority=75),
-                ContextSlot(ContextSlotName.OUTPUT_SCHEMA, DraftGenerateV2Result.model_json_schema(), priority=70, token_limit=1200),
-                ContextSlot(ContextSlotName.STRATEGY_MEMORY, context.get("strategy_memory_snapshot") or {}, priority=60, token_limit=1000),
+                ContextSlot(ContextSlotName.USER_INPUT, context_payload.user_requirement or "", priority=75, source_type="manual_input"),
+                ContextSlot(
+                    ContextSlotName.OUTPUT_SCHEMA,
+                    DraftGenerateV2Result.model_json_schema(),
+                    priority=70,
+                    token_limit=1200,
+                    source_type="schema_model",
+                    metadata={"source_version": "DraftGenerateV2Result"},
+                ),
+                ContextSlot(
+                    ContextSlotName.STRATEGY_MEMORY,
+                    context.get("strategy_memory_snapshot") or {},
+                    priority=60,
+                    token_limit=1000,
+                    source_type="strategy_memory",
+                    metadata={"data_status": "NOT_PROVIDED" if not context.get("strategy_memory_snapshot") else "PARTIAL"},
+                ),
             ]
         )
         return manager.build()
 
     def _call_llm(self, prompt: RenderedPrompt, built_context):
-        """Call the LLM and validate the structured draft output."""
+        """调用 LLM 并校验结构化草稿输出。"""
         try:
             return LLMClient().generate_structured_with_context(
                 context=built_context,
@@ -208,7 +242,7 @@ class ContentDraftV2Service:
             raise
 
     def _save_prompt_log(self, prompt: RenderedPrompt, built_context, llm_result) -> object:
-        """Persist a successful prompt run log."""
+        """记录成功的提示词运行日志。"""
         return self.repo.create_prompt_run_log(
             PromptRunLogCreate(
                 prompt_template_id=prompt.template.id,
@@ -240,7 +274,7 @@ class ContentDraftV2Service:
         )
 
     def _save_failed_prompt_log(self, prompt: RenderedPrompt, built_context, exc: Exception) -> None:
-        """Persist a failed prompt run log."""
+        """记录失败的提示词运行日志。"""
         self.repo.create_prompt_run_log(
             PromptRunLogCreate(
                 prompt_template_id=prompt.template.id,
@@ -258,12 +292,12 @@ class ContentDraftV2Service:
         )
 
     def _prompt_io_summary(self, text: str | None) -> dict:
-        """Build a bounded prompt or output summary for observability."""
+        """为可观测性构建有界的提示词/输出摘要。"""
         value = text or ""
         return {"length": len(value), "preview": value[:500], "truncated": len(value) > 500}
 
     def _prompt_log_input_payload(self, prompt: RenderedPrompt, built_context) -> dict:
-        """Attach context metadata without storing raw oversized prompts."""
+        """附加上下文元数据，但不保存超长的原始提示词。"""
         return {
             **prompt.input_payload,
             "_context": {
@@ -274,6 +308,11 @@ class ContentDraftV2Service:
                 "truncation_summary": built_context.truncation_summary,
                 "sanitizer_summary": built_context.sanitizer_summary,
                 "memory_usage_summary": built_context.memory_usage_summary,
+                "slot_budget_summary": [
+                    slot.metadata.get("budget_meta")
+                    for slot in built_context.slots
+                    if slot.metadata.get("budget_meta")
+                ],
             },
         }
 
@@ -285,7 +324,7 @@ class ContentDraftV2Service:
         agent_run_id: int | None = None,
         agent_step_id: int | None = None,
     ) -> None:
-        """Persist the governed context snapshot for developer inspection."""
+        """持久化受治理的上下文快照，供开发者排查问题。"""
         ContextUsageLogger(self.repo.db).record_snapshot(
             built_context,
             agent_run_id=agent_run_id,
@@ -296,7 +335,7 @@ class ContentDraftV2Service:
         )
 
     def _build_draft_create(self, experiment_id: int, llm_result, context_payload: DraftGenerationContextCreate) -> ContentDraftV2Create:
-        """Build draft creation payload from an LLM result."""
+        """从 LLM 结果构建草稿创建入参。"""
         result = llm_result.data
         image_script = [item.model_dump() for item in result.image_script]
         return ContentDraftV2Create(
@@ -324,7 +363,7 @@ class ContentDraftV2Service:
         )
 
     def _merged_fields(self, draft: ContentDraft, result: DraftGenerateV2Result, scope: str) -> dict:
-        """Merge regenerated fields according to the requested scope."""
+        """按指定 scope 合并重生成后的字段。"""
         all_fields = {
             "title_candidates": result.title_candidates,
             "recommended_title": result.recommended_title,
@@ -345,7 +384,7 @@ class ContentDraftV2Service:
         return {field: value for field, value in all_fields.items() if field in selected} | {"version": draft.version + 1}
 
     def _build_context(self, account, experiment, opportunity, user_requirement: str | None, draft: ContentDraft | None = None) -> DraftGenerationContextCreate:
-        """Build the context snapshot sent to the prompt."""
+        """构建发送给提示词的上下文快照。"""
         strategy_memory: dict[str, Any] = {"status": "NOT_IMPLEMENTED_IN_ROUND_6"}
         if draft:
             strategy_memory["previous_draft"] = self._draft_snapshot(draft)
@@ -385,7 +424,7 @@ class ContentDraftV2Service:
         )
 
     def _opportunity_snapshot(self, opportunity) -> dict:
-        """Build a snapshot for the linked content opportunity."""
+        """构建关联内容机会的快照。"""
         return {
             "opportunity_title": getattr(opportunity, "opportunity_title", None),
             "suggested_angle": getattr(opportunity, "suggested_angle", None),
@@ -396,12 +435,12 @@ class ContentDraftV2Service:
         }
 
     def _ensure_experiment_approved(self, experiment) -> None:
-        """Ensure only approved experiments can generate drafts."""
+        """确保只有已批准的内容实验才能生成草稿。"""
         if experiment.status != "APPROVED":
             raise ValueError("Only APPROVED content experiments can generate drafts")
 
     def _ensure_risk_safe(self, result: DraftGenerateV2Result) -> None:
-        """Run baseline risk phrase checks against generated draft fields."""
+        """对生成草稿的字段做基础风险短语扫描。"""
         text = " ".join(
             [
                 *result.title_candidates,
@@ -420,7 +459,7 @@ class ContentDraftV2Service:
             raise ValueError(f"Draft failed baseline risk check: {', '.join(sorted(violations))}")
 
     def _draft_snapshot(self, draft: ContentDraft) -> dict:
-        """Create a serializable snapshot for a draft version."""
+        """为草稿版本创建可序列化的快照。"""
         return {
             "title_candidates": draft.title_candidates,
             "recommended_title": draft.recommended_title,
@@ -436,7 +475,7 @@ class ContentDraftV2Service:
         }
 
     def _build_response(self, draft: ContentDraft) -> ContentDraftV2Response:
-        """Build the draft detail response."""
+        """构建草稿详情响应。"""
         context = self.repo.get_generation_context(draft.id)
         versions = self.repo.list_versions(draft.id)
         return ContentDraftV2Response.model_validate(
@@ -448,21 +487,21 @@ class ContentDraftV2Service:
         )
 
     def _get_experiment_or_raise(self, experiment_id: int):
-        """Return an experiment or raise a business error."""
+        """获取内容实验，不存在则抛业务异常。"""
         experiment = self.repo.get_experiment(experiment_id)
         if not experiment:
             raise ValueError("Content experiment does not exist")
         return experiment
 
     def _get_account_or_raise(self, account_id: int):
-        """Return an account profile or raise a business error."""
+        """获取账号画像，不存在则抛业务异常。"""
         account = self.repo.get_account(account_id)
         if not account:
             raise ValueError("Account profile does not exist")
         return account
 
     def _get_draft_or_raise(self, draft_id: int) -> ContentDraft:
-        """Return a content draft or raise a business error."""
+        """获取内容草稿，不存在则抛业务异常。"""
         draft = self.repo.get_draft(draft_id)
         if not draft:
             raise ValueError("Content draft does not exist")

@@ -7,6 +7,8 @@ from app.llm.errors import LLMError
 from app.models.competitor_account import CompetitorAccount
 from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
+from app.models.context_snapshot import ContextSnapshot
+from app.models.context_slot_log import ContextSlotLog
 from app.models.prompt_run_log import PromptRunLog
 from app.models.prompt_template import PromptTemplate
 from app.schemas.llm import LLMStructuredResult, LLMUsage
@@ -298,6 +300,18 @@ def test_generate_regenerate_and_version_draft(monkeypatch):
         )
         assert latest_log.provider == "qwen"
         assert latest_log.is_mock is False
+        snapshot = db.query(ContextSnapshot).filter(ContextSnapshot.prompt_run_log_id == latest_log.id).one_or_none()
+        assert snapshot is not None
+        assert any(item["budget_tokens"] for item in snapshot.slot_token_breakdown)
+        budget_breakdown_by_slot = {item["slot_name"]: item for item in snapshot.slot_token_breakdown}
+        assert budget_breakdown_by_slot["system_rules"]["budget_tokens"] == 300
+        slot_logs = db.query(ContextSlotLog).filter(ContextSlotLog.context_snapshot_id == snapshot.id).all()
+        assert slot_logs
+        budget_meta_by_slot = {item.slot_name: item.metadata_payload["budget_meta"] for item in slot_logs}
+        assert "system_rules" in budget_meta_by_slot
+        assert budget_meta_by_slot["system_rules"]["source_label"] == "提示词模板"
+        assert all("budget_tokens" in meta for meta in budget_meta_by_slot.values())
+        assert any(meta["contains_hardcoded_domain_terms"] for meta in budget_meta_by_slot.values())
 
     regenerate_response = client.post(
         f"/api/drafts/{draft_id}/regenerate",

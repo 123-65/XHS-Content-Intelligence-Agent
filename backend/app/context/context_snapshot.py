@@ -30,7 +30,7 @@ SENSITIVE_PATTERNS = [
 
 @dataclass(frozen=True)
 class TraceRetentionRule:
-    """Storage policy for a trace table."""
+    """追踪日志表的存储保留策略。"""
 
     log_table: str
     retention_days: int
@@ -50,14 +50,14 @@ DEFAULT_TRACE_RETENTION_POLICIES: dict[str, TraceRetentionRule] = {
 
 
 class TracePayloadGovernor:
-    """Redact, summarize, and hash trace payloads before persistence."""
+    """在持久化前对追踪 payload 做脱敏、摘要和 hash。"""
 
     def policy_for(self, log_table: str) -> TraceRetentionRule:
-        """Return a retention rule for a trace table."""
+        """返回某个追踪表的保留策略。"""
         return DEFAULT_TRACE_RETENTION_POLICIES.get(log_table, DEFAULT_TRACE_RETENTION_POLICIES["agent_step"])
 
     def govern_payload(self, payload: Any, log_table: str) -> Any:
-        """Govern structured payload storage."""
+        """治理结构化 payload 的存储内容。"""
         rule = self.policy_for(log_table)
         redacted = self.redact(payload) if rule.redact_sensitive else payload
         raw_text = self._to_json(redacted)
@@ -72,7 +72,7 @@ class TracePayloadGovernor:
         }
 
     def govern_text(self, text: str | None, log_table: str) -> str | None:
-        """Govern text storage."""
+        """治理纯文本的存储内容。"""
         if text is None:
             return None
         rule = self.policy_for(log_table)
@@ -87,7 +87,7 @@ class TracePayloadGovernor:
         )
 
     def redact(self, value: Any) -> Any:
-        """Redact sensitive values in dictionaries, lists, and strings."""
+        """对字典、列表和字符串中的敏感值做脱敏。"""
         if isinstance(value, dict):
             return {key: self._redact_value(key, item) for key, item in value.items()}
         if isinstance(value, list):
@@ -97,18 +97,18 @@ class TracePayloadGovernor:
         return value
 
     def redact_text(self, value: str) -> str:
-        """Redact sensitive string patterns."""
+        """对字符串里的敏感模式做脱敏。"""
         redacted = value
         for pattern in SENSITIVE_PATTERNS:
             redacted = pattern.sub("[REDACTED]", redacted)
         return redacted
 
     def hash_text(self, text: str) -> str:
-        """Return a sha256 hash for text."""
+        """返回文本的 sha256 hash。"""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def policies_as_dicts(self) -> list[dict[str, Any]]:
-        """Return public retention policy details."""
+        """返回可公开展示的保留策略明细。"""
         return [
             {
                 **rule.__dict__,
@@ -126,4 +126,3 @@ class TracePayloadGovernor:
 
     def _to_json(self, value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-

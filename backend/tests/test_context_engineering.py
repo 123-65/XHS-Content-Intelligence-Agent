@@ -19,6 +19,9 @@ def test_context_slots_are_assembled_by_role():
     assert "task_instruction" in built.user_prompt
     assert "account_profile" in built.user_prompt
     assert built.injected_slot_names == ["system_rules", "task_instruction", "account_profile"]
+    assert all(slot.metadata.get("budget_meta") for slot in built.slots)
+    assert built.slots[0].metadata["budget_meta"]["budget_tokens"] == 300
+    assert built.slots[2].metadata["budget_meta"]["source"] == "internal"
 
 
 def test_token_budget_trims_lower_priority_slots_first():

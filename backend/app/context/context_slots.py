@@ -5,28 +5,32 @@ from typing import Any
 
 
 class ContextSlotName(str, Enum):
-    """Canonical context slots used before LLM calls."""
+    """LLM 调用前统一使用的上下文槽位名称。"""
 
     SYSTEM_RULES = "system_rules"
     TASK_INSTRUCTION = "task_instruction"
     ACCOUNT_PROFILE = "account_profile"
+    DOMAIN_PROFILE = "domain_profile"
     USER_INPUT = "user_input"
     WORKFLOW_STATE = "workflow_state"
+    COMPETITOR_EVIDENCE = "competitor_evidence"
+    COMMENT_INSIGHT = "comment_insight"
     TOOL_RESULT = "tool_result"
     STRATEGY_MEMORY = "strategy_memory"
     RISK_CONSTRAINTS = "risk_constraints"
     OUTPUT_SCHEMA = "output_schema"
+    DRAFT_CONTENT = "draft_content"
 
 
 class ContextTrustLevel(str, Enum):
-    """Trust labels used to prevent external text from becoming instructions."""
+    """上下文可信等级，用于避免外部文本被当成系统指令。"""
 
     TRUSTED = "trusted"
     UNTRUSTED = "untrusted"
 
 
 class ContextRole(str, Enum):
-    """Target prompt role for a context slot."""
+    """上下文槽位最终进入 prompt 时使用的角色。"""
 
     SYSTEM = "system"
     USER = "user"
@@ -34,7 +38,7 @@ class ContextRole(str, Enum):
 
 @dataclass
 class ContextSlot:
-    """A single typed piece of context injected into an LLM prompt."""
+    """准备注入 LLM prompt 的单个结构化上下文槽位。"""
 
     name: ContextSlotName | str
     content: Any
@@ -47,11 +51,11 @@ class ContextSlot:
 
     @property
     def slot_name(self) -> str:
-        """Return the stable string slot name."""
+        """返回稳定的字符串槽位名。"""
         return self.name.value if isinstance(self.name, Enum) else str(self.name)
 
     def render_content(self) -> str:
-        """Render slot content into stable prompt text."""
+        """把 slot 内容渲染为稳定的 prompt 文本。"""
         if isinstance(self.content, str):
             return self.content
         return json.dumps(self.content, ensure_ascii=False, indent=2, default=str)
@@ -59,7 +63,7 @@ class ContextSlot:
 
 @dataclass
 class BuiltContextSlot:
-    """A slot after sanitization, compression, and budget trimming."""
+    """经过清洗、压缩和整体预算处理后的上下文槽位。"""
 
     name: str
     role: str
@@ -77,7 +81,7 @@ class BuiltContextSlot:
 
 @dataclass
 class BuiltContext:
-    """Final prompt pieces and metadata for one LLM call."""
+    """一次 LLM 调用最终使用的 prompt 片段和上下文元数据。"""
 
     task_name: str
     system_prompt: str
@@ -91,6 +95,5 @@ class BuiltContext:
 
     @property
     def injected_slot_names(self) -> list[str]:
-        """Return names for all injected slots."""
+        """返回所有实际注入 prompt 的槽位名。"""
         return [slot.name for slot in self.slots if slot.injected_tokens > 0]
-
