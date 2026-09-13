@@ -2,7 +2,7 @@ import hashlib
 from typing import Any
 
 from app.context.context_budget import ContextBudgetManager, build_slot_budget_meta, estimate_tokens, trim_to_token_budget
-from app.context.context_compressor import ToolResultCompressor, select_competitor_evidence_top_k
+from app.context.context_compressor import ToolResultCompressor, select_competitor_evidence_top_k, select_strategy_memory_items
 from app.context.context_sanitizer import ContextSanitizer
 from app.context.context_slots import BuiltContext, BuiltContextSlot, ContextRole, ContextSlot, ContextSlotName, ContextTrustLevel
 
@@ -67,6 +67,22 @@ class ContextManager:
     def _prepare_slot(self, slot: ContextSlot) -> BuiltContextSlot:
         if slot.slot_name == ContextSlotName.COMPETITOR_EVIDENCE.value and isinstance(slot.content, list):
             selected, compression_meta = select_competitor_evidence_top_k(
+                slot.content,
+                top_k=slot.metadata.get("top_k", 5),
+                query_context=slot.metadata.get("query_context"),
+            )
+            slot.content = selected
+            slot.metadata = {
+                **slot.metadata,
+                "compression_meta": compression_meta,
+            }
+
+        if (
+            slot.slot_name == ContextSlotName.STRATEGY_MEMORY.value
+            and isinstance(slot.content, list)
+            and all(isinstance(item, dict) for item in slot.content)
+        ):
+            selected, compression_meta = select_strategy_memory_items(
                 slot.content,
                 top_k=slot.metadata.get("top_k", 5),
                 query_context=slot.metadata.get("query_context"),

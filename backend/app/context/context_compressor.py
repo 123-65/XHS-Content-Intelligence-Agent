@@ -86,6 +86,66 @@ def select_competitor_evidence_top_k(
     return selected, compression_meta
 
 
+def select_strategy_memory_items(
+    items: list[dict],
+    top_k: int = 5,
+    query_context: dict | None = None,
+) -> tuple[list[dict], dict]:
+    """根据同领域、置信度、新鲜度和结果验证筛选策略记忆。"""
+    safe_top_k = max(0, int(top_k or 0))
+    before_text = _stable_json(items)
+    drop_reason: dict[str, int] = {}
+    query_context = query_context or {}
+    query_keywords = _strategy_query_keywords(query_context)
+    query_domain_version = str(query_context.get("domain_profile_version") or "").strip()
+    candidates: list[tuple[tuple, int, dict, bool]] = []
+
+    for index, item in enumerate(items):
+        copied = dict(item)
+        blocked_reason = _strategy_memory_blocked_reason(copied, query_domain_version)
+        if blocked_reason:
+            _count_reason(drop_reason, blocked_reason)
+            continue
+        candidates.append(
+            (
+                _score_strategy_memory(copied, query_keywords, query_domain_version),
+                index,
+                copied,
+                _is_failure_memory(copied),
+            )
+        )
+
+    candidates.sort(key=lambda value: (value[0], -value[1]), reverse=True)
+    selected_rows = _pick_strategy_memory_rows(candidates, safe_top_k)
+    selected = [item for _, _, item, _ in selected_rows]
+    selected_ids = {id(item) for _, _, item, _ in selected_rows}
+    for _, _, item, _ in candidates:
+        if id(item) not in selected_ids:
+            _count_reason(drop_reason, "not_in_top_k")
+
+    after_text = _stable_json(selected)
+    warning = None
+    if any(is_failure for *_, is_failure in selected_rows):
+        warning = "已保留少量失败复盘，用于避免重复踩坑"
+
+    compression_meta = {
+        "compressed": True,
+        "truncated": False,
+        "compression_method": "deterministic_strategy_memory_filter",
+        "before_chars": len(before_text),
+        "after_chars": len(after_text),
+        "before_rough_tokens": rough_token_count(before_text),
+        "after_rough_tokens": rough_token_count(after_text),
+        "selected_count": len(selected),
+        "dropped_count": max(0, len(items) - len(selected)),
+        "drop_reason": drop_reason,
+        "top_k": safe_top_k,
+        "summary_generated": False,
+        "warning": warning,
+    }
+    return selected, compression_meta
+
+
 class ToolResultCompressor:
     """在工具输出进入上下文或追踪日志前，对长内容做有界压缩。"""
 
@@ -191,6 +251,160 @@ def _score_item(item: dict, query_keywords: set[str]) -> tuple:
     freshness_score = _freshness_score(item)
     confidence_score = _number(item.get("confidence"))
     return (trust_score, relevance_score, interaction_score, freshness_score, confidence_score)
+
+
+def _pick_strategy_memory_rows(
+    candidates: list[tuple[tuple, int, dict, bool]],
+    top_k: int,
+) -> list[tuple[tuple, int, dict, bool]]:
+    if top_k <= 0:
+        return []
+
+    failure_limit = 0 if top_k <= 1 else (2 if top_k >= 6 else 1)
+    selected: list[tuple[tuple, int, dict, bool]] = []
+    failure_rows = [row for row in candidates if row[3]]
+    positive_rows = [row for row in candidates if not row[3]]
+
+    selected.extend(failure_rows[:failure_limit])
+    selected.extend(positive_rows[: max(0, top_k - len(selected))])
+
+    if len(selected) < top_k and len(failure_rows) > failure_limit:
+        selected.extend(failure_rows[failure_limit : top_k - len(selected) + failure_limit])
+
+    selected = selected[:top_k]
+    selected.sort(key=lambda value: (value[0], -value[1]), reverse=True)
+    return selected
+
+
+def _score_strategy_memory(item: dict, query_keywords: set[str], query_domain_version: str) -> tuple:
+    domain_score = _strategy_domain_score(item, query_keywords, query_domain_version)
+    confidence_score = _strategy_confidence(item)
+    freshness_score = _freshness_score(item)
+    verified_score = 1 if _has_result_validation(item) else 0
+    failure_score = 1 if _is_failure_memory(item) else 0
+    return (domain_score, confidence_score, freshness_score, verified_score, failure_score)
+
+
+def _strategy_memory_blocked_reason(item: dict, query_domain_version: str) -> str | None:
+    blocked_reason = _blocked_reason(item)
+    if blocked_reason:
+        return blocked_reason
+    confidence = _strategy_confidence(item)
+    if confidence < 0.2:
+        return "low_confidence"
+    if _domain_profile_version_mismatch(item, query_domain_version):
+        return "domain_profile_version_mismatch"
+    return None
+
+
+def _strategy_domain_score(item: dict, query_keywords: set[str], query_domain_version: str) -> int:
+    score = 0
+    if query_domain_version and str(item.get("domain_profile_version") or "").strip() == query_domain_version:
+        score += 3
+    haystack = _strategy_memory_haystack(item)
+    score += sum(1 for keyword in query_keywords if keyword and keyword.lower() in haystack)
+    return score
+
+
+def _strategy_memory_haystack(item: dict) -> str:
+    parts = [
+        item.get("memory_type"),
+        item.get("summary"),
+        item.get("pattern"),
+        item.get("usage_reason"),
+        item.get("content_pillar"),
+        item.get("memory_domain"),
+        item.get("account_type"),
+        item.get("target_audience"),
+    ]
+    parts.extend(item.get("tags") or [])
+    return " ".join(str(part or "") for part in parts).lower()
+
+
+def _strategy_confidence(item: dict) -> float:
+    values = [item.get("confidence"), item.get("score"), item.get("reliability")]
+    normalized = [_normalize_confidence(value) for value in values if value is not None]
+    if not normalized:
+        return 0.5
+    return max(normalized)
+
+
+def _normalize_confidence(value: Any) -> float:
+    number = _number(value)
+    if number > 1:
+        number = number / 100
+    return max(0.0, min(1.0, number))
+
+
+def _has_result_validation(item: dict) -> bool:
+    return any(
+        bool(item.get(key))
+        for key in (
+            "result_metric",
+            "result_value",
+            "success_or_failure",
+            "verified",
+            "usage_snapshot",
+            "has_result",
+        )
+    )
+
+
+def _is_failure_memory(item: dict) -> bool:
+    values = [
+        item.get("success_or_failure"),
+        item.get("result_status"),
+        item.get("outcome"),
+        item.get("memory_type"),
+        item.get("sentiment"),
+    ]
+    failure_values = {"failure", "failed", "negative", "ineffective", "invalid", "失败", "无效", "负向"}
+    return any(str(value or "").strip().lower() in failure_values for value in values)
+
+
+def _domain_profile_version_mismatch(item: dict, query_domain_version: str) -> bool:
+    item_version = str(item.get("domain_profile_version") or "").strip()
+    return bool(query_domain_version and item_version and item_version != query_domain_version and not _is_generic_memory(item))
+
+
+def _is_generic_memory(item: dict) -> bool:
+    if item.get("is_generic") is True:
+        return True
+    values = [
+        item.get("scope"),
+        item.get("memory_domain"),
+        *(item.get("tags") or []),
+    ]
+    generic_values = {"general", "generic", "global", "通用", "全局"}
+    return any(str(value or "").strip().lower() in generic_values for value in values)
+
+
+def _strategy_query_keywords(query_context: dict) -> set[str]:
+    keywords: set[str] = set()
+    for key in ("selected_topic", "topic", "content_pillar", "target_audience", "account_type", "memory_domain"):
+        _add_keywords(keywords, query_context.get(key))
+    for key in ("account_profile", "domain_profile"):
+        nested = query_context.get(key)
+        if isinstance(nested, dict):
+            for nested_key in ("content_domain", "positioning", "target_audience", "account_type", "content_pillar", "memory_domain"):
+                _add_keywords(keywords, nested.get(nested_key))
+            for nested_key in ("domain_keywords", "tags", "keywords"):
+                _add_keywords(keywords, nested.get(nested_key))
+    for key in ("account_keywords", "domain_keywords", "keywords", "tags"):
+        _add_keywords(keywords, query_context.get(key))
+    return {keyword.strip().lower() for keyword in keywords if keyword and keyword.strip()}
+
+
+def _add_keywords(keywords: set[str], value: Any) -> None:
+    if not value:
+        return
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            _add_keywords(keywords, item)
+        return
+    text = str(value)
+    keywords.add(text)
+    keywords.update(text.split())
 
 
 def _trust_score(item: dict) -> int:
