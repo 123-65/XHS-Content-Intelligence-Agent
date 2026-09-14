@@ -37,6 +37,15 @@ from app.agent.product_entry.schemas import (
     ValidationSeverity,
 )
 from app.agent.product_entry.task_planner import LLMTaskPlanner, apply_action_registry_constraints
+from app.agent.product_entry.trace import (
+    AgentEntryTrace,
+    AgentEntryTraceEvent,
+    AgentEntryTraceRecorder,
+    AgentEntryTraceStage,
+    mask_sensitive_text,
+    summarize_payload,
+    to_agent_trace_payload,
+)
 from app.agent.product_entry.validation_rules import ACTION_ALTERNATIVE_PARAM_GROUPS, ACTION_PARAM_SPECS
 from app.agent.product_entry.validators import validate_action_params, validate_param_sources, validate_plan_params, validate_plan_result, validate_router_result
 
@@ -51,6 +60,10 @@ __all__ = [
     "Action",
     "AgentChatRequest",
     "AgentChatResponse",
+    "AgentEntryTrace",
+    "AgentEntryTraceEvent",
+    "AgentEntryTraceRecorder",
+    "AgentEntryTraceStage",
     "AgentInput",
     "AgentPlanningResult",
     "AgentResponseStatus",
@@ -79,6 +92,9 @@ __all__ = [
     "build_user_input_router_system_prompt",
     "build_user_input_router_user_prompt",
     "apply_action_registry_constraints",
+    "mask_sensitive_text",
+    "summarize_payload",
+    "to_agent_trace_payload",
     "validate_action_params",
     "validate_param_sources",
     "validate_plan_params",

@@ -14,6 +14,7 @@ from app.agent.product_entry.schemas import (
     RouterResult,
     TargetType,
 )
+from app.agent.product_entry.trace import AgentEntryTraceRecorder, AgentEntryTraceStage
 from app.agent.product_entry.validators import validate_router_result
 from app.llm.errors import LLMError
 from app.schemas.provider_status import ProviderErrorCode
@@ -26,10 +27,10 @@ class LLMUserInputRouter:
         """初始化路由器，注入已有 LLMClient 或兼容客户端。"""
         self.llm_client = llm_client
 
-    def route(self, agent_input: AgentInput | AgentChatRequest) -> RouterResult:
+    def route(self, agent_input: AgentInput | AgentChatRequest, recorder: AgentEntryTraceRecorder | None = None) -> RouterResult:
         """调用 LLM 识别用户意图，并返回经过校验的 RouterResult。"""
         if self._is_image_only_without_text(agent_input):
-            return validate_router_result(
+            result = validate_router_result(
                 RouterResult(
                     intent=Intent.UNKNOWN,
                     confidence=0,
@@ -41,9 +42,24 @@ class LLMUserInputRouter:
                     warning="图片输入未包含文字目标说明，本阶段不做 OCR 或视觉识别。",
                 )
             )
+            if recorder:
+                recorder.record_router_result(result)
+            return result
 
         system_prompt = build_user_input_router_system_prompt()
-        user_prompt = build_user_input_router_user_prompt(self._input_text(agent_input), self._prompt_context(agent_input))
+        prompt_context = self._prompt_context(agent_input)
+        user_prompt = build_user_input_router_user_prompt(self._input_text(agent_input), prompt_context)
+        if recorder:
+            recorder.record_event(
+                AgentEntryTraceStage.ROUTER_PROMPT_BUILT,
+                summary="Router Prompt 已构建。",
+                payload={
+                    "system_prompt_length": len(system_prompt),
+                    "user_prompt_length": len(user_prompt),
+                    "context_keys": list(prompt_context.keys()),
+                    "input_type": agent_input.input_type,
+                },
+            )
         try:
             llm_result = self.llm_client.generate_text(
                 user_prompt,
@@ -52,43 +68,110 @@ class LLMUserInputRouter:
                 prompt_version="6.2",
             )
         except LLMError as exc:
-            return self._failed_result(agent_input, self._error_code_from_exception(exc), "真实 LLM 不可用，未执行路由。", "check_llm_config")
+            result = self._failed_result(agent_input, self._error_code_from_exception(exc), "真实 LLM 不可用，未执行路由。", "check_llm_config")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=result.intent,
+                    error_code=result.error_code,
+                    warning=result.warning,
+                    summary="Router LLM 调用失败。",
+                    payload={"next_action": result.next_action},
+                )
+            return result
         except Exception:
-            return self._failed_result(agent_input, ProviderErrorCode.LLM_OUTPUT_FAILED.value, "LLM Router 调用失败，未执行路由。", "check_llm_config")
+            result = self._failed_result(agent_input, ProviderErrorCode.LLM_OUTPUT_FAILED.value, "LLM Router 调用失败，未执行路由。", "check_llm_config")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=result.intent,
+                    error_code=result.error_code,
+                    warning=result.warning,
+                    summary="Router 调用失败。",
+                    payload={"next_action": result.next_action},
+                )
+            return result
 
-        return self._parse_and_validate(self._result_text(llm_result), agent_input)
+        return self._parse_and_validate(self._result_text(llm_result), agent_input, recorder)
 
-    def _parse_and_validate(self, raw_text: str, agent_input: AgentInput | AgentChatRequest) -> RouterResult:
+    def _parse_and_validate(
+        self,
+        raw_text: str,
+        agent_input: AgentInput | AgentChatRequest,
+        recorder: AgentEntryTraceRecorder | None = None,
+    ) -> RouterResult:
         """按 JSON 解析、Schema 校验、Router Validator 三层处理 LLM 输出。"""
         try:
             payload = json.loads(raw_text)
         except JSONDecodeError:
-            return self._failed_result(
+            result = self._failed_result(
                 agent_input,
                 ProviderErrorCode.LLM_OUTPUT_PARSE_FAILED.value,
                 "LLM 输出不是合法 JSON。",
                 "ask_user_to_retry_or_simplify",
                 requires_clarification=True,
             )
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=result.intent,
+                    error_code=result.error_code,
+                    warning=result.warning,
+                    summary="Router 输出 JSON 解析失败。",
+                    payload={"raw_text_length": len(raw_text)},
+                )
+            return result
         if not isinstance(payload, dict):
-            return self._failed_result(
+            result = self._failed_result(
                 agent_input,
                 ProviderErrorCode.LLM_OUTPUT_PARSE_FAILED.value,
                 "LLM 输出 JSON 必须是对象。",
                 "ask_user_to_retry_or_simplify",
                 requires_clarification=True,
             )
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=result.intent,
+                    error_code=result.error_code,
+                    warning=result.warning,
+                    summary="Router 输出 JSON 不是对象。",
+                    payload={"payload_type": type(payload).__name__},
+                )
+            return result
         try:
             router_result = RouterResult.model_validate(payload)
         except ValidationError:
-            return self._failed_result(
+            result = self._failed_result(
                 agent_input,
                 ProviderErrorCode.LLM_SCHEMA_INVALID.value,
                 "LLM 输出不符合 RouterResult Schema。",
                 "ask_user_to_retry_or_simplify",
                 requires_clarification=True,
             )
-        return validate_router_result(router_result)
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=result.intent,
+                    error_code=result.error_code,
+                    warning=result.warning,
+                    summary="RouterResult Schema 校验失败。",
+                    payload={"payload_keys": list(payload.keys())},
+                )
+            return result
+        if recorder:
+            recorder.record_event(
+                AgentEntryTraceStage.ROUTER_RESULT_PARSED,
+                intent=router_result.intent,
+                risk_flags=router_result.risk_flags,
+                missing_params=router_result.missing_params,
+                summary="RouterResult 已解析。",
+                payload={"confidence": router_result.confidence, "can_execute": router_result.can_execute},
+            )
+        validated = validate_router_result(router_result)
+        if recorder:
+            recorder.record_router_result(validated)
+        return validated
 
     def _prompt_context(self, agent_input: AgentInput | AgentChatRequest) -> dict[str, Any]:
         """构建传给 Router Prompt 的入口上下文，只传附件元信息。"""

@@ -17,6 +17,7 @@ from app.agent.product_entry.schemas import (
     RiskFlag,
     RouterResult,
 )
+from app.agent.product_entry.trace import AgentEntryTraceRecorder, AgentEntryTraceStage
 from app.agent.product_entry.validators import validate_plan_result, validate_router_result
 from app.llm.errors import LLMError
 from app.schemas.provider_status import ProviderErrorCode
@@ -29,14 +30,30 @@ class LLMTaskPlanner:
         """初始化任务规划器，注入已有 LLMClient 或兼容客户端。"""
         self.llm_client = llm_client
 
-    def plan(self, agent_input: AgentInput, router_result: RouterResult) -> Plan:
+    def plan(self, agent_input: AgentInput, router_result: RouterResult, recorder: AgentEntryTraceRecorder | None = None) -> Plan:
         """根据用户输入和路由结果生成任务计划，并返回经过校验的 Plan。"""
         checked_router = validate_router_result(router_result)
         if not checked_router.can_execute:
-            return self._blocked_by_router(agent_input, checked_router)
+            plan = self._blocked_by_router(agent_input, checked_router)
+            if recorder:
+                recorder.record_plan(plan, AgentEntryTraceStage.PLAN_VALIDATED)
+            return plan
 
         system_prompt = build_task_planner_system_prompt()
-        user_prompt = build_task_planner_user_prompt(checked_router.model_dump(mode="json"), self._prompt_context(agent_input))
+        prompt_context = self._prompt_context(agent_input)
+        user_prompt = build_task_planner_user_prompt(checked_router.model_dump(mode="json"), prompt_context)
+        if recorder:
+            recorder.record_event(
+                AgentEntryTraceStage.PLANNER_PROMPT_BUILT,
+                intent=checked_router.intent,
+                summary="Planner Prompt 已构建。",
+                payload={
+                    "system_prompt_length": len(system_prompt),
+                    "user_prompt_length": len(user_prompt),
+                    "context_keys": list(prompt_context.keys()),
+                    "router_confidence": checked_router.confidence,
+                },
+            )
         try:
             llm_result = self.llm_client.generate_text(
                 user_prompt,
@@ -45,30 +62,82 @@ class LLMTaskPlanner:
                 prompt_version="6.3",
             )
         except LLMError as exc:
-            return self._safe_plan(
+            plan = self._safe_plan(
                 checked_router.intent,
                 f"Planner LLM 调用失败：{self._error_code_from_exception(exc)}。",
                 "check_llm_config",
             )
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=checked_router.intent,
+                    warning=plan.blocked_reason,
+                    summary="Planner LLM 调用失败。",
+                    payload={"next_action": plan.next_action},
+                )
+            return plan
         except Exception:
-            return self._safe_plan(checked_router.intent, "Planner LLM 调用失败。", "check_llm_config")
+            plan = self._safe_plan(checked_router.intent, "Planner LLM 调用失败。", "check_llm_config")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=checked_router.intent,
+                    warning=plan.blocked_reason,
+                    summary="Planner 调用失败。",
+                    payload={"next_action": plan.next_action},
+                )
+            return plan
 
-        return self._parse_and_validate(self._result_text(llm_result), checked_router)
+        return self._parse_and_validate(self._result_text(llm_result), checked_router, recorder)
 
-    def _parse_and_validate(self, raw_text: str, router_result: RouterResult) -> Plan:
+    def _parse_and_validate(self, raw_text: str, router_result: RouterResult, recorder: AgentEntryTraceRecorder | None = None) -> Plan:
         """按 JSON 解析、Plan Schema、Registry 约束、Plan Validator 四层处理 LLM 输出。"""
         try:
             payload = json.loads(raw_text)
         except JSONDecodeError:
-            return self._safe_plan(router_result.intent, "Planner 输出不是合法 JSON。", "ask_user_to_retry_or_simplify")
+            plan = self._safe_plan(router_result.intent, "Planner 输出不是合法 JSON。", "ask_user_to_retry_or_simplify")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=router_result.intent,
+                    warning=plan.blocked_reason,
+                    summary="Planner 输出 JSON 解析失败。",
+                    payload={"raw_text_length": len(raw_text)},
+                )
+            return plan
         if not isinstance(payload, dict):
-            return self._safe_plan(router_result.intent, "Planner 输出 JSON 必须是对象。", "ask_user_to_retry_or_simplify")
+            plan = self._safe_plan(router_result.intent, "Planner 输出 JSON 必须是对象。", "ask_user_to_retry_or_simplify")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=router_result.intent,
+                    warning=plan.blocked_reason,
+                    summary="Planner 输出 JSON 不是对象。",
+                    payload={"payload_type": type(payload).__name__},
+                )
+            return plan
         try:
             plan = Plan.model_validate(payload)
         except ValidationError:
-            return self._safe_plan(router_result.intent, "Planner 输出不符合 Plan Schema。", "ask_user_to_retry_or_simplify")
+            plan = self._safe_plan(router_result.intent, "Planner 输出不符合 Plan Schema。", "ask_user_to_retry_or_simplify")
+            if recorder:
+                recorder.record_event(
+                    AgentEntryTraceStage.FAILED,
+                    intent=router_result.intent,
+                    warning=plan.blocked_reason,
+                    summary="Plan Schema 校验失败。",
+                    payload={"payload_keys": list(payload.keys())},
+                )
+            return plan
+        if recorder:
+            recorder.record_plan(plan, AgentEntryTraceStage.PLAN_PARSED)
         constrained_plan = apply_action_registry_constraints(plan)
-        return validate_plan_result(constrained_plan)
+        if recorder:
+            recorder.record_plan(constrained_plan, AgentEntryTraceStage.PLAN_REGISTRY_APPLIED)
+        validated = validate_plan_result(constrained_plan)
+        if recorder:
+            recorder.record_plan(validated, AgentEntryTraceStage.PLAN_VALIDATED)
+        return validated
 
     def _blocked_by_router(self, agent_input: AgentInput, router_result: RouterResult) -> Plan:
         """Router 已要求澄清或阻断时，Planner 只生成追问计划。"""
