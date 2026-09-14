@@ -1,0 +1,2124 @@
+[
+  {
+    "case": "new_topic_missing_account",
+    "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+    "response": {
+      "session_id": "demo_case_1",
+      "router_result": {
+        "intent": "GENERATE_CONTENT_OPPORTUNITY",
+        "confidence": 0.9,
+        "input_type": "TEXT",
+        "target_type": "UNKNOWN",
+        "target_id": null,
+        "feedback_action": "UNKNOWN",
+        "feedback_polarity": "UNKNOWN",
+        "reject_reason": null,
+        "preferred_direction": null,
+        "extracted_params": {
+          "topic": "27 届双非本科做 Agent 求职"
+        },
+        "missing_params": [],
+        "risk_flags": [],
+        "requires_clarification": false,
+        "requires_confirmation": false,
+        "can_execute": true,
+        "next_action": null,
+        "error_code": null,
+        "warning": null,
+        "clarification_question": null
+      },
+      "plan": {
+        "plan_id": null,
+        "conversation_id": null,
+        "intent": "GENERATE_CONTENT_OPPORTUNITY",
+        "steps": [
+          {
+            "step_no": 1,
+            "action": "GENERATE_CONTENT_OPPORTUNITY",
+            "description": "把自然语言想法整理成可评估的内容机会。",
+            "inputs": {},
+            "required_params": [
+              "account_id"
+            ],
+            "input_params": {
+              "topic": "27 届双非本科做 Agent 求职"
+            },
+            "depends_on": [],
+            "expected_output": "内容机会预览",
+            "allowed_effect": "LOCAL_GENERATION",
+            "risk_flags": [
+              "MISSING_REQUIRED_PARAM"
+            ],
+            "requires_confirmation": false,
+            "can_execute": false
+          }
+        ],
+        "required_params": [],
+        "missing_params": [
+          "account_id",
+          "step_1.account_id"
+        ],
+        "risk_flags": [
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "confirmation_requirement": "CLARIFICATION_REQUIRED",
+        "can_execute": false,
+        "summary_for_user": "入口预览链路已完成任务规划。",
+        "blocked_reason": "计划步骤缺少必填参数。",
+        "next_action": "ask_user_to_provide_required_params",
+        "metadata": {}
+      },
+      "param_validation": {
+        "valid": false,
+        "issues": [
+          {
+            "field": "step_1.account_id",
+            "source": "plan_step",
+            "message": "缺少必填参数 account_id。",
+            "suggestion": "请补充 account_id。",
+            "risk_flag": "MISSING_REQUIRED_PARAM",
+            "severity": "BLOCKER"
+          }
+        ],
+        "missing_params": [
+          "step_1.account_id"
+        ],
+        "normalized_params": {
+          "step_1": {
+            "topic": "27 届双非本科做 Agent 求职"
+          }
+        }
+      },
+      "plan_validation": {
+        "valid": false,
+        "confirmation_requirement": "CLARIFICATION_REQUIRED",
+        "risk_flags": [
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "issues": [
+          {
+            "field": "step_1.account_id",
+            "source": "plan_step",
+            "message": "缺少必填参数 account_id。",
+            "suggestion": "请补充 account_id。",
+            "risk_flag": "MISSING_REQUIRED_PARAM",
+            "severity": "BLOCKER"
+          }
+        ],
+        "blocked_reason": "计划步骤缺少必填参数。"
+      },
+      "confirmation_card": {
+        "title": "需要补充信息",
+        "description": "缺少必要信息：account_id、step_1.account_id",
+        "action_type": "ASK_CLARIFICATION",
+        "risk_flags": [
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "params_preview": {
+          "missing_params": [
+            "account_id",
+            "step_1.account_id"
+          ],
+          "next_action": "ask_user_to_provide_required_params"
+        },
+        "confirm_button_text": "补充信息",
+        "cancel_button_text": "取消",
+        "requires_confirmation": true,
+        "confirmation_requirement": "CLARIFICATION_REQUIRED"
+      },
+      "status": "NEED_CLARIFICATION",
+      "can_execute": false,
+      "requires_confirmation": false,
+      "message": "缺少必要信息：account_id、step_1.account_id",
+      "next_action": "ask_user_to_clarify",
+      "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+      "metadata": {
+        "execution": {
+          "plan_id": null,
+          "session_id": null,
+          "trace_id": null,
+          "status": "NEED_CLARIFICATION",
+          "mode": "DRY_RUN",
+          "can_execute": false,
+          "step_results": [],
+          "output": {},
+          "error_code": "CLARIFICATION_REQUIRED",
+          "message": "计划需要先补充信息。",
+          "risk_flags": [
+            "MISSING_REQUIRED_PARAM"
+          ],
+          "confirmation_requirement": "CLARIFICATION_REQUIRED"
+        },
+        "entry_trace": {
+          "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+          "session_id": "demo_case_1",
+          "agent_type": "PRODUCT_ENTRY_AGENT",
+          "workflow_name": "router_planner_entry",
+          "account_id": null,
+          "input_type": "TEXT",
+          "final_status": "NEED_CLARIFICATION",
+          "final_intent": "GENERATE_CONTENT_OPPORTUNITY",
+          "final_confirmation_requirement": "CLARIFICATION_REQUIRED",
+          "final_can_execute": false,
+          "events": [
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "INPUT_RECEIVED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "收到用户输入。",
+              "payload": {
+                "input_type": "TEXT",
+                "account_id_present": false,
+                "text_summary": "我想写一篇 27 届双非本科做 Agent 求职的帖子",
+                "text_length": 27,
+                "attachments": [],
+                "current_target_type": "UNKNOWN",
+                "current_target_id_present": false
+              },
+              "created_at": "2026-09-14T10:08:05.158740Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "ROUTER_PROMPT_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Router Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 455,
+                "user_prompt_length": 317,
+                "context_keys": [
+                  "input_type",
+                  "attachments",
+                  "account_id",
+                  "current_target_type",
+                  "current_target_id",
+                  "context"
+                ],
+                "input_type": "TEXT"
+              },
+              "created_at": "2026-09-14T10:08:05.158790Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "ROUTER_RESULT_PARSED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已解析。",
+              "payload": {
+                "confidence": 0.9,
+                "can_execute": true
+              },
+              "created_at": "2026-09-14T10:08:05.158849Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "ROUTER_VALIDATED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已生成并完成校验。",
+              "payload": {
+                "confidence": 0.9,
+                "input_type": "TEXT",
+                "target_type": "UNKNOWN",
+                "target_id_present": false,
+                "feedback_action": "UNKNOWN",
+                "requires_clarification": false,
+                "requires_confirmation": false,
+                "can_execute": true,
+                "next_action": null,
+                "extracted_param_keys": [
+                  "topic"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.158897Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PLANNER_PROMPT_BUILT",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Planner Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 951,
+                "user_prompt_length": 6224,
+                "context_keys": [
+                  "conversation_id",
+                  "account_id",
+                  "user_input",
+                  "input_type",
+                  "current_target_type",
+                  "current_target_id",
+                  "attachments",
+                  "metadata"
+                ],
+                "router_confidence": 0.9
+              },
+              "created_at": "2026-09-14T10:08:05.159069Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PLAN_PARSED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "NONE",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "GENERATE_CONTENT_OPPORTUNITY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION"
+                ],
+                "can_execute": true,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.159128Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PLAN_REGISTRY_APPLIED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [
+                "account_id"
+              ],
+              "confirmation_requirement": "NONE",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "GENERATE_CONTENT_OPPORTUNITY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.159169Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [
+                "account_id",
+                "step_1.account_id"
+              ],
+              "confirmation_requirement": "NONE",
+              "error_code": null,
+              "warning": "计划步骤缺少必填参数。",
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "GENERATE_CONTENT_OPPORTUNITY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.159215Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [
+                "step_1.account_id"
+              ],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": false,
+                "issues_count": 1,
+                "issues": [
+                  {
+                    "field": "step_1.account_id",
+                    "source": "plan_step",
+                    "risk_flag": "MISSING_REQUIRED_PARAM",
+                    "severity": "BLOCKER",
+                    "message": "缺少必填参数 account_id。",
+                    "suggestion": "请补充 account_id。"
+                  }
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.159281Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.159301Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": "计划步骤缺少必填参数。",
+              "summary": "计划校验完成。",
+              "payload": {
+                "valid": false,
+                "issues_count": 1,
+                "blocked_reason": "计划步骤缺少必填参数。",
+                "issues": [
+                  {
+                    "field": "step_1.account_id",
+                    "source": "plan_step",
+                    "risk_flag": "MISSING_REQUIRED_PARAM",
+                    "severity": "BLOCKER",
+                    "message": "缺少必填参数 account_id。",
+                    "suggestion": "请补充 account_id。"
+                  }
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.159364Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "CONFIRMATION_CARD_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "确认卡片已生成。",
+              "payload": {
+                "has_card": true,
+                "title": "需要补充信息",
+                "action_type": "ASK_CLARIFICATION",
+                "requires_confirmation": true,
+                "params_preview_keys": [
+                  "missing_params",
+                  "next_action"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.159391Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "EXECUTION_STARTED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "执行编排开始。",
+              "payload": {
+                "mode": "DRY_RUN",
+                "steps_count": 1,
+                "plan_can_execute": false
+              },
+              "created_at": "2026-09-14T10:08:05.159403Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "EXECUTION_BLOCKED",
+              "status": null,
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": "计划需要先补充信息。",
+              "summary": "执行编排被阻断。",
+              "payload": {
+                "error_code": "CLARIFICATION_REQUIRED",
+                "mode": "DRY_RUN"
+              },
+              "created_at": "2026-09-14T10:08:05.159426Z"
+            },
+            {
+              "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde",
+              "session_id": "demo_case_1",
+              "stage": "RESPONSE_BUILT",
+              "status": "NEED_CLARIFICATION",
+              "intent": "GENERATE_CONTENT_OPPORTUNITY",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "入口层响应已生成。",
+              "payload": {
+                "can_execute": false,
+                "requires_confirmation": false,
+                "has_confirmation_card": true,
+                "next_action": "ask_user_to_clarify",
+                "trace_id": "entry_bd6510e6d9e54c6aa2a227bd6468adde"
+              },
+              "created_at": "2026-09-14T10:08:05.159474Z"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case": "ambiguous_rejection_without_target",
+    "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+    "response": {
+      "session_id": "demo_case_2",
+      "router_result": {
+        "intent": "REFINE_OR_REJECT_RESULT",
+        "confidence": 0.9,
+        "input_type": "TEXT",
+        "target_type": "UNKNOWN",
+        "target_id": null,
+        "feedback_action": "REJECT",
+        "feedback_polarity": "NEGATIVE",
+        "reject_reason": null,
+        "preferred_direction": null,
+        "extracted_params": {},
+        "missing_params": [
+          "target"
+        ],
+        "risk_flags": [
+          "TARGET_AMBIGUOUS"
+        ],
+        "requires_clarification": true,
+        "requires_confirmation": false,
+        "can_execute": false,
+        "next_action": "ask_user_to_clarify_target",
+        "error_code": null,
+        "warning": null,
+        "clarification_question": "你说的“这个”是指草稿、标题、选题还是执行计划？"
+      },
+      "plan": {
+        "plan_id": null,
+        "conversation_id": "demo_case_2",
+        "intent": "REFINE_OR_REJECT_RESULT",
+        "steps": [
+          {
+            "step_no": 1,
+            "action": "ASK_CLARIFICATION",
+            "description": "你说的“这个”是指草稿、标题、选题还是执行计划？",
+            "inputs": {
+              "missing_params": [
+                "target"
+              ]
+            },
+            "required_params": [
+              "question"
+            ],
+            "input_params": {
+              "missing_params": [
+                "target"
+              ]
+            },
+            "depends_on": [],
+            "expected_output": "用户补充信息",
+            "allowed_effect": "READ_ONLY",
+            "risk_flags": [
+              "TARGET_AMBIGUOUS",
+              "MISSING_REQUIRED_PARAM"
+            ],
+            "requires_confirmation": false,
+            "can_execute": false
+          }
+        ],
+        "required_params": [],
+        "missing_params": [
+          "target",
+          "step_1.question"
+        ],
+        "risk_flags": [
+          "TARGET_AMBIGUOUS",
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "confirmation_requirement": "CLARIFICATION_REQUIRED",
+        "can_execute": false,
+        "summary_for_user": "需要先补充信息，再继续规划任务。",
+        "blocked_reason": "RouterResult 当前不可继续规划执行链路。",
+        "next_action": "ask_user_to_clarify_target",
+        "metadata": {}
+      },
+      "param_validation": {
+        "valid": false,
+        "issues": [
+          {
+            "field": "step_1.question",
+            "source": "plan_step",
+            "message": "缺少必填参数 question。",
+            "suggestion": "请补充 question。",
+            "risk_flag": "MISSING_REQUIRED_PARAM",
+            "severity": "BLOCKER"
+          }
+        ],
+        "missing_params": [
+          "step_1.question"
+        ],
+        "normalized_params": {
+          "step_1": {
+            "missing_params": [
+              "target"
+            ]
+          }
+        }
+      },
+      "plan_validation": {
+        "valid": false,
+        "confirmation_requirement": "CLARIFICATION_REQUIRED",
+        "risk_flags": [
+          "TARGET_AMBIGUOUS",
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "issues": [
+          {
+            "field": "step_1.question",
+            "source": "plan_step",
+            "message": "缺少必填参数 question。",
+            "suggestion": "请补充 question。",
+            "risk_flag": "MISSING_REQUIRED_PARAM",
+            "severity": "BLOCKER"
+          }
+        ],
+        "blocked_reason": "RouterResult 当前不可继续规划执行链路。"
+      },
+      "confirmation_card": {
+        "title": "需要补充信息",
+        "description": "缺少必要信息：target、step_1.question",
+        "action_type": "ASK_CLARIFICATION",
+        "risk_flags": [
+          "TARGET_AMBIGUOUS",
+          "MISSING_REQUIRED_PARAM"
+        ],
+        "params_preview": {
+          "missing_params": [
+            "target",
+            "step_1.question"
+          ],
+          "next_action": "ask_user_to_clarify_target"
+        },
+        "confirm_button_text": "补充信息",
+        "cancel_button_text": "取消",
+        "requires_confirmation": true,
+        "confirmation_requirement": "CLARIFICATION_REQUIRED"
+      },
+      "status": "NEED_CLARIFICATION",
+      "can_execute": false,
+      "requires_confirmation": false,
+      "message": "你说的“这个”是指草稿、标题、选题还是执行计划？",
+      "next_action": "ask_user_to_clarify",
+      "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+      "metadata": {
+        "execution": {
+          "plan_id": null,
+          "session_id": "demo_case_2",
+          "trace_id": null,
+          "status": "NEED_CLARIFICATION",
+          "mode": "DRY_RUN",
+          "can_execute": false,
+          "step_results": [],
+          "output": {},
+          "error_code": "CLARIFICATION_REQUIRED",
+          "message": "计划需要先补充信息。",
+          "risk_flags": [
+            "TARGET_AMBIGUOUS",
+            "MISSING_REQUIRED_PARAM"
+          ],
+          "confirmation_requirement": "CLARIFICATION_REQUIRED"
+        },
+        "entry_trace": {
+          "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+          "session_id": "demo_case_2",
+          "agent_type": "PRODUCT_ENTRY_AGENT",
+          "workflow_name": "router_planner_entry",
+          "account_id": null,
+          "input_type": "TEXT",
+          "final_status": "NEED_CLARIFICATION",
+          "final_intent": "REFINE_OR_REJECT_RESULT",
+          "final_confirmation_requirement": "CLARIFICATION_REQUIRED",
+          "final_can_execute": false,
+          "events": [
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "INPUT_RECEIVED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "收到用户输入。",
+              "payload": {
+                "input_type": "TEXT",
+                "account_id_present": false,
+                "text_summary": "这个不行",
+                "text_length": 4,
+                "attachments": [],
+                "current_target_type": "UNKNOWN",
+                "current_target_id_present": false
+              },
+              "created_at": "2026-09-14T10:08:05.160978Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "ROUTER_PROMPT_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Router Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 455,
+                "user_prompt_length": 294,
+                "context_keys": [
+                  "input_type",
+                  "attachments",
+                  "account_id",
+                  "current_target_type",
+                  "current_target_id",
+                  "context"
+                ],
+                "input_type": "TEXT"
+              },
+              "created_at": "2026-09-14T10:08:05.161022Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "ROUTER_RESULT_PARSED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已解析。",
+              "payload": {
+                "confidence": 0.9,
+                "can_execute": true
+              },
+              "created_at": "2026-09-14T10:08:05.161060Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "ROUTER_VALIDATED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "TARGET_AMBIGUOUS"
+              ],
+              "missing_params": [
+                "target"
+              ],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已生成并完成校验。",
+              "payload": {
+                "confidence": 0.9,
+                "input_type": "TEXT",
+                "target_type": "UNKNOWN",
+                "target_id_present": false,
+                "feedback_action": "REJECT",
+                "requires_clarification": true,
+                "requires_confirmation": false,
+                "can_execute": false,
+                "next_action": "ask_user_to_clarify_target",
+                "extracted_param_keys": []
+              },
+              "created_at": "2026-09-14T10:08:05.161110Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "TARGET_AMBIGUOUS",
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [
+                "target",
+                "step_1.question"
+              ],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": "RouterResult 当前不可继续规划执行链路。",
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "ASK_CLARIFICATION"
+                ],
+                "step_effects": [
+                  "READ_ONLY"
+                ],
+                "can_execute": false,
+                "next_action": "ask_user_to_clarify_target"
+              },
+              "created_at": "2026-09-14T10:08:05.161179Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [
+                "step_1.question"
+              ],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": false,
+                "issues_count": 1,
+                "issues": [
+                  {
+                    "field": "step_1.question",
+                    "source": "plan_step",
+                    "risk_flag": "MISSING_REQUIRED_PARAM",
+                    "severity": "BLOCKER",
+                    "message": "缺少必填参数 question。",
+                    "suggestion": "请补充 question。"
+                  }
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.161225Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.161242Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "TARGET_AMBIGUOUS",
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": "RouterResult 当前不可继续规划执行链路。",
+              "summary": "计划校验完成。",
+              "payload": {
+                "valid": false,
+                "issues_count": 1,
+                "blocked_reason": "RouterResult 当前不可继续规划执行链路。",
+                "issues": [
+                  {
+                    "field": "step_1.question",
+                    "source": "plan_step",
+                    "risk_flag": "MISSING_REQUIRED_PARAM",
+                    "severity": "BLOCKER",
+                    "message": "缺少必填参数 question。",
+                    "suggestion": "请补充 question。"
+                  }
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.161295Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "CONFIRMATION_CARD_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "TARGET_AMBIGUOUS",
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "确认卡片已生成。",
+              "payload": {
+                "has_card": true,
+                "title": "需要补充信息",
+                "action_type": "ASK_CLARIFICATION",
+                "requires_confirmation": true,
+                "params_preview_keys": [
+                  "missing_params",
+                  "next_action"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.161320Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "EXECUTION_STARTED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "执行编排开始。",
+              "payload": {
+                "mode": "DRY_RUN",
+                "steps_count": 1,
+                "plan_can_execute": false
+              },
+              "created_at": "2026-09-14T10:08:05.161336Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "EXECUTION_BLOCKED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "TARGET_AMBIGUOUS",
+                "MISSING_REQUIRED_PARAM"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": "计划需要先补充信息。",
+              "summary": "执行编排被阻断。",
+              "payload": {
+                "error_code": "CLARIFICATION_REQUIRED",
+                "mode": "DRY_RUN"
+              },
+              "created_at": "2026-09-14T10:08:05.161355Z"
+            },
+            {
+              "trace_id": "entry_a6a37f338559429892a35099e630fc1f",
+              "session_id": "demo_case_2",
+              "stage": "RESPONSE_BUILT",
+              "status": "NEED_CLARIFICATION",
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "CLARIFICATION_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "入口层响应已生成。",
+              "payload": {
+                "can_execute": false,
+                "requires_confirmation": false,
+                "has_confirmation_card": true,
+                "next_action": "ask_user_to_clarify",
+                "trace_id": "entry_a6a37f338559429892a35099e630fc1f"
+              },
+              "created_at": "2026-09-14T10:08:05.161398Z"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case": "refine_title_with_current_target",
+    "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+    "response": {
+      "session_id": "demo_case_3",
+      "router_result": {
+        "intent": "REFINE_OR_REJECT_RESULT",
+        "confidence": 0.9,
+        "input_type": "TEXT",
+        "target_type": "DRAFT",
+        "target_id": 123,
+        "feedback_action": "REFINE",
+        "feedback_polarity": "NEGATIVE",
+        "reject_reason": "标题太 AI",
+        "preferred_direction": "更自然",
+        "extracted_params": {
+          "scope": "title"
+        },
+        "missing_params": [],
+        "risk_flags": [],
+        "requires_clarification": false,
+        "requires_confirmation": false,
+        "can_execute": true,
+        "next_action": null,
+        "error_code": null,
+        "warning": null,
+        "clarification_question": null
+      },
+      "plan": {
+        "plan_id": null,
+        "conversation_id": null,
+        "intent": "REFINE_OR_REJECT_RESULT",
+        "steps": [
+          {
+            "step_no": 1,
+            "action": "REFINE_DRAFT",
+            "description": "按用户反馈把当前草稿标题改得更自然。",
+            "inputs": {},
+            "required_params": [
+              "account_id",
+              "feedback"
+            ],
+            "input_params": {
+              "account_id": 1,
+              "draft_id": 123,
+              "feedback": "标题太 AI，换自然一点",
+              "scope": "title"
+            },
+            "depends_on": [],
+            "expected_output": "更自然的标题候选",
+            "allowed_effect": "LOCAL_GENERATION",
+            "risk_flags": [],
+            "requires_confirmation": false,
+            "can_execute": true
+          },
+          {
+            "step_no": 2,
+            "action": "CREATE_CANDIDATE_MEMORY",
+            "description": "把用户不喜欢 AI 味标题的偏好暂存为候选记忆。",
+            "inputs": {},
+            "required_params": [
+              "account_id",
+              "memory_content",
+              "source"
+            ],
+            "input_params": {
+              "account_id": 1,
+              "memory_content": "用户偏好更自然、更少 AI 味的标题",
+              "source": "user_feedback"
+            },
+            "depends_on": [
+              1
+            ],
+            "expected_output": "候选记忆",
+            "allowed_effect": "LOCAL_WRITE",
+            "risk_flags": [
+              "NEEDS_HUMAN_CONFIRMATION"
+            ],
+            "requires_confirmation": true,
+            "can_execute": false
+          }
+        ],
+        "required_params": [],
+        "missing_params": [],
+        "risk_flags": [
+          "NEEDS_HUMAN_CONFIRMATION"
+        ],
+        "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+        "can_execute": false,
+        "summary_for_user": "入口预览链路已完成任务规划。",
+        "blocked_reason": null,
+        "next_action": null,
+        "metadata": {}
+      },
+      "param_validation": {
+        "valid": true,
+        "issues": [],
+        "missing_params": [],
+        "normalized_params": {
+          "step_1": {
+            "account_id": 1,
+            "draft_id": 123,
+            "feedback": "标题太 AI，换自然一点",
+            "scope": "title"
+          },
+          "step_2": {
+            "account_id": 1,
+            "memory_content": "用户偏好更自然、更少 AI 味的标题",
+            "source": "user_feedback"
+          }
+        }
+      },
+      "plan_validation": {
+        "valid": true,
+        "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+        "risk_flags": [
+          "NEEDS_HUMAN_CONFIRMATION"
+        ],
+        "issues": [],
+        "blocked_reason": null
+      },
+      "confirmation_card": {
+        "title": "请确认执行计划",
+        "description": "计划包含需要确认的动作：CREATE_CANDIDATE_MEMORY",
+        "action_type": "CONFIRM_PLAN",
+        "risk_flags": [
+          "NEEDS_HUMAN_CONFIRMATION"
+        ],
+        "params_preview": {
+          "steps": [
+            "REFINE_DRAFT",
+            "CREATE_CANDIDATE_MEMORY"
+          ],
+          "missing_params": []
+        },
+        "confirm_button_text": "确认执行",
+        "cancel_button_text": "取消",
+        "requires_confirmation": true,
+        "confirmation_requirement": "USER_CONFIRM_REQUIRED"
+      },
+      "status": "WAITING_CONFIRMATION",
+      "can_execute": false,
+      "requires_confirmation": true,
+      "message": "计划已生成，但包含需要你确认的动作，本阶段只展示确认卡片和 dry-run 结果。",
+      "next_action": "show_confirmation_card",
+      "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+      "metadata": {
+        "execution": {
+          "plan_id": null,
+          "session_id": null,
+          "trace_id": null,
+          "status": "WAITING_CONFIRMATION",
+          "mode": "DRY_RUN",
+          "can_execute": false,
+          "step_results": [],
+          "output": {},
+          "error_code": "CONFIRMATION_REQUIRED",
+          "message": "计划需要用户确认后才能执行。",
+          "risk_flags": [
+            "NEEDS_HUMAN_CONFIRMATION"
+          ],
+          "confirmation_requirement": "USER_CONFIRM_REQUIRED"
+        },
+        "entry_trace": {
+          "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+          "session_id": "demo_case_3",
+          "agent_type": "PRODUCT_ENTRY_AGENT",
+          "workflow_name": "router_planner_entry",
+          "account_id": 1,
+          "input_type": "TEXT",
+          "final_status": "WAITING_CONFIRMATION",
+          "final_intent": "REFINE_OR_REJECT_RESULT",
+          "final_confirmation_requirement": "USER_CONFIRM_REQUIRED",
+          "final_can_execute": false,
+          "events": [
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "INPUT_RECEIVED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "收到用户输入。",
+              "payload": {
+                "input_type": "TEXT",
+                "account_id_present": true,
+                "text_summary": "这个标题太 AI 了，换自然一点",
+                "text_length": 16,
+                "attachments": [],
+                "current_target_type": "DRAFT",
+                "current_target_id_present": true
+              },
+              "created_at": "2026-09-14T10:08:05.161886Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "ROUTER_PROMPT_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Router Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 455,
+                "user_prompt_length": 300,
+                "context_keys": [
+                  "input_type",
+                  "attachments",
+                  "account_id",
+                  "current_target_type",
+                  "current_target_id",
+                  "context"
+                ],
+                "input_type": "TEXT"
+              },
+              "created_at": "2026-09-14T10:08:05.161924Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "ROUTER_RESULT_PARSED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已解析。",
+              "payload": {
+                "confidence": 0.9,
+                "can_execute": true
+              },
+              "created_at": "2026-09-14T10:08:05.161958Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "ROUTER_VALIDATED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已生成并完成校验。",
+              "payload": {
+                "confidence": 0.9,
+                "input_type": "TEXT",
+                "target_type": "DRAFT",
+                "target_id_present": true,
+                "feedback_action": "REFINE",
+                "requires_clarification": false,
+                "requires_confirmation": false,
+                "can_execute": true,
+                "next_action": null,
+                "extracted_param_keys": [
+                  "scope"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.161989Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PLANNER_PROMPT_BUILT",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Planner Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 951,
+                "user_prompt_length": 6191,
+                "context_keys": [
+                  "conversation_id",
+                  "account_id",
+                  "user_input",
+                  "input_type",
+                  "current_target_type",
+                  "current_target_id",
+                  "attachments",
+                  "metadata"
+                ],
+                "router_confidence": 0.9
+              },
+              "created_at": "2026-09-14T10:08:05.162117Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PLAN_PARSED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "NONE",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 2,
+                "actions": [
+                  "REFINE_DRAFT",
+                  "CREATE_CANDIDATE_MEMORY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION",
+                  "LOCAL_WRITE"
+                ],
+                "can_execute": true,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.162161Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PLAN_REGISTRY_APPLIED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "NEEDS_HUMAN_CONFIRMATION"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 2,
+                "actions": [
+                  "REFINE_DRAFT",
+                  "CREATE_CANDIDATE_MEMORY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION",
+                  "LOCAL_WRITE"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.162200Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "NEEDS_HUMAN_CONFIRMATION"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 2,
+                "actions": [
+                  "REFINE_DRAFT",
+                  "CREATE_CANDIDATE_MEMORY"
+                ],
+                "step_effects": [
+                  "LOCAL_GENERATION",
+                  "LOCAL_WRITE"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.162246Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.162283Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.162306Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "NEEDS_HUMAN_CONFIRMATION"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "计划校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "blocked_reason": null,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.162351Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "CONFIRMATION_CARD_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "NEEDS_HUMAN_CONFIRMATION"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "确认卡片已生成。",
+              "payload": {
+                "has_card": true,
+                "title": "请确认执行计划",
+                "action_type": "CONFIRM_PLAN",
+                "requires_confirmation": true,
+                "params_preview_keys": [
+                  "steps",
+                  "missing_params"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.162376Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "EXECUTION_STARTED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "执行编排开始。",
+              "payload": {
+                "mode": "DRY_RUN",
+                "steps_count": 2,
+                "plan_can_execute": false
+              },
+              "created_at": "2026-09-14T10:08:05.162385Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "EXECUTION_BLOCKED",
+              "status": null,
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [
+                "NEEDS_HUMAN_CONFIRMATION"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": "计划需要用户确认后才能执行。",
+              "summary": "执行编排被阻断。",
+              "payload": {
+                "error_code": "CONFIRMATION_REQUIRED",
+                "mode": "DRY_RUN"
+              },
+              "created_at": "2026-09-14T10:08:05.162401Z"
+            },
+            {
+              "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf",
+              "session_id": "demo_case_3",
+              "stage": "RESPONSE_BUILT",
+              "status": "WAITING_CONFIRMATION",
+              "intent": "REFINE_OR_REJECT_RESULT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "USER_CONFIRM_REQUIRED",
+              "error_code": null,
+              "warning": null,
+              "summary": "入口层响应已生成。",
+              "payload": {
+                "can_execute": false,
+                "requires_confirmation": true,
+                "has_confirmation_card": true,
+                "next_action": "show_confirmation_card",
+                "trace_id": "entry_1d8ac1da202c4f4cb9f5d3a1cd148bbf"
+              },
+              "created_at": "2026-09-14T10:08:05.162436Z"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "case": "auto_publish_blocked",
+    "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+    "response": {
+      "session_id": "demo_case_4",
+      "router_result": {
+        "intent": "GENERATE_DRAFT",
+        "confidence": 0.9,
+        "input_type": "TEXT",
+        "target_type": "UNKNOWN",
+        "target_id": null,
+        "feedback_action": "UNKNOWN",
+        "feedback_polarity": "UNKNOWN",
+        "reject_reason": null,
+        "preferred_direction": null,
+        "extracted_params": {
+          "account_id": 1
+        },
+        "missing_params": [],
+        "risk_flags": [
+          "EXTERNAL_WRITE"
+        ],
+        "requires_clarification": false,
+        "requires_confirmation": false,
+        "can_execute": true,
+        "next_action": null,
+        "error_code": null,
+        "warning": null,
+        "clarification_question": null
+      },
+      "plan": {
+        "plan_id": null,
+        "conversation_id": null,
+        "intent": "GENERATE_DRAFT",
+        "steps": [
+          {
+            "step_no": 1,
+            "action": "NOOP",
+            "description": "用户请求自动发布到小红书，当前阶段明确阻断。",
+            "inputs": {},
+            "required_params": [],
+            "input_params": {
+              "account_id": 1
+            },
+            "depends_on": [],
+            "expected_output": "外部发布结果",
+            "allowed_effect": "READ_ONLY",
+            "risk_flags": [
+              "EXTERNAL_WRITE",
+              "CAPABILITY_BOUNDARY_EXCEEDED"
+            ],
+            "requires_confirmation": false,
+            "can_execute": true
+          }
+        ],
+        "required_params": [],
+        "missing_params": [],
+        "risk_flags": [
+          "EXTERNAL_WRITE",
+          "CAPABILITY_BOUNDARY_EXCEEDED"
+        ],
+        "confirmation_requirement": "BLOCKED",
+        "can_execute": false,
+        "summary_for_user": "入口预览链路已完成任务规划。",
+        "blocked_reason": "计划步骤试图执行外部写入动作。",
+        "next_action": null,
+        "metadata": {}
+      },
+      "param_validation": {
+        "valid": true,
+        "issues": [],
+        "missing_params": [],
+        "normalized_params": {
+          "step_1": {
+            "account_id": 1
+          }
+        }
+      },
+      "plan_validation": {
+        "valid": false,
+        "confirmation_requirement": "BLOCKED",
+        "risk_flags": [
+          "EXTERNAL_WRITE",
+          "CAPABILITY_BOUNDARY_EXCEEDED"
+        ],
+        "issues": [],
+        "blocked_reason": "计划步骤试图执行外部写入动作。"
+      },
+      "confirmation_card": {
+        "title": "当前无法执行",
+        "description": "计划步骤试图执行外部写入动作。",
+        "action_type": "BLOCKED",
+        "risk_flags": [
+          "EXTERNAL_WRITE",
+          "CAPABILITY_BOUNDARY_EXCEEDED"
+        ],
+        "params_preview": {
+          "blocked_reason": "计划步骤试图执行外部写入动作。"
+        },
+        "confirm_button_text": "知道了",
+        "cancel_button_text": "取消",
+        "requires_confirmation": false,
+        "confirmation_requirement": "BLOCKED"
+      },
+      "status": "BLOCKED",
+      "can_execute": false,
+      "requires_confirmation": false,
+      "message": "计划步骤试图执行外部写入动作。",
+      "next_action": "explain_execution_blocked",
+      "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+      "metadata": {
+        "execution": {
+          "plan_id": null,
+          "session_id": null,
+          "trace_id": null,
+          "status": "BLOCKED",
+          "mode": "DRY_RUN",
+          "can_execute": false,
+          "step_results": [],
+          "output": {},
+          "error_code": "PLAN_BLOCKED",
+          "message": "计划步骤试图执行外部写入动作。",
+          "risk_flags": [
+            "EXTERNAL_WRITE",
+            "CAPABILITY_BOUNDARY_EXCEEDED"
+          ],
+          "confirmation_requirement": "BLOCKED"
+        },
+        "entry_trace": {
+          "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+          "session_id": "demo_case_4",
+          "agent_type": "PRODUCT_ENTRY_AGENT",
+          "workflow_name": "router_planner_entry",
+          "account_id": 1,
+          "input_type": "TEXT",
+          "final_status": "BLOCKED",
+          "final_intent": "GENERATE_DRAFT",
+          "final_confirmation_requirement": "BLOCKED",
+          "final_can_execute": false,
+          "events": [
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "INPUT_RECEIVED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "收到用户输入。",
+              "payload": {
+                "input_type": "TEXT",
+                "account_id_present": true,
+                "text_summary": "直接帮我发布到小红书",
+                "text_length": 10,
+                "attachments": [],
+                "current_target_type": "UNKNOWN",
+                "current_target_id_present": false
+              },
+              "created_at": "2026-09-14T10:08:05.162964Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "ROUTER_PROMPT_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Router Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 455,
+                "user_prompt_length": 297,
+                "context_keys": [
+                  "input_type",
+                  "attachments",
+                  "account_id",
+                  "current_target_type",
+                  "current_target_id",
+                  "context"
+                ],
+                "input_type": "TEXT"
+              },
+              "created_at": "2026-09-14T10:08:05.163020Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "ROUTER_RESULT_PARSED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已解析。",
+              "payload": {
+                "confidence": 0.9,
+                "can_execute": true
+              },
+              "created_at": "2026-09-14T10:08:05.163060Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "ROUTER_VALIDATED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "RouterResult 已生成并完成校验。",
+              "payload": {
+                "confidence": 0.9,
+                "input_type": "TEXT",
+                "target_type": "UNKNOWN",
+                "target_id_present": false,
+                "feedback_action": "UNKNOWN",
+                "requires_clarification": false,
+                "requires_confirmation": false,
+                "can_execute": true,
+                "next_action": null,
+                "extracted_param_keys": [
+                  "account_id"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.163095Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PLANNER_PROMPT_BUILT",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "Planner Prompt 已构建。",
+              "payload": {
+                "system_prompt_length": 951,
+                "user_prompt_length": 6200,
+                "context_keys": [
+                  "conversation_id",
+                  "account_id",
+                  "user_input",
+                  "input_type",
+                  "current_target_type",
+                  "current_target_id",
+                  "attachments",
+                  "metadata"
+                ],
+                "router_confidence": 0.9
+              },
+              "created_at": "2026-09-14T10:08:05.163253Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PLAN_PARSED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "NONE",
+              "error_code": null,
+              "warning": null,
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "NOOP"
+                ],
+                "step_effects": [
+                  "EXTERNAL_WRITE"
+                ],
+                "can_execute": true,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.163302Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PLAN_REGISTRY_APPLIED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE",
+                "CAPABILITY_BOUNDARY_EXCEEDED"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": "计划步骤试图执行外部写入动作。",
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "NOOP"
+                ],
+                "step_effects": [
+                  "READ_ONLY"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.163351Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE",
+                "CAPABILITY_BOUNDARY_EXCEEDED"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": "计划步骤试图执行外部写入动作。",
+              "summary": "Plan 已生成。",
+              "payload": {
+                "steps_count": 1,
+                "actions": [
+                  "NOOP"
+                ],
+                "step_effects": [
+                  "READ_ONLY"
+                ],
+                "can_execute": false,
+                "next_action": null
+              },
+              "created_at": "2026-09-14T10:08:05.163392Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.163429Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PARAM_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": null,
+              "error_code": null,
+              "warning": null,
+              "summary": "参数校验完成。",
+              "payload": {
+                "valid": true,
+                "issues_count": 0,
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.163454Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "PLAN_VALIDATED",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE",
+                "CAPABILITY_BOUNDARY_EXCEEDED"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": "计划步骤试图执行外部写入动作。",
+              "summary": "计划校验完成。",
+              "payload": {
+                "valid": false,
+                "issues_count": 0,
+                "blocked_reason": "计划步骤试图执行外部写入动作。",
+                "issues": []
+              },
+              "created_at": "2026-09-14T10:08:05.163495Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "CONFIRMATION_CARD_BUILT",
+              "status": null,
+              "intent": null,
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE",
+                "CAPABILITY_BOUNDARY_EXCEEDED"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": null,
+              "summary": "确认卡片已生成。",
+              "payload": {
+                "has_card": true,
+                "title": "当前无法执行",
+                "action_type": "BLOCKED",
+                "requires_confirmation": false,
+                "params_preview_keys": [
+                  "blocked_reason"
+                ]
+              },
+              "created_at": "2026-09-14T10:08:05.163525Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "EXECUTION_STARTED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": null,
+              "summary": "执行编排开始。",
+              "payload": {
+                "mode": "DRY_RUN",
+                "steps_count": 1,
+                "plan_can_execute": false
+              },
+              "created_at": "2026-09-14T10:08:05.163537Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "EXECUTION_BLOCKED",
+              "status": null,
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [
+                "EXTERNAL_WRITE",
+                "CAPABILITY_BOUNDARY_EXCEEDED"
+              ],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": "计划步骤试图执行外部写入动作。",
+              "summary": "执行编排被阻断。",
+              "payload": {
+                "error_code": "PLAN_BLOCKED",
+                "mode": "DRY_RUN"
+              },
+              "created_at": "2026-09-14T10:08:05.163554Z"
+            },
+            {
+              "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd",
+              "session_id": "demo_case_4",
+              "stage": "RESPONSE_BUILT",
+              "status": "BLOCKED",
+              "intent": "GENERATE_DRAFT",
+              "action": null,
+              "risk_flags": [],
+              "missing_params": [],
+              "confirmation_requirement": "BLOCKED",
+              "error_code": null,
+              "warning": null,
+              "summary": "入口层响应已生成。",
+              "payload": {
+                "can_execute": false,
+                "requires_confirmation": false,
+                "has_confirmation_card": true,
+                "next_action": "explain_execution_blocked",
+                "trace_id": "entry_b9ba9932a1374a0a9a82bbaaaa714abd"
+              },
+              "created_at": "2026-09-14T10:08:05.163601Z"
+            }
+          ]
+        }
+      }
+    }
+  }
+]
