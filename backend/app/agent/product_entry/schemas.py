@@ -121,8 +121,14 @@ class RiskFlag(StrEnum):
 
     LOW_CONFIDENCE = "LOW_CONFIDENCE"
     MISSING_REQUIRED_PARAM = "MISSING_REQUIRED_PARAM"
+    INVALID_PARAM_TYPE = "INVALID_PARAM_TYPE"
+    PARAM_SOURCE_UNVERIFIED = "PARAM_SOURCE_UNVERIFIED"
     TARGET_AMBIGUOUS = "TARGET_AMBIGUOUS"
+    TARGET_NOT_FOUND = "TARGET_NOT_FOUND"
+    TARGET_EXISTENCE_UNCHECKED = "TARGET_EXISTENCE_UNCHECKED"
+    UNAUTHORIZED_ACTION = "UNAUTHORIZED_ACTION"
     UNTRUSTED_EXTERNAL_INPUT = "UNTRUSTED_EXTERNAL_INPUT"
+    UNTRUSTED_INPUT_USED_AS_INSTRUCTION = "UNTRUSTED_INPUT_USED_AS_INSTRUCTION"
     MOCK_DATA_USED = "MOCK_DATA_USED"
     UNSUPPORTED_ACTION = "UNSUPPORTED_ACTION"
     EXTERNAL_WRITE = "EXTERNAL_WRITE"
@@ -160,6 +166,33 @@ class ValidationSeverity(StrEnum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     BLOCKER = "BLOCKER"
+
+
+class ParamType(StrEnum):
+    """参数类型枚举，用于入口层参数校验。"""
+
+    STRING = "STRING"
+    INT = "INT"
+    FLOAT = "FLOAT"
+    BOOL = "BOOL"
+    ID = "ID"
+    TEXT = "TEXT"
+    URL = "URL"
+    DATETIME = "DATETIME"
+    LIST = "LIST"
+    DICT = "DICT"
+    ANY = "ANY"
+
+
+class ParamSpec(StrictSchema):
+    """动作参数规格，声明参数名、类型、是否必填和可信来源。"""
+
+    name: str = Field(description="参数名")
+    param_type: ParamType = Field(default=ParamType.ANY, description="参数类型")
+    required: bool = Field(default=True, description="是否必填")
+    allowed_sources: list[str] = Field(default_factory=list, description="允许的参数来源")
+    allow_untrusted: bool = Field(default=False, description="是否允许外部不可信输入作为该参数")
+    description: str | None = Field(default=None, description="参数说明")
 
 
 class InputAttachment(StrictSchema):
@@ -267,7 +300,9 @@ class ValidationIssue(StrictSchema):
     """参数或计划校验问题。"""
 
     field: str | None = Field(default=None, description="问题字段")
+    source: str | None = Field(default=None, description="问题来源")
     message: str = Field(description="问题说明")
+    suggestion: str | None = Field(default=None, description="面向用户或前端的处理建议")
     risk_flag: RiskFlag | None = Field(default=None, description="关联风险标记")
     severity: ValidationSeverity = Field(default=ValidationSeverity.ERROR, description="问题等级")
 

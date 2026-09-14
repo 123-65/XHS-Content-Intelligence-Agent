@@ -1,5 +1,6 @@
 """Agent 产品入口层结构化协议。"""
 
+from app.agent.product_entry.confirmation import build_confirmation_card
 from app.agent.product_entry.prompts import (
     build_task_planner_system_prompt,
     build_task_planner_user_prompt,
@@ -24,6 +25,8 @@ from app.agent.product_entry.schemas import (
     InputType,
     Intent,
     ParamValidationResult,
+    ParamSpec,
+    ParamType,
     Plan,
     PlanStep,
     PlanValidationResult,
@@ -34,10 +37,13 @@ from app.agent.product_entry.schemas import (
     ValidationSeverity,
 )
 from app.agent.product_entry.task_planner import LLMTaskPlanner, apply_action_registry_constraints
-from app.agent.product_entry.validators import validate_plan_result, validate_router_result
+from app.agent.product_entry.validation_rules import ACTION_ALTERNATIVE_PARAM_GROUPS, ACTION_PARAM_SPECS
+from app.agent.product_entry.validators import validate_action_params, validate_param_sources, validate_plan_params, validate_plan_result, validate_router_result
 
 __all__ = [
     "ACTION_REGISTRY",
+    "ACTION_ALTERNATIVE_PARAM_GROUPS",
+    "ACTION_PARAM_SPECS",
     "INTENT_ACTION_MAPPING",
     "LLMUserInputRouter",
     "LLMTaskPlanner",
@@ -57,6 +63,8 @@ __all__ = [
     "InputType",
     "Intent",
     "ParamValidationResult",
+    "ParamSpec",
+    "ParamType",
     "Plan",
     "PlanStep",
     "PlanValidationResult",
@@ -67,9 +75,13 @@ __all__ = [
     "ValidationSeverity",
     "build_task_planner_system_prompt",
     "build_task_planner_user_prompt",
+    "build_confirmation_card",
     "build_user_input_router_system_prompt",
     "build_user_input_router_user_prompt",
     "apply_action_registry_constraints",
+    "validate_action_params",
+    "validate_param_sources",
+    "validate_plan_params",
     "validate_plan_result",
     "validate_router_result",
 ]
