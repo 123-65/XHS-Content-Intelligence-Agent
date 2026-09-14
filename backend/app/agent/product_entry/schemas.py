@@ -223,6 +223,8 @@ class RouterResult(StrictSchema):
     requires_confirmation: bool = Field(default=False, description="是否需要用户确认后才能继续")
     can_execute: bool = Field(default=False, description="是否可直接进入执行，默认安全关闭")
     next_action: str | None = Field(default=None, description="下一步建议动作")
+    error_code: str | None = Field(default=None, description="Router 阶段错误码，正常路由时为空")
+    warning: str | None = Field(default=None, description="Router 阶段面向 Trace 或用户的警告说明")
     clarification_question: str | None = Field(default=None, description="给用户的澄清问题")
 
 

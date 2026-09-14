@@ -6,6 +6,7 @@ from app.agent.product_entry.prompts import (
     build_user_input_router_system_prompt,
     build_user_input_router_user_prompt,
 )
+from app.agent.product_entry.llm_router import LLMUserInputRouter
 from app.agent.product_entry.registry import ACTION_REGISTRY, INTENT_ACTION_MAPPING, UNSUPPORTED_ACTION_REGISTRY
 from app.agent.product_entry.schemas import (
     Action,
@@ -37,6 +38,7 @@ from app.agent.product_entry.validators import validate_plan_result, validate_ro
 __all__ = [
     "ACTION_REGISTRY",
     "INTENT_ACTION_MAPPING",
+    "LLMUserInputRouter",
     "UNSUPPORTED_ACTION_REGISTRY",
     "Action",
     "AgentChatRequest",

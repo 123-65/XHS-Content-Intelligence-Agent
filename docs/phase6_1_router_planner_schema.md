@@ -267,6 +267,8 @@ requires_clarification
 requires_confirmation
 can_execute
 next_action
+error_code
+warning
 clarification_question
 ```
 
