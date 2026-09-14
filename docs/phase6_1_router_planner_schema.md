@@ -281,6 +281,8 @@ step_no
 action
 description
 inputs
+required_params
+input_params
 depends_on
 expected_output
 allowed_effect

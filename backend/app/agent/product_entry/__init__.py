@@ -33,12 +33,14 @@ from app.agent.product_entry.schemas import (
     ValidationIssue,
     ValidationSeverity,
 )
+from app.agent.product_entry.task_planner import LLMTaskPlanner, apply_action_registry_constraints
 from app.agent.product_entry.validators import validate_plan_result, validate_router_result
 
 __all__ = [
     "ACTION_REGISTRY",
     "INTENT_ACTION_MAPPING",
     "LLMUserInputRouter",
+    "LLMTaskPlanner",
     "UNSUPPORTED_ACTION_REGISTRY",
     "Action",
     "AgentChatRequest",
@@ -67,6 +69,7 @@ __all__ = [
     "build_task_planner_user_prompt",
     "build_user_input_router_system_prompt",
     "build_user_input_router_user_prompt",
+    "apply_action_registry_constraints",
     "validate_plan_result",
     "validate_router_result",
 ]

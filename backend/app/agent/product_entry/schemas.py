@@ -235,6 +235,8 @@ class PlanStep(StrictSchema):
     action: Action = Field(description="计划动作")
     description: str = Field(description="面向用户或 Trace 的步骤说明")
     inputs: dict[str, Any] = Field(default_factory=dict, description="本步骤需要的输入")
+    required_params: list[str] = Field(default_factory=list, description="该动作按 Registry 要求的必需参数")
+    input_params: dict[str, Any] = Field(default_factory=dict, description="该步骤实际传入参数，保留给 Executor 前校验")
     depends_on: list[int] = Field(default_factory=list, description="依赖的步骤序号")
     expected_output: str | None = Field(default=None, description="预期输出")
     allowed_effect: AllowedEffect = Field(description="动作影响范围")
