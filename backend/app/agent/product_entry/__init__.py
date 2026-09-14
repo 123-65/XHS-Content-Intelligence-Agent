@@ -1,6 +1,8 @@
 """Agent 产品入口层结构化协议。"""
 
 from app.agent.product_entry.confirmation import build_confirmation_card
+from app.agent.product_entry.execution import ExecutionMode, ExecutionStatus, PlanExecutionResult, StepExecutionResult
+from app.agent.product_entry.executor import ActionHandlerRegistry, ExecutionOrchestrator, build_response_from_execution
 from app.agent.product_entry.prompts import (
     build_task_planner_system_prompt,
     build_task_planner_user_prompt,
@@ -58,6 +60,7 @@ __all__ = [
     "LLMTaskPlanner",
     "UNSUPPORTED_ACTION_REGISTRY",
     "Action",
+    "ActionHandlerRegistry",
     "AgentChatRequest",
     "AgentChatResponse",
     "AgentEntryTrace",
@@ -70,6 +73,9 @@ __all__ = [
     "AllowedEffect",
     "ConfirmationCard",
     "ConfirmationRequirement",
+    "ExecutionMode",
+    "ExecutionOrchestrator",
+    "ExecutionStatus",
     "FeedbackAction",
     "FeedbackPolarity",
     "InputAttachment",
@@ -79,9 +85,11 @@ __all__ = [
     "ParamSpec",
     "ParamType",
     "Plan",
+    "PlanExecutionResult",
     "PlanStep",
     "PlanValidationResult",
     "RiskFlag",
+    "StepExecutionResult",
     "TargetType",
     "TrustLevel",
     "ValidationIssue",
@@ -89,6 +97,7 @@ __all__ = [
     "build_task_planner_system_prompt",
     "build_task_planner_user_prompt",
     "build_confirmation_card",
+    "build_response_from_execution",
     "build_user_input_router_system_prompt",
     "build_user_input_router_user_prompt",
     "apply_action_registry_constraints",
