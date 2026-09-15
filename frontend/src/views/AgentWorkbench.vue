@@ -51,6 +51,60 @@
           />
         </section>
 
+        <section class="data-source-box">
+          <div class="toolbar">
+            <strong>数据源配置</strong>
+            <el-tag type="info" effect="plain">B2 Config Only</el-tag>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>platform</span>
+              <el-select v-model="dataSourceForm.platform">
+                <el-option label="小红书" value="xhs" />
+              </el-select>
+            </label>
+            <label>
+              <span>status</span>
+              <el-select v-model="dataSourceForm.status">
+                <el-option label="ACTIVE" value="ACTIVE" />
+                <el-option label="DISABLED" value="DISABLED" />
+              </el-select>
+            </label>
+          </div>
+          <div class="form-grid single">
+            <label>
+              <span>keywords</span>
+              <el-input v-model="dataSourceForm.keywordsText" type="textarea" :rows="3" resize="none" />
+            </label>
+            <label>
+              <span>competitor_accounts</span>
+              <el-input v-model="dataSourceForm.competitorAccountsText" type="textarea" :rows="3" resize="none" />
+            </label>
+            <label>
+              <span>note_urls</span>
+              <el-input v-model="dataSourceForm.noteUrlsText" type="textarea" :rows="2" resize="none" />
+            </label>
+          </div>
+          <div class="action-row compact-actions">
+            <el-button size="small" :loading="dataSourceLoading" @click="loadDataSourceConfig">
+              加载配置
+            </el-button>
+            <el-button size="small" type="primary" :loading="dataSourceLoading" @click="saveDataSourceConfig">
+              保存配置
+            </el-button>
+          </div>
+          <el-descriptions v-if="dataSourceConfig" :column="1" border size="small">
+            <el-descriptions-item label="config_id">{{ dataSourceConfig.id }}</el-descriptions-item>
+            <el-descriptions-item label="updated_at">{{ dataSourceConfig.updated_at }}</el-descriptions-item>
+          </el-descriptions>
+          <el-alert
+            type="info"
+            title="这里只保存长期关注的数据源，不触发采集、刷新、报告生成或 LLM 调用。"
+            show-icon
+            :closable="false"
+          />
+        </section>
+
         <el-input
           v-model="form.text"
           type="textarea"
@@ -441,6 +495,7 @@ import {
   listAgentConversationMessages,
   previewAgentChat
 } from '@/api/agentChat'
+import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -453,6 +508,7 @@ import type {
   EntryTraceEvent,
   ValidationIssue
 } from '@/types/agentChat'
+import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 
 interface ExampleInput {
   label: string
@@ -496,6 +552,15 @@ const demoLoaded = ref(false)
 const conversation = ref<ConversationResponse | null>(null)
 const conversationMessages = ref<ConversationMessageResponse[]>([])
 const conversationState = ref<ConversationCurrentState | null>(null)
+const dataSourceLoading = ref(false)
+const dataSourceConfig = ref<DataSourceConfigResponse | null>(null)
+const dataSourceForm = reactive({
+  platform: 'xhs',
+  status: 'ACTIVE' as 'ACTIVE' | 'DISABLED',
+  keywordsText: 'AI Agent project\njob search content',
+  competitorAccountsText: '',
+  noteUrlsText: ''
+})
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
 const planSteps = computed(() => response.value?.plan?.steps || [])
@@ -655,6 +720,76 @@ const refreshConversationData = async () => {
   }
 }
 
+const loadDataSourceConfig = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先输入 account_id'
+    return
+  }
+  dataSourceLoading.value = true
+  errorMessage.value = ''
+  try {
+    const config = await getDataSourceConfigByAccount(form.account_id, dataSourceForm.platform)
+    applyDataSourceConfig(config)
+  } catch {
+    dataSourceConfig.value = null
+    errorMessage.value = '当前账号还没有数据源配置，可以直接保存新配置'
+  } finally {
+    dataSourceLoading.value = false
+  }
+}
+
+const saveDataSourceConfig = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先输入 account_id'
+    return
+  }
+  dataSourceLoading.value = true
+  errorMessage.value = ''
+  try {
+    const config = await upsertDataSourceConfig({
+      account_id: form.account_id,
+      platform: dataSourceForm.platform,
+      status: dataSourceForm.status,
+      keywords: splitSourceLines(dataSourceForm.keywordsText).map((keyword) => ({ keyword, enabled: true })),
+      competitor_accounts: splitSourceLines(dataSourceForm.competitorAccountsText).map((item) =>
+        item.startsWith('http')
+          ? { profile_url: item, enabled: true }
+          : { name: item, enabled: true }
+      ),
+      note_urls: splitSourceLines(dataSourceForm.noteUrlsText),
+      refresh_policy: { manual_only: true },
+      metadata_payload: { source: 'agent_workbench_b2' }
+    })
+    applyDataSourceConfig(config)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '保存数据源配置失败'
+  } finally {
+    dataSourceLoading.value = false
+  }
+}
+
+const applyDataSourceConfig = (config: DataSourceConfigResponse) => {
+  dataSourceConfig.value = config
+  dataSourceForm.platform = config.platform
+  dataSourceForm.status = config.status
+  dataSourceForm.keywordsText = config.keywords.map((item) => item.keyword).join('\n')
+  dataSourceForm.competitorAccountsText = config.competitor_accounts
+    .map((item) => item.name || item.profile_url || item.platform_account_id || '')
+    .filter(Boolean)
+    .join('\n')
+  dataSourceForm.noteUrlsText = config.note_urls.join('\n')
+}
+
+const splitSourceLines = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .split(/[\n,，]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  )
+
 const loadLocalDemo = () => {
   Object.assign(form, {
     session_id: demoAgentRequest.session_id || `workbench-${Date.now()}`,
@@ -799,6 +934,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.data-source-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
 }
 
 .compact-actions {
