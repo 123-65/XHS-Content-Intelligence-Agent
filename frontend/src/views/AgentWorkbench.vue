@@ -299,6 +299,80 @@
           </div>
         </section>
 
+        <section class="operation-run-box">
+          <div class="toolbar">
+            <strong>今日运营分析</strong>
+            <el-tag type="primary" effect="plain">Operation Run V0</el-tag>
+          </div>
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="account_id">{{ form.account_id || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="latest_evidence_run">{{ latestEvidenceRun?.id || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="latest_operation_status">{{ latestOperationRun?.status || '-' }}</el-descriptions-item>
+          </el-descriptions>
+          <div class="action-row compact-actions">
+            <el-button size="small" type="primary" :loading="operationLoading" @click="runOperationAnalysis">
+              生成今日运营分析
+            </el-button>
+            <el-button size="small" :loading="operationLoading" @click="loadOperationRuns">
+              最近运营分析
+            </el-button>
+          </div>
+          <div v-if="latestOperationRun" class="operation-summary">
+            <div class="toolbar">
+              <strong>#{{ latestOperationRun.id }}</strong>
+              <el-tag :type="operationStatusType(latestOperationRun.status)" effect="plain">
+                {{ latestOperationRun.status }}
+              </el-tag>
+            </div>
+            <p>{{ latestOperationRun.summary || latestOperationRun.error_message || '-' }}</p>
+            <div v-if="latestOperationRun.recommendations.length" class="mini-card-list">
+              <div v-for="item in latestOperationRun.recommendations" :key="item.rank" class="mini-card">
+                <strong>{{ item.rank }}. {{ item.title }}</strong>
+                <p>{{ item.reason }}</p>
+                <div class="slot-meta">
+                  <span>confidence {{ item.confidence }}</span>
+                  <span>risk {{ item.risk_level }}</span>
+                  <span>opportunity {{ item.opportunity_id }}</span>
+                  <span>{{ item.suggested_next_action }}</span>
+                </div>
+                <p>{{ item.evidence }}</p>
+              </div>
+            </div>
+            <div v-if="latestOperationRun.data_gaps.length" class="mini-card-list">
+              <div v-for="gap in latestOperationRun.data_gaps" :key="`${gap.type}-${gap.suggested_action}`" class="mini-card">
+                <strong>{{ gap.type }}</strong>
+                <p>{{ gap.message }}</p>
+                <span class="inline-code">{{ gap.suggested_action }}</span>
+              </div>
+            </div>
+            <div v-if="latestOperationRun.next_actions.length" class="slot-meta">
+              <span v-for="action in latestOperationRun.next_actions" :key="action.action">
+                {{ action.label }} / {{ action.enabled ? 'enabled' : 'disabled' }}
+              </span>
+            </div>
+          </div>
+          <el-alert
+            type="info"
+            title="今日运营分析只读取已入库证据，不会访问外部链接，不会调用 LLM，不会重新生成 Evidence，不会生成草稿。"
+            show-icon
+            :closable="false"
+          />
+          <div v-if="operationRuns.length" class="refresh-run-list">
+            <div v-for="run in operationRuns" :key="run.id" class="refresh-run-item">
+              <div class="toolbar">
+                <strong>#{{ run.id }}</strong>
+                <el-tag :type="operationStatusType(run.status)" effect="plain">{{ run.status }}</el-tag>
+              </div>
+              <div class="slot-meta">
+                <span>report {{ run.report_id || '-' }}</span>
+                <span>evidence {{ run.evidence_refresh_run_id || '-' }}</span>
+                <span>recommendations {{ run.recommendations.length }}</span>
+                <span>{{ run.error_code || 'NO_ERROR' }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <el-input
           v-model="form.text"
           type="textarea"
@@ -693,6 +767,7 @@ import { createAccountProfile, getAccountProfiles, type AccountProfileResponse }
 import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
 import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
 import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenceRefreshRun'
+import { createOperationRun, listOperationRuns } from '@/api/operationRun'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -708,6 +783,7 @@ import type {
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefreshRun'
 import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/types/evidenceRefreshRun'
+import type { OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
 
 interface ExampleInput {
   label: string
@@ -761,6 +837,9 @@ const refreshRuns = ref<DataRefreshRunResponse[]>([])
 const evidenceLoading = ref(false)
 const latestEvidenceRun = ref<EvidenceRefreshRunResponse | null>(null)
 const evidenceRuns = ref<EvidenceRefreshRunResponse[]>([])
+const operationLoading = ref(false)
+const latestOperationRun = ref<OperationRunResponse | null>(null)
+const operationRuns = ref<OperationRunResponse[]>([])
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1095,6 +1174,40 @@ const loadEvidenceRuns = async () => {
   }
 }
 
+const runOperationAnalysis = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  operationLoading.value = true
+  errorMessage.value = ''
+  try {
+    latestOperationRun.value = await createOperationRun({
+      account_id: form.account_id,
+      evidence_refresh_run_id: latestEvidenceRun.value?.id || null,
+      data_refresh_run_id: latestRefreshRun.value?.id || null
+    })
+    await loadOperationRuns()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建今日运营分析失败'
+  } finally {
+    operationLoading.value = false
+  }
+}
+
+const loadOperationRuns = async () => {
+  if (!form.account_id) return
+  operationLoading.value = true
+  try {
+    operationRuns.value = await listOperationRuns(form.account_id)
+    latestOperationRun.value = operationRuns.value[0] || latestOperationRun.value
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '加载运营分析记录失败'
+  } finally {
+    operationLoading.value = false
+  }
+}
+
 const applyDataSourceConfig = (config: DataSourceConfigResponse) => {
   dataSourceConfig.value = config
   dataSourceForm.platform = config.platform
@@ -1173,6 +1286,13 @@ const refreshStatusType = (status: RefreshRunStatus) => {
 }
 
 const evidenceStatusType = (status: EvidenceRefreshRunStatus) => {
+  if (status === 'SUCCESS') return 'success'
+  if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const operationStatusType = (status: OperationRunStatus) => {
   if (status === 'SUCCESS') return 'success'
   if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT') return 'warning'
   if (status === 'FAILED') return 'danger'
@@ -1307,6 +1427,32 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #bfdbfe;
   border-radius: 8px;
   background: #f8fbff;
+}
+
+.operation-run-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: #f8f9ff;
+}
+
+.operation-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e0e7ff;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.operation-summary p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.6;
 }
 
 .refresh-run-list {
