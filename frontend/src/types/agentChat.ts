@@ -3,6 +3,7 @@ export type AgentInputType = 'TEXT' | 'IMAGE' | 'URL' | 'FILE' | 'MIXED' | 'UNKN
 export interface AgentChatRequest {
   user_id?: string | null
   account_id?: number | null
+  conversation_id?: number | null
   session_id?: string | null
   text?: string | null
   input_type: AgentInputType
@@ -275,6 +276,7 @@ export interface ReadonlyBusinessResult {
 
 export interface AgentChatResponse {
   session_id: string | null
+  conversation_id: number | null
   router_result: RouterResult | null
   plan: Plan | null
   param_validation: ParamValidationResult | null
@@ -293,4 +295,40 @@ export interface AgentChatResponse {
     demo_source?: string
     [key: string]: unknown
   }
+}
+
+export interface ConversationCurrentState {
+  current_goal: string | null
+  active_account_id: number | null
+  active_opportunity_id: number | null
+  active_experiment_id: number | null
+  active_draft_id: number | null
+  current_target_type: string | null
+  current_target_id: string | number | null
+  last_action: string | null
+  last_artifacts: Record<string, unknown>[]
+  pending_confirmation: Record<string, unknown> | null
+  conversation_constraints: Record<string, unknown>
+}
+
+export interface ConversationResponse {
+  id: number
+  account_id: number | null
+  title: string
+  status: string
+  current_state: ConversationCurrentState
+  created_at: string
+  updated_at: string
+  last_message_at: string | null
+}
+
+export interface ConversationMessageResponse {
+  id: number
+  conversation_id: number
+  role: string
+  content: string
+  message_type: string
+  metadata_payload: Record<string, unknown>
+  trace_id: string | null
+  created_at: string
 }

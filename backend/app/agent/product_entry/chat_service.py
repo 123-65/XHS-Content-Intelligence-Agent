@@ -17,41 +17,51 @@ from app.agent.product_entry.task_planner import LLMTaskPlanner
 from app.agent.product_entry.trace import AgentEntryTraceRecorder, to_agent_trace_payload
 from app.agent.product_entry.validators import validate_param_sources, validate_plan_params, validate_plan_result
 from app.llm.client import LLMClient
+from app.services.agent_conversation_sev import AgentConversationService
 
 
 class AgentChatPreviewService:
     """Agent Chat 预览服务，封装入口 dry-run pipeline。"""
 
-    def __init__(self, pipeline: AgentEntryPreviewPipeline):
+    def __init__(self, pipeline: AgentEntryPreviewPipeline, conversation_service: AgentConversationService | None = None):
         """初始化预览服务。"""
         self.pipeline = pipeline
+        self.conversation_service = conversation_service
 
     def preview(self, request: AgentChatRequest) -> AgentChatResponse:
         """处理 Agent Chat dry-run 请求，返回统一响应。"""
-        return self.pipeline.preview(request)
+        if not self.conversation_service or request.conversation_id is None:
+            return self.pipeline.preview(request)
+        conversation, merged_request = self.conversation_service.prepare_agent_request(request)
+        response = self.pipeline.preview(merged_request)
+        return self.conversation_service.record_agent_response(conversation, merged_request, response)
 
 
-def build_agent_chat_preview_service() -> AgentChatPreviewService:
+def build_agent_chat_preview_service(db: Session | None = None) -> AgentChatPreviewService:
     """构建 Agent Chat 预览服务。"""
     llm_client = LLMClient()
     pipeline = AgentEntryPreviewPipeline(
         router=LLMUserInputRouter(llm_client),
         planner=LLMTaskPlanner(llm_client),
     )
-    return AgentChatPreviewService(pipeline)
+    return AgentChatPreviewService(pipeline, AgentConversationService(db) if db else None)
 
 
 class AgentChatReadonlyExecuteService:
     """Agent Chat 只读执行服务，仅允许白名单只读 Action 进入 REAL 模式。"""
 
-    def __init__(self, router, planner, db: Session):
+    def __init__(self, router, planner, db: Session, conversation_service: AgentConversationService | None = None):
         """初始化只读执行服务。"""
         self.router = router
         self.planner = planner
         self.db = db
+        self.conversation_service = conversation_service
 
     def execute_readonly(self, request: AgentChatRequest) -> AgentChatResponse:
         """执行只读 Agent Action，仅允许只读白名单 Action 进入 REAL。"""
+        conversation = None
+        if self.conversation_service and request.conversation_id is not None:
+            conversation, request = self.conversation_service.prepare_agent_request(request)
         agent_input = build_agent_input_from_chat_request(request)
         recorder = AgentEntryTraceRecorder(session_id=request.session_id)
         recorder.user_id = request.user_id
@@ -111,7 +121,10 @@ class AgentChatReadonlyExecuteService:
                 Action.PREVIEW_DRAFT_CONTEXT.value,
             ],
         }
-        return response.model_copy(update={"metadata": metadata})
+        response = response.model_copy(update={"metadata": metadata})
+        if conversation and self.conversation_service:
+            return self.conversation_service.record_agent_response(conversation, request, response)
+        return response
 
 
 def build_agent_chat_readonly_execute_service(db: Session) -> AgentChatReadonlyExecuteService:
@@ -121,6 +134,7 @@ def build_agent_chat_readonly_execute_service(db: Session) -> AgentChatReadonlyE
         router=LLMUserInputRouter(llm_client),
         planner=LLMTaskPlanner(llm_client),
         db=db,
+        conversation_service=AgentConversationService(db),
     )
 
 

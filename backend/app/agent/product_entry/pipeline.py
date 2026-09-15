@@ -144,6 +144,7 @@ def build_agent_input_from_chat_request(request: AgentChatRequest) -> AgentInput
         "context": request.context,
         "request_metadata": request.metadata,
         "user_id": request.user_id,
+        "conversation_id": request.conversation_id,
     }
     target_id = _target_id(request.current_target_id)
     if request.current_target_id is not None and target_id is None:

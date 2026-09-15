@@ -15,6 +15,42 @@
           <MessageSquareText :size="20" />
         </div>
 
+        <section class="conversation-box">
+          <div class="toolbar">
+            <strong>会话</strong>
+            <el-tag v-if="conversation" type="success" effect="plain">#{{ conversation.id }}</el-tag>
+            <el-tag v-else type="info" effect="plain">无会话</el-tag>
+          </div>
+          <div class="form-grid single">
+            <label>
+              <span>conversation_id</span>
+              <el-input-number v-model="form.conversation_id" :min="1" controls-position="right" />
+            </label>
+          </div>
+          <div class="action-row compact-actions">
+            <el-button size="small" type="primary" :loading="conversationLoading" @click="createConversation">
+              创建新会话
+            </el-button>
+            <el-button size="small" :loading="conversationLoading" @click="loadConversation">
+              加载会话
+            </el-button>
+            <el-button size="small" :loading="conversationLoading" @click="refreshConversationData">
+              刷新消息
+            </el-button>
+          </div>
+          <el-descriptions v-if="conversation" :column="1" border size="small">
+            <el-descriptions-item label="title">{{ conversation.title }}</el-descriptions-item>
+            <el-descriptions-item label="status">{{ conversation.status }}</el-descriptions-item>
+          </el-descriptions>
+          <el-alert
+            v-else
+            type="info"
+            title="当前是无会话请求，不会保存历史。"
+            show-icon
+            :closable="false"
+          />
+        </section>
+
         <el-input
           v-model="form.text"
           type="textarea"
@@ -330,6 +366,46 @@
           </el-card>
 
           <el-card shadow="never">
+            <template #header>
+              <div class="toolbar">
+                <strong>消息历史</strong>
+                <el-tag effect="plain">{{ conversationMessages.length }}</el-tag>
+              </div>
+            </template>
+            <div v-if="conversationMessages.length" class="message-list">
+              <div v-for="message in conversationMessages" :key="message.id" class="message-item">
+                <div class="toolbar">
+                  <strong>{{ message.role }}</strong>
+                  <span>{{ message.created_at }}</span>
+                </div>
+                <p>{{ message.content }}</p>
+                <div class="tag-row">
+                  <el-tag effect="plain">{{ message.message_type }}</el-tag>
+                  <el-tag v-if="message.trace_id" type="info" effect="plain">{{ message.trace_id }}</el-tag>
+                  <el-tag v-if="messageStatus(message)" type="success" effect="plain">{{ messageStatus(message) }}</el-tag>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无会话消息" />
+          </el-card>
+
+          <el-card shadow="never">
+            <template #header><strong>Current State</strong></template>
+            <el-descriptions v-if="conversationState" :column="1" border>
+              <el-descriptions-item label="active_account_id">{{ conversationState.active_account_id ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="active_opportunity_id">{{ conversationState.active_opportunity_id ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="active_experiment_id">{{ conversationState.active_experiment_id ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="active_draft_id">{{ conversationState.active_draft_id ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="current_target_type">{{ conversationState.current_target_type || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="current_target_id">{{ conversationState.current_target_id ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="last_action">{{ conversationState.last_action || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="pending_confirmation">{{ conversationState.pending_confirmation ? 'YES' : '-' }}</el-descriptions-item>
+              <el-descriptions-item label="conversation_constraints">{{ formatJson(conversationState.conversation_constraints) }}</el-descriptions-item>
+            </el-descriptions>
+            <el-empty v-else description="暂无 Current State" />
+          </el-card>
+
+          <el-card shadow="never">
             <template #header><strong>Entry Trace</strong></template>
             <el-timeline v-if="traceEvents.length">
               <el-timeline-item
@@ -357,13 +433,23 @@
 import { computed, reactive, ref } from 'vue'
 import { FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
-import { executeReadonlyAgentChat, previewAgentChat } from '@/api/agentChat'
+import {
+  createAgentConversation,
+  executeReadonlyAgentChat,
+  getAgentConversation,
+  getAgentConversationState,
+  listAgentConversationMessages,
+  previewAgentChat
+} from '@/api/agentChat'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
   AgentChatRequest,
   AgentChatResponse,
   CommentInsightSummaryItem,
+  ConversationCurrentState,
+  ConversationMessageResponse,
+  ConversationResponse,
   EntryTraceEvent,
   ValidationIssue
 } from '@/types/agentChat'
@@ -392,6 +478,7 @@ const examples: ExampleInput[] = [
 
 const form = reactive({
   session_id: `workbench-${Date.now()}`,
+  conversation_id: null as number | null,
   account_id: null as number | null,
   experiment_id: null as number | null,
   text: examples[0].text,
@@ -403,8 +490,12 @@ const response = ref<AgentChatResponse | null>(null)
 const loading = ref(false)
 const readonlyLoading = ref(false)
 const draftContextLoading = ref(false)
+const conversationLoading = ref(false)
 const errorMessage = ref('')
 const demoLoaded = ref(false)
+const conversation = ref<ConversationResponse | null>(null)
+const conversationMessages = ref<ConversationMessageResponse[]>([])
+const conversationState = ref<ConversationCurrentState | null>(null)
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
 const planSteps = computed(() => response.value?.plan?.steps || [])
@@ -451,6 +542,7 @@ const applyExample = (item: ExampleInput) => {
 
 const buildRequest = (overrides: Partial<AgentChatRequest> = {}): AgentChatRequest => ({
   session_id: form.session_id || `workbench-${Date.now()}`,
+  conversation_id: form.conversation_id,
   account_id: form.account_id,
   text: form.text,
   input_type: 'TEXT',
@@ -467,6 +559,7 @@ const submitPreview = async () => {
   demoLoaded.value = false
   try {
     response.value = await previewAgentChat(buildRequest())
+    await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Agent Chat preview 请求失败'
   } finally {
@@ -480,6 +573,7 @@ const submitReadonlyExecute = async () => {
   demoLoaded.value = false
   try {
     response.value = await executeReadonlyAgentChat(buildRequest())
+    await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Agent Chat execute-readonly 请求失败'
   } finally {
@@ -501,6 +595,7 @@ const submitDraftContextPreview = async () => {
         context
       })
     )
+    await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '草稿上下文预览请求失败'
   } finally {
@@ -508,9 +603,62 @@ const submitDraftContextPreview = async () => {
   }
 }
 
+const createConversation = async () => {
+  conversationLoading.value = true
+  errorMessage.value = ''
+  try {
+    conversation.value = await createAgentConversation({
+      account_id: form.account_id,
+      title: 'Agent 工作台会话'
+    })
+    form.conversation_id = conversation.value.id
+    conversationState.value = conversation.value.current_state
+    conversationMessages.value = []
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建会话失败'
+  } finally {
+    conversationLoading.value = false
+  }
+}
+
+const loadConversation = async () => {
+  if (!form.conversation_id) {
+    errorMessage.value = '请先输入 conversation_id'
+    return
+  }
+  conversationLoading.value = true
+  errorMessage.value = ''
+  try {
+    conversation.value = await getAgentConversation(form.conversation_id)
+    conversationState.value = conversation.value.current_state
+    conversationMessages.value = await listAgentConversationMessages(form.conversation_id)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '加载会话失败'
+  } finally {
+    conversationLoading.value = false
+  }
+}
+
+const refreshConversationData = async () => {
+  if (!form.conversation_id) return
+  try {
+    const [nextConversation, messages, state] = await Promise.all([
+      getAgentConversation(form.conversation_id),
+      listAgentConversationMessages(form.conversation_id),
+      getAgentConversationState(form.conversation_id)
+    ])
+    conversation.value = nextConversation
+    conversationMessages.value = messages
+    conversationState.value = state
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '刷新会话失败'
+  }
+}
+
 const loadLocalDemo = () => {
   Object.assign(form, {
     session_id: demoAgentRequest.session_id || `workbench-${Date.now()}`,
+    conversation_id: demoAgentRequest.conversation_id || null,
     account_id: demoAgentRequest.account_id || null,
     experiment_id: Number(demoAgentRequest.context?.experiment_id || '') || null,
     text: demoAgentRequest.text || '',
@@ -518,6 +666,9 @@ const loadLocalDemo = () => {
     current_target_id: String(demoAgentRequest.current_target_id || '')
   })
   response.value = demoAgentResponse
+  conversation.value = null
+  conversationMessages.value = []
+  conversationState.value = null
   errorMessage.value = ''
   demoLoaded.value = true
 }
@@ -540,6 +691,9 @@ const percent = (value: number) => `${Math.round(value * 100)}%`
 
 const summaryList = (items: CommentInsightSummaryItem[]) =>
   items.length ? items.map((item) => `${item.type || item.name || '-'}:${item.count ?? 0}`).join(' / ') : '-'
+
+const messageStatus = (message: ConversationMessageResponse) =>
+  typeof message.metadata_payload.status === 'string' ? message.metadata_payload.status : ''
 
 const riskTagType = (riskLevel?: string) => {
   if (riskLevel === 'HIGH' || riskLevel === 'BLOCKED') return 'danger'
@@ -607,6 +761,10 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   gap: 12px;
 }
 
+.form-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .form-grid label {
   display: flex;
   min-width: 0;
@@ -631,6 +789,22 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.conversation-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.compact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .confirmation-panel {
@@ -716,6 +890,30 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
 .result-section {
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.message-item {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.message-item p {
+  margin: 8px 0;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.message-item span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .result-summary {

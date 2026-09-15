@@ -229,6 +229,7 @@ class AgentChatRequest(StrictSchema):
 
     user_id: str | None = Field(default=None, description="用户 ID，可为空")
     account_id: int | None = Field(default=None, description="账号 ID，可为空，入口层不能编造")
+    conversation_id: int | None = Field(default=None, description="Agent 会话 ID，可为空")
     session_id: str | None = Field(default=None, description="会话 ID，可为空")
     text: str | None = Field(default=None, description="用户输入文本，可为空")
     input_type: InputType = Field(default=InputType.TEXT, description="输入类型")
@@ -358,6 +359,7 @@ class AgentChatResponse(StrictSchema):
     """Agent 产品入口层统一响应。"""
 
     session_id: str | None = Field(default=None, description="会话 ID")
+    conversation_id: int | None = Field(default=None, description="Agent 会话 ID")
     router_result: RouterResult | None = Field(default=None, description="Router 结构化结果")
     plan: Plan | None = Field(default=None, description="Planner 结构化计划")
     param_validation: ParamValidationResult | None = Field(default=None, description="参数校验结果")

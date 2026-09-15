@@ -1,6 +1,7 @@
 from app.models.account import AccountProfile
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
+from app.models.agent_conversation import AgentConversation, AgentConversationMessage
 from app.models.competitors_analysis import CompetitorAnalysisReport
 from app.models.competitor_account import CompetitorAccount
 from app.models.competitor_comment import CompetitorComment
@@ -44,6 +45,8 @@ __all__ = [
     "AccountProfile",
     "AgentRun",
     "AgentStep",
+    "AgentConversation",
+    "AgentConversationMessage",
     "XhsNoteSnapshot",
     "CompetitorAnalysisReport",
     "CrawlTask",

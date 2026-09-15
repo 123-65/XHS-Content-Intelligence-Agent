@@ -12,6 +12,7 @@ export const demoAgentRequest: AgentChatRequest = {
 
 export const demoAgentResponse: AgentChatResponse = {
   session_id: 'demo-local-fixture',
+  conversation_id: null,
   router_result: {
     intent: 'GENERATE_CONTENT_OPPORTUNITY',
     confidence: 0.9,

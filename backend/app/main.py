@@ -26,6 +26,7 @@ from app.api.provider_health_rout import router as provider_health_router
 from app.api.demo_rout import router as demo_router
 from app.api.developer_rout import router as developer_router
 from app.api.agent_chat import router as agent_chat_router
+from app.api.agent_conversation import router as agent_conversation_router
 
 def create_app():
     """创建 FastAPI 应用实例。"""
@@ -56,6 +57,7 @@ def create_app():
     app.include_router(context_router)
     app.include_router(developer_router)
     app.include_router(agent_chat_router)
+    app.include_router(agent_conversation_router)
     return app
 
 app=create_app()

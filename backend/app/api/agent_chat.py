@@ -40,10 +40,10 @@ class _UnavailableReadonlyExecuteService:
         raise self.error
 
 
-def get_agent_chat_preview_service() -> AgentChatPreviewService:
+def get_agent_chat_preview_service(db: Session = Depends(get_db)) -> AgentChatPreviewService:
     """获取 Agent Chat 预览服务，方便测试替换依赖。"""
     try:
-        return build_agent_chat_preview_service()
+        return build_agent_chat_preview_service(db)
     except Exception as exc:
         return AgentChatPreviewService(_UnavailablePreviewPipeline(exc))
 
@@ -67,6 +67,7 @@ def preview_agent_chat(
     except Exception as exc:
         return AgentChatResponse(
             session_id=request.session_id,
+            conversation_id=request.conversation_id,
             status=AgentResponseStatus.FAILED,
             can_execute=False,
             requires_confirmation=False,
@@ -87,6 +88,7 @@ def execute_readonly_agent_chat(
     except Exception as exc:
         return AgentChatResponse(
             session_id=request.session_id,
+            conversation_id=request.conversation_id,
             status=AgentResponseStatus.FAILED,
             can_execute=False,
             requires_confirmation=False,
