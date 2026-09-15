@@ -51,6 +51,66 @@
           />
         </section>
 
+        <section class="account-setup-box">
+          <div class="toolbar">
+            <strong>账号画像</strong>
+            <el-tag type="success" effect="plain">AccountProfile</el-tag>
+          </div>
+          <div class="form-grid single">
+            <label>
+              <span>选择账号画像</span>
+              <el-select
+                v-model="form.account_id"
+                filterable
+                clearable
+                placeholder="请选择已创建的账号画像"
+                :loading="accountLoading"
+              >
+                <el-option
+                  v-for="account in accounts"
+                  :key="account.id"
+                  :label="`${account.account_name} #${account.id}`"
+                  :value="account.id"
+                />
+              </el-select>
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>account_name</span>
+              <el-input v-model="accountSetupForm.account_name" />
+            </label>
+            <label>
+              <span>content_domain</span>
+              <el-input v-model="accountSetupForm.content_domain" />
+            </label>
+          </div>
+          <div class="form-grid single">
+            <label>
+              <span>positioning</span>
+              <el-input v-model="accountSetupForm.positioning" type="textarea" :rows="2" resize="none" />
+            </label>
+            <label>
+              <span>target_audience</span>
+              <el-input v-model="accountSetupForm.target_audience" type="textarea" :rows="2" resize="none" />
+            </label>
+          </div>
+          <div class="action-row compact-actions">
+            <el-button size="small" :loading="accountLoading" @click="loadAccounts">
+              刷新账号
+            </el-button>
+            <el-button size="small" type="primary" :loading="accountLoading" @click="createWorkbenchAccount">
+              创建并选择
+            </el-button>
+          </div>
+          <el-alert
+            type="info"
+            title="数据源配置必须绑定到用户创建或选择的账号画像，不使用系统默认账号。"
+            show-icon
+            :closable="false"
+          />
+        </section>
+
         <section class="data-source-box">
           <div class="toolbar">
             <strong>数据源配置</strong>
@@ -120,8 +180,8 @@
             <el-input v-model="form.session_id" />
           </label>
           <label>
-            <span>account_id</span>
-            <el-input-number v-model="form.account_id" :min="1" controls-position="right" />
+            <span>selected account_id</span>
+            <el-input-number v-model="form.account_id" :min="1" controls-position="right" disabled />
           </label>
           <label>
             <span>experiment_id</span>
@@ -484,7 +544,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import {
@@ -495,6 +555,7 @@ import {
   listAgentConversationMessages,
   previewAgentChat
 } from '@/api/agentChat'
+import { createAccountProfile, getAccountProfiles, type AccountProfileResponse } from '@/api/account'
 import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
@@ -513,23 +574,23 @@ import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 interface ExampleInput {
   label: string
   text: string
-  account_id: number | null
+  account_id?: number | null
   experiment_id?: number | null
   current_target_type?: string
   current_target_id?: string
 }
 
 const examples: ExampleInput[] = [
-  { label: '账号画像', text: '查看当前账号画像', account_id: 1 },
-  { label: '上下文证据', text: '查看这个账号最近能用于写作的上下文证据', account_id: 1 },
-  { label: '竞品证据', text: '查看当前账号的竞品证据', account_id: 1 },
-  { label: '评论洞察', text: '看看评论洞察', account_id: 1 },
-  { label: '策略记忆', text: '查看策略记忆', account_id: 1 },
-  { label: '草稿上下文', text: '补充要求：更自然，不要太功利', account_id: 1, experiment_id: 1 },
-  { label: '新选题', text: '我想写一篇 27 届双非本科做 Agent 求职的帖子', account_id: null },
-  { label: '这个不行', text: '这个不行', account_id: null },
-  { label: '标题太 AI', text: '这个标题太 AI 了，换自然一点', account_id: 1, current_target_type: 'DRAFT', current_target_id: '123' },
-  { label: '自动发布', text: '直接帮我发布到小红书', account_id: 1 }
+  { label: '账号画像', text: '查看当前账号画像' },
+  { label: '上下文证据', text: '查看这个账号最近能用于写作的上下文证据' },
+  { label: '竞品证据', text: '查看当前账号的竞品证据' },
+  { label: '评论洞察', text: '看看评论洞察' },
+  { label: '策略记忆', text: '查看策略记忆' },
+  { label: '草稿上下文', text: '补充要求：更自然，不要太功利', experiment_id: 1 },
+  { label: '新选题', text: '我想写一篇新的小红书选题' },
+  { label: '这个不行', text: '这个不行' },
+  { label: '标题太 AI', text: '这个标题太 AI 了，换自然一点', current_target_type: 'DRAFT', current_target_id: '123' },
+  { label: '自动发布', text: '直接帮我发布到小红书' }
 ]
 
 const form = reactive({
@@ -552,12 +613,20 @@ const demoLoaded = ref(false)
 const conversation = ref<ConversationResponse | null>(null)
 const conversationMessages = ref<ConversationMessageResponse[]>([])
 const conversationState = ref<ConversationCurrentState | null>(null)
+const accountLoading = ref(false)
+const accounts = ref<AccountProfileResponse[]>([])
 const dataSourceLoading = ref(false)
 const dataSourceConfig = ref<DataSourceConfigResponse | null>(null)
+const accountSetupForm = reactive({
+  account_name: '',
+  content_domain: '',
+  positioning: '',
+  target_audience: ''
+})
 const dataSourceForm = reactive({
   platform: 'xhs',
   status: 'ACTIVE' as 'ACTIVE' | 'DISABLED',
-  keywordsText: 'AI Agent project\njob search content',
+  keywordsText: '',
   competitorAccountsText: '',
   noteUrlsText: ''
 })
@@ -598,7 +667,7 @@ const activeStep = computed(() => {
 
 const applyExample = (item: ExampleInput) => {
   form.text = item.text
-  form.account_id = item.account_id
+  if (item.account_id !== undefined) form.account_id = item.account_id
   form.experiment_id = item.experiment_id || null
   form.current_target_type = item.current_target_type || ''
   form.current_target_id = item.current_target_id || ''
@@ -720,9 +789,46 @@ const refreshConversationData = async () => {
   }
 }
 
+const loadAccounts = async () => {
+  accountLoading.value = true
+  errorMessage.value = ''
+  try {
+    accounts.value = await getAccountProfiles()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '加载账号画像失败'
+  } finally {
+    accountLoading.value = false
+  }
+}
+
+const createWorkbenchAccount = async () => {
+  if (!accountSetupForm.account_name.trim() || !accountSetupForm.positioning.trim() || !accountSetupForm.target_audience.trim()) {
+    errorMessage.value = '请先填写账号名称、账号定位和目标用户'
+    return
+  }
+  accountLoading.value = true
+  errorMessage.value = ''
+  try {
+    const account = await createAccountProfile({
+      account_name: accountSetupForm.account_name.trim(),
+      platform: 'xhs',
+      content_domain: accountSetupForm.content_domain.trim() || null,
+      positioning: accountSetupForm.positioning.trim(),
+      target_audience: accountSetupForm.target_audience.trim(),
+      primary_goal: 'lead'
+    })
+    await loadAccounts()
+    form.account_id = account.id
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建账号画像失败'
+  } finally {
+    accountLoading.value = false
+  }
+}
+
 const loadDataSourceConfig = async () => {
   if (!form.account_id) {
-    errorMessage.value = '请先输入 account_id'
+    errorMessage.value = '请先创建或选择账号画像'
     return
   }
   dataSourceLoading.value = true
@@ -740,7 +846,7 @@ const loadDataSourceConfig = async () => {
 
 const saveDataSourceConfig = async () => {
   if (!form.account_id) {
-    errorMessage.value = '请先输入 account_id'
+    errorMessage.value = '请先创建或选择账号画像'
     return
   }
   dataSourceLoading.value = true
@@ -789,6 +895,8 @@ const splitSourceLines = (value: string) =>
         .filter(Boolean)
     )
   )
+
+onMounted(loadAccounts)
 
 const loadLocalDemo = () => {
   Object.assign(form, {
@@ -944,6 +1052,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #dbeafe;
   border-radius: 8px;
   background: #f8fbff;
+}
+
+.account-setup-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f7fef9;
 }
 
 .compact-actions {
