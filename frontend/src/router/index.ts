@@ -14,6 +14,7 @@ const routes = [
   { path: '/metrics', name: 'metrics', component: () => import('@/views/MetricsReview.vue') },
   { path: '/strategy', name: 'strategy', component: () => import('@/views/StrategyMemory.vue') },
   { path: '/workflow-logs', name: 'workflowLogs', component: () => import('@/views/WorkflowLogs.vue') },
+  { path: '/agent/workbench', name: 'agentWorkbench', component: () => import('@/views/AgentWorkbench.vue') },
   { path: '/developer/agent-trace', name: 'developerAgentTrace', component: () => import('@/views/DeveloperAgentTrace.vue') }
 ]
 
