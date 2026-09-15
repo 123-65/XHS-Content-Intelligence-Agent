@@ -220,6 +220,85 @@
           </div>
         </section>
 
+        <section class="evidence-refresh-box">
+          <div class="toolbar">
+            <strong>证据刷新</strong>
+            <el-tag type="success" effect="plain">Evidence Refresh V0</el-tag>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>keyword</span>
+              <el-input v-model="evidenceRefreshForm.keyword" clearable />
+            </label>
+            <label>
+              <span>target_metric</span>
+              <el-select v-model="evidenceRefreshForm.target_metric">
+                <el-option label="composite" value="composite" />
+                <el-option label="engagement" value="engagement" />
+              </el-select>
+            </label>
+            <label>
+              <span>limit</span>
+              <el-input-number v-model="evidenceRefreshForm.limit" :min="1" :max="100" controls-position="right" />
+            </label>
+            <label>
+              <span>data_refresh_run_id</span>
+              <el-input-number
+                v-model="evidenceRefreshForm.data_refresh_run_id"
+                :min="1"
+                controls-position="right"
+                clearable
+              />
+            </label>
+          </div>
+          <div class="action-row compact-actions">
+            <el-button size="small" type="primary" :loading="evidenceLoading" @click="runEvidenceRefresh">
+              刷新证据分析
+            </el-button>
+            <el-button size="small" :loading="evidenceLoading" @click="loadEvidenceRuns">
+              最近证据刷新
+            </el-button>
+          </div>
+          <el-descriptions v-if="latestEvidenceRun" :column="1" border size="small">
+            <el-descriptions-item label="status">{{ latestEvidenceRun.status }}</el-descriptions-item>
+            <el-descriptions-item label="report_id">{{ latestEvidenceRun.report_id || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="data_quality">{{ latestEvidenceRun.data_quality || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="note_count">{{ latestEvidenceRun.note_count }}</el-descriptions-item>
+            <el-descriptions-item label="comment_count">{{ latestEvidenceRun.comment_count }}</el-descriptions-item>
+            <el-descriptions-item label="breakdown_count">{{ latestEvidenceRun.breakdown_count }}</el-descriptions-item>
+            <el-descriptions-item label="opportunity_count">{{ latestEvidenceRun.opportunity_count }}</el-descriptions-item>
+            <el-descriptions-item label="hint">{{ latestEvidenceRun.hint || latestEvidenceRun.error_message || '-' }}</el-descriptions-item>
+          </el-descriptions>
+          <el-alert
+            v-if="latestEvidenceRun?.status === 'DATA_INSUFFICIENT'"
+            type="warning"
+            title="当前账号缺少可用真实竞品数据，请先手动录入或通过合规数据刷新入库。"
+            show-icon
+            :closable="false"
+          />
+          <el-alert
+            type="info"
+            title="证据刷新只基于已入库真实竞品数据，不访问外部链接，不调用 LLM，不生成草稿。"
+            show-icon
+            :closable="false"
+          />
+          <div v-if="evidenceRuns.length" class="refresh-run-list">
+            <div v-for="run in evidenceRuns" :key="run.id" class="refresh-run-item">
+              <div class="toolbar">
+                <strong>#{{ run.id }}</strong>
+                <el-tag :type="evidenceStatusType(run.status)" effect="plain">{{ run.status }}</el-tag>
+              </div>
+              <div class="slot-meta">
+                <span>report {{ run.report_id || '-' }}</span>
+                <span>notes {{ run.note_count }}</span>
+                <span>comments {{ run.comment_count }}</span>
+                <span>breakdowns {{ run.breakdown_count }}</span>
+                <span>opportunities {{ run.opportunity_count }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <el-input
           v-model="form.text"
           type="textarea"
@@ -613,6 +692,7 @@ import {
 import { createAccountProfile, getAccountProfiles, type AccountProfileResponse } from '@/api/account'
 import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
 import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
+import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenceRefreshRun'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -627,6 +707,7 @@ import type {
 } from '@/types/agentChat'
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefreshRun'
+import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/types/evidenceRefreshRun'
 
 interface ExampleInput {
   label: string
@@ -677,6 +758,9 @@ const dataSourceConfig = ref<DataSourceConfigResponse | null>(null)
 const refreshLoading = ref(false)
 const latestRefreshRun = ref<DataRefreshRunResponse | null>(null)
 const refreshRuns = ref<DataRefreshRunResponse[]>([])
+const evidenceLoading = ref(false)
+const latestEvidenceRun = ref<EvidenceRefreshRunResponse | null>(null)
+const evidenceRuns = ref<EvidenceRefreshRunResponse[]>([])
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -689,6 +773,12 @@ const dataSourceForm = reactive({
   keywordsText: '',
   competitorAccountsText: '',
   noteUrlsText: ''
+})
+const evidenceRefreshForm = reactive({
+  keyword: '',
+  target_metric: 'composite',
+  limit: 20,
+  data_refresh_run_id: null as number | null
 })
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
@@ -969,6 +1059,42 @@ const loadRefreshRuns = async () => {
   }
 }
 
+const runEvidenceRefresh = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  evidenceLoading.value = true
+  errorMessage.value = ''
+  try {
+    latestEvidenceRun.value = await createEvidenceRefreshRun({
+      account_id: form.account_id,
+      data_refresh_run_id: evidenceRefreshForm.data_refresh_run_id || null,
+      keyword: evidenceRefreshForm.keyword.trim() || null,
+      target_metric: evidenceRefreshForm.target_metric,
+      limit: evidenceRefreshForm.limit
+    })
+    await loadEvidenceRuns()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建证据刷新运行失败'
+  } finally {
+    evidenceLoading.value = false
+  }
+}
+
+const loadEvidenceRuns = async () => {
+  if (!form.account_id) return
+  evidenceLoading.value = true
+  try {
+    evidenceRuns.value = await listEvidenceRefreshRuns(form.account_id)
+    latestEvidenceRun.value = evidenceRuns.value[0] || latestEvidenceRun.value
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '加载证据刷新记录失败'
+  } finally {
+    evidenceLoading.value = false
+  }
+}
+
 const applyDataSourceConfig = (config: DataSourceConfigResponse) => {
   dataSourceConfig.value = config
   dataSourceForm.platform = config.platform
@@ -1043,6 +1169,13 @@ const refreshStatusType = (status: RefreshRunStatus) => {
   if (status === 'SUCCESS') return 'success'
   if (status === 'FAILED' || status === 'PROVIDER_NOT_CONFIGURED') return 'warning'
   if (status === 'PARTIAL') return 'warning'
+  return 'info'
+}
+
+const evidenceStatusType = (status: EvidenceRefreshRunStatus) => {
+  if (status === 'SUCCESS') return 'success'
+  if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT') return 'warning'
+  if (status === 'FAILED') return 'danger'
   return 'info'
 }
 
@@ -1164,6 +1297,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #fde68a;
   border-radius: 8px;
   background: #fffdf4;
+}
+
+.evidence-refresh-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #f8fbff;
 }
 
 .refresh-run-list {
