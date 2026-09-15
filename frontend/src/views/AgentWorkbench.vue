@@ -55,8 +55,17 @@
 
         <div class="action-row">
           <el-button type="primary" :icon="Send" :loading="loading" @click="submitPreview">发送预览</el-button>
+          <el-button type="success" :icon="Search" :loading="readonlyLoading" @click="submitReadonlyExecute">
+            执行只读查询
+          </el-button>
           <el-button :icon="FileJson" @click="loadLocalDemo">加载本地 Demo 数据</el-button>
         </div>
+        <el-alert
+          type="info"
+          title="当前只支持 QUERY_ACCOUNT_PROFILE，只读，不写数据库。"
+          show-icon
+          :closable="false"
+        />
 
         <el-alert v-if="demoLoaded" type="info" title="当前展示本地演示数据，未调用接口" show-icon :closable="false" />
         <el-alert v-if="errorMessage" type="error" :title="errorMessage" show-icon :closable="false" />
@@ -174,7 +183,7 @@
 
         <div class="grid result-grid">
           <el-card shadow="never">
-            <template #header><strong>Execution dry-run</strong></template>
+            <template #header><strong>Execution</strong></template>
             <el-descriptions v-if="execution" :column="1" border>
               <el-descriptions-item label="mode">{{ execution.mode }}</el-descriptions-item>
               <el-descriptions-item label="status">{{ execution.status }}</el-descriptions-item>
@@ -182,6 +191,24 @@
               <el-descriptions-item label="message">{{ execution.message || '-' }}</el-descriptions-item>
             </el-descriptions>
             <el-empty v-else description="暂无 dry-run 结果" />
+          </el-card>
+
+          <el-card shadow="never">
+            <template #header><strong>业务结果</strong></template>
+            <el-descriptions v-if="businessResult" :column="1" border>
+              <el-descriptions-item label="account_id">{{ businessResult.account_id }}</el-descriptions-item>
+              <el-descriptions-item label="account_name">{{ businessResult.account_name }}</el-descriptions-item>
+              <el-descriptions-item label="platform">{{ businessResult.platform }}</el-descriptions-item>
+              <el-descriptions-item label="content_domain">{{ businessResult.content_domain || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="positioning">{{ businessResult.positioning }}</el-descriptions-item>
+              <el-descriptions-item label="target_audience">{{ businessResult.target_audience }}</el-descriptions-item>
+              <el-descriptions-item label="tone_preference">{{ businessResult.tone_preference || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="risk_preference">{{ businessResult.risk_preference }}</el-descriptions-item>
+              <el-descriptions-item label="account_stage">{{ businessResult.account_stage }}</el-descriptions-item>
+              <el-descriptions-item label="primary_goal">{{ businessResult.primary_goal }}</el-descriptions-item>
+              <el-descriptions-item label="summary">{{ businessResult.summary }}</el-descriptions-item>
+            </el-descriptions>
+            <el-empty v-else description="暂无账号画像结果" />
           </el-card>
 
           <el-card shadow="never">
@@ -210,9 +237,9 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { FileJson, MessageSquareText, Send, ShieldAlert } from 'lucide-vue-next'
+import { FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
-import { previewAgentChat } from '@/api/agentChat'
+import { executeReadonlyAgentChat, previewAgentChat } from '@/api/agentChat'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type { AgentChatRequest, AgentChatResponse, EntryTraceEvent, ValidationIssue } from '@/types/agentChat'
 
@@ -225,6 +252,7 @@ interface ExampleInput {
 }
 
 const examples: ExampleInput[] = [
+  { label: '账号画像', text: '查看当前账号画像', account_id: 1 },
   { label: '新选题', text: '我想写一篇 27 届双非本科做 Agent 求职的帖子', account_id: null },
   { label: '这个不行', text: '这个不行', account_id: null },
   { label: '标题太 AI', text: '这个标题太 AI 了，换自然一点', account_id: 1, current_target_type: 'DRAFT', current_target_id: '123' },
@@ -241,12 +269,14 @@ const form = reactive({
 
 const response = ref<AgentChatResponse | null>(null)
 const loading = ref(false)
+const readonlyLoading = ref(false)
 const errorMessage = ref('')
 const demoLoaded = ref(false)
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
 const planSteps = computed(() => response.value?.plan?.steps || [])
 const execution = computed(() => response.value?.metadata.execution || null)
+const businessResult = computed(() => response.value?.metadata.business_result || null)
 const traceEvents = computed(() => response.value?.metadata.entry_trace?.events || [])
 const validationOk = computed(() => Boolean(response.value?.param_validation?.valid && response.value?.plan_validation?.valid))
 const validationIssues = computed<ValidationIssue[]>(() => [
@@ -298,6 +328,19 @@ const submitPreview = async () => {
   }
 }
 
+const submitReadonlyExecute = async () => {
+  readonlyLoading.value = true
+  errorMessage.value = ''
+  demoLoaded.value = false
+  try {
+    response.value = await executeReadonlyAgentChat(buildRequest())
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Agent Chat execute-readonly 请求失败'
+  } finally {
+    readonlyLoading.value = false
+  }
+}
+
 const loadLocalDemo = () => {
   Object.assign(form, {
     session_id: demoAgentRequest.session_id || `workbench-${Date.now()}`,
@@ -312,6 +355,7 @@ const loadLocalDemo = () => {
 }
 
 const statusType = (status?: string) => {
+  if (status === 'SUCCESS') return 'success'
   if (status === 'READY_TO_EXECUTE') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'NEED_CLARIFICATION') return 'warning'
   if (status === 'BLOCKED' || status === 'FAILED') return 'danger'

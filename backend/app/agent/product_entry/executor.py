@@ -98,6 +98,12 @@ class ExecutionOrchestrator:
     def _preflight(self, plan: Plan, validation: PlanValidationResult | None, mode: ExecutionMode) -> PlanExecutionResult | None:
         """执行前硬性检查，不通过时不执行任何 step。"""
         if validation and not validation.valid:
+            if validation.confirmation_requirement == ConfirmationRequirement.CLARIFICATION_REQUIRED:
+                return _blocked_result(plan, mode, ExecutionStatus.NEED_CLARIFICATION, "CLARIFICATION_REQUIRED", validation.blocked_reason or "计划需要先补充信息。", validation.risk_flags)
+            if validation.confirmation_requirement == ConfirmationRequirement.USER_CONFIRM_REQUIRED:
+                return _blocked_result(plan, mode, ExecutionStatus.WAITING_CONFIRMATION, "CONFIRMATION_REQUIRED", validation.blocked_reason or "计划需要用户确认后才能执行。", validation.risk_flags)
+            if validation.confirmation_requirement == ConfirmationRequirement.BLOCKED:
+                return _blocked_result(plan, mode, ExecutionStatus.BLOCKED, "PLAN_BLOCKED", validation.blocked_reason or "计划已被阻断。", validation.risk_flags)
             return _blocked_result(plan, mode, ExecutionStatus.BLOCKED, "PLAN_VALIDATION_FAILED", validation.blocked_reason or "计划校验未通过。", validation.risk_flags)
         requirement = validation.confirmation_requirement if validation else plan.confirmation_requirement
         if requirement == ConfirmationRequirement.USER_CONFIRM_REQUIRED:
@@ -253,8 +259,9 @@ def build_response_from_execution(
     confirmation_card: ConfirmationCard | None = None,
 ) -> AgentChatResponse:
     """根据执行结果构造入口层统一响应。"""
+    success_status = AgentResponseStatus.SUCCESS if execution_result.mode == ExecutionMode.REAL else AgentResponseStatus.READY_TO_EXECUTE
     status_mapping = {
-        ExecutionStatus.SUCCESS: AgentResponseStatus.READY_TO_EXECUTE,
+        ExecutionStatus.SUCCESS: success_status,
         ExecutionStatus.WAITING_CONFIRMATION: AgentResponseStatus.WAITING_CONFIRMATION,
         ExecutionStatus.NEED_CLARIFICATION: AgentResponseStatus.NEED_CLARIFICATION,
         ExecutionStatus.BLOCKED: AgentResponseStatus.BLOCKED,

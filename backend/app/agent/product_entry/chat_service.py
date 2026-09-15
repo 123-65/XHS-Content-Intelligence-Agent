@@ -1,7 +1,21 @@
+from sqlalchemy.orm import Session
+
+from app.agent.product_entry.business_handlers import build_readonly_action_handler_registry
+from app.agent.product_entry.confirmation import build_confirmation_card
+from app.agent.product_entry.execution import ExecutionMode, ExecutionStatus, PlanExecutionResult
+from app.agent.product_entry.executor import ExecutionOrchestrator, build_response_from_execution
 from app.agent.product_entry.llm_router import LLMUserInputRouter
-from app.agent.product_entry.pipeline import AgentEntryPreviewPipeline
-from app.agent.product_entry.schemas import AgentChatRequest, AgentChatResponse
+from app.agent.product_entry.pipeline import (
+    AgentEntryPreviewPipeline,
+    apply_param_validation_to_plan,
+    build_agent_input_from_chat_request,
+    build_plan_validation_result,
+    merge_param_validation_results,
+)
+from app.agent.product_entry.schemas import Action, AgentChatRequest, AgentChatResponse
 from app.agent.product_entry.task_planner import LLMTaskPlanner
+from app.agent.product_entry.trace import AgentEntryTraceRecorder, to_agent_trace_payload
+from app.agent.product_entry.validators import validate_param_sources, validate_plan_params, validate_plan_result
 from app.llm.client import LLMClient
 
 
@@ -25,3 +39,99 @@ def build_agent_chat_preview_service() -> AgentChatPreviewService:
         planner=LLMTaskPlanner(llm_client),
     )
     return AgentChatPreviewService(pipeline)
+
+
+class AgentChatReadonlyExecuteService:
+    """Agent Chat 只读执行服务，仅允许白名单只读 Action 进入 REAL 模式。"""
+
+    def __init__(self, router, planner, db: Session):
+        """初始化只读执行服务。"""
+        self.router = router
+        self.planner = planner
+        self.db = db
+
+    def execute_readonly(self, request: AgentChatRequest) -> AgentChatResponse:
+        """执行只读 Agent Action，目前仅支持 QUERY_ACCOUNT_PROFILE。"""
+        agent_input = build_agent_input_from_chat_request(request)
+        recorder = AgentEntryTraceRecorder(session_id=request.session_id)
+        recorder.user_id = request.user_id
+        recorder.record_input(agent_input)
+
+        pipeline = AgentEntryPreviewPipeline(self.router, self.planner)
+        router_result = pipeline._route(agent_input, recorder)
+        plan = pipeline._plan(agent_input, router_result, recorder)
+
+        param_validation = validate_plan_params(plan)
+        recorder.record_param_validation(param_validation)
+        source_validation = validate_param_sources(agent_input, router_result, plan)
+        recorder.record_param_validation(source_validation)
+        combined_param_validation = merge_param_validation_results(param_validation, source_validation)
+
+        plan = apply_param_validation_to_plan(plan, combined_param_validation)
+        plan = validate_plan_result(plan)
+        plan_validation = build_plan_validation_result(plan, combined_param_validation)
+        recorder.record_plan_validation(plan_validation)
+
+        confirmation_card = build_confirmation_card(plan, plan_validation)
+        recorder.record_confirmation_card(confirmation_card)
+
+        registry = build_readonly_action_handler_registry(self.db)
+        orchestrator = ExecutionOrchestrator(registry)
+        execution_result = orchestrator.execute_plan(
+            plan,
+            plan_validation=plan_validation,
+            mode=ExecutionMode.REAL,
+            recorder=recorder,
+            context={"db": self.db, "account_id": request.account_id},
+        )
+        response = build_response_from_execution(plan, execution_result, confirmation_card)
+        response = response.model_copy(
+            update={
+                "session_id": request.session_id,
+                "router_result": router_result,
+                "param_validation": combined_param_validation,
+                "plan_validation": plan_validation,
+                "trace_id": recorder.trace_id,
+                "message": _message_for_readonly_response(response, execution_result),
+            }
+        )
+        recorder.record_response(response)
+        trace_payload = to_agent_trace_payload(recorder.build_trace())
+        metadata = {
+            **response.metadata,
+            "business_result": _business_result(execution_result),
+            "entry_trace": trace_payload,
+            "readonly_registry_actions": [
+                Action.NOOP.value,
+                Action.ASK_CLARIFICATION.value,
+                Action.QUERY_ACCOUNT_PROFILE.value,
+            ],
+        }
+        return response.model_copy(update={"metadata": metadata})
+
+
+def build_agent_chat_readonly_execute_service(db: Session) -> AgentChatReadonlyExecuteService:
+    """构建 Agent Chat 只读执行服务。"""
+    llm_client = LLMClient()
+    return AgentChatReadonlyExecuteService(
+        router=LLMUserInputRouter(llm_client),
+        planner=LLMTaskPlanner(llm_client),
+        db=db,
+    )
+
+
+def _business_result(execution_result: PlanExecutionResult) -> dict | None:
+    """提取只读业务结果，供前端展示。"""
+    if execution_result.status != ExecutionStatus.SUCCESS:
+        return None
+    for step in execution_result.step_results:
+        if step.action == Action.QUERY_ACCOUNT_PROFILE and step.output:
+            return step.output
+    return None
+
+
+def _message_for_readonly_response(response: AgentChatResponse, execution_result: PlanExecutionResult) -> str:
+    """为只读执行结果生成用户可读消息。"""
+    if execution_result.status == ExecutionStatus.SUCCESS:
+        return "只读查询执行完成。"
+    return response.message

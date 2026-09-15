@@ -1,6 +1,7 @@
 """Agent 产品入口层结构化协议。"""
 
 from app.agent.product_entry.confirmation import build_confirmation_card
+from app.agent.product_entry.business_handlers import build_readonly_action_handler_registry, query_account_profile_handler
 from app.agent.product_entry.execution import ExecutionMode, ExecutionStatus, PlanExecutionResult, StepExecutionResult
 from app.agent.product_entry.executor import ActionHandlerRegistry, ExecutionOrchestrator, build_response_from_execution
 from app.agent.product_entry.prompts import (
@@ -10,7 +11,7 @@ from app.agent.product_entry.prompts import (
     build_user_input_router_user_prompt,
 )
 from app.agent.product_entry.llm_router import LLMUserInputRouter
-from app.agent.product_entry.chat_service import AgentChatPreviewService, build_agent_chat_preview_service
+from app.agent.product_entry.chat_service import AgentChatPreviewService, AgentChatReadonlyExecuteService, build_agent_chat_preview_service, build_agent_chat_readonly_execute_service
 from app.agent.product_entry.pipeline import AgentEntryPreviewPipeline, build_agent_input_from_chat_request
 from app.agent.product_entry.registry import ACTION_REGISTRY, INTENT_ACTION_MAPPING, UNSUPPORTED_ACTION_REGISTRY
 from app.agent.product_entry.schemas import (
@@ -71,6 +72,7 @@ __all__ = [
     "AgentEntryTraceStage",
     "AgentEntryPreviewPipeline",
     "AgentChatPreviewService",
+    "AgentChatReadonlyExecuteService",
     "AgentInput",
     "AgentPlanningResult",
     "AgentResponseStatus",
@@ -103,10 +105,13 @@ __all__ = [
     "build_confirmation_card",
     "build_agent_input_from_chat_request",
     "build_agent_chat_preview_service",
+    "build_agent_chat_readonly_execute_service",
+    "build_readonly_action_handler_registry",
     "build_response_from_execution",
     "build_user_input_router_system_prompt",
     "build_user_input_router_user_prompt",
     "apply_action_registry_constraints",
+    "query_account_profile_handler",
     "mask_sensitive_text",
     "summarize_payload",
     "to_agent_trace_payload",

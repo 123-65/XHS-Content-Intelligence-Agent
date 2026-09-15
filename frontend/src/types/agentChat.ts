@@ -148,6 +148,21 @@ export interface AgentExecutionResult {
   confirmation_requirement: string | null
 }
 
+export interface AccountProfileBusinessResult {
+  account_id: number
+  account_name: string
+  platform: string
+  content_domain: string | null
+  positioning: string
+  target_audience: string
+  persona: string | null
+  tone_preference: string | null
+  risk_preference: string
+  account_stage: string
+  primary_goal: string
+  summary: string
+}
+
 export interface AgentChatResponse {
   session_id: string | null
   router_result: RouterResult | null
@@ -163,6 +178,7 @@ export interface AgentChatResponse {
   trace_id: string | null
   metadata: {
     execution?: AgentExecutionResult
+    business_result?: AccountProfileBusinessResult | null
     entry_trace?: EntryTrace
     demo_source?: string
     [key: string]: unknown

@@ -38,6 +38,9 @@ class LLMTaskPlanner:
             if recorder:
                 recorder.record_plan(plan, AgentEntryTraceStage.PLAN_VALIDATED)
             return plan
+        deterministic_plan = self._plan_query_account_profile(agent_input, checked_router, recorder)
+        if deterministic_plan:
+            return deterministic_plan
 
         system_prompt = build_task_planner_system_prompt()
         prompt_context = self._prompt_context(agent_input)
@@ -89,6 +92,40 @@ class LLMTaskPlanner:
             return plan
 
         return self._parse_and_validate(self._result_text(llm_result), checked_router, recorder)
+
+    def _plan_query_account_profile(
+        self,
+        agent_input: AgentInput,
+        router_result: RouterResult,
+        recorder: AgentEntryTraceRecorder | None = None,
+    ) -> Plan | None:
+        """对账号画像查询做确定性规划，不调用真实 LLM。"""
+        account_id = router_result.extracted_params.get("account_id") or agent_input.account_id
+        if router_result.intent != Intent.QUERY_STATUS or router_result.target_type != "ACCOUNT" or account_id is None:
+            return None
+        plan = Plan(
+            conversation_id=agent_input.conversation_id,
+            intent=router_result.intent,
+            steps=[
+                PlanStep(
+                    step_no=1,
+                    action=Action.QUERY_ACCOUNT_PROFILE,
+                    description="查询当前账号画像，只读读取 AccountProfile。",
+                    input_params={"account_id": account_id},
+                    expected_output="账号画像摘要",
+                    allowed_effect=AllowedEffect.READ_ONLY,
+                    can_execute=True,
+                )
+            ],
+            confirmation_requirement=ConfirmationRequirement.NONE,
+            can_execute=True,
+            summary_for_user="将只读查询当前账号画像。",
+        )
+        constrained = apply_action_registry_constraints(plan)
+        validated = validate_plan_result(constrained)
+        if recorder:
+            recorder.record_plan(validated, AgentEntryTraceStage.PLAN_VALIDATED)
+        return validated
 
     def _parse_and_validate(self, raw_text: str, router_result: RouterResult, recorder: AgentEntryTraceRecorder | None = None) -> Plan:
         """按 JSON 解析、Plan Schema、Registry 约束、Plan Validator 四层处理 LLM 输出。"""
