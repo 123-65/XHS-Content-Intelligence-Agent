@@ -1,5 +1,6 @@
 from app.models.account import AccountProfile
 from app.models.account_data_source_config import AccountDataSourceConfig
+from app.models.account_data_refresh_run import AccountDataRefreshRun
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
 from app.models.agent_conversation import AgentConversation, AgentConversationMessage
@@ -45,6 +46,7 @@ from app.models.xhs_note import XhsNoteSnapshot
 __all__ = [
     "AccountProfile",
     "AccountDataSourceConfig",
+    "AccountDataRefreshRun",
     "AgentRun",
     "AgentStep",
     "AgentConversation",

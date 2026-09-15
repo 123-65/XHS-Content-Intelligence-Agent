@@ -165,6 +165,61 @@
           />
         </section>
 
+        <section class="data-refresh-box">
+          <div class="toolbar">
+            <strong>数据刷新</strong>
+            <el-tag type="warning" effect="plain">Manual Refresh V0</el-tag>
+          </div>
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="account_id">{{ form.account_id || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="latest_status">{{ latestRefreshRun?.status || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="provider_status">{{ latestRefreshRun?.stats.provider_status || '-' }}</el-descriptions-item>
+          </el-descriptions>
+          <div class="action-row compact-actions">
+            <el-button size="small" type="primary" :loading="refreshLoading" @click="runManualRefresh">
+              刷新今日数据
+            </el-button>
+            <el-button size="small" :loading="refreshLoading" @click="loadRefreshRuns">
+              最近刷新记录
+            </el-button>
+          </div>
+          <el-alert
+            v-if="latestRefreshRun?.status === 'PROVIDER_NOT_CONFIGURED'"
+            type="warning"
+            title="当前未配置真实数据刷新 Provider，本次仅创建刷新记录，没有伪造采集结果。"
+            show-icon
+            :closable="false"
+          />
+          <el-alert
+            v-else-if="latestRefreshRun?.error_code === 'NO_ENABLED_DATA_SOURCE'"
+            type="warning"
+            title="请先保存并启用数据源配置。"
+            show-icon
+            :closable="false"
+          />
+          <el-alert
+            type="info"
+            title="本阶段是用户触发式刷新，不是定时任务；不会自动生成报告、选题或草稿。"
+            show-icon
+            :closable="false"
+          />
+          <div v-if="refreshRuns.length" class="refresh-run-list">
+            <div v-for="run in refreshRuns" :key="run.id" class="refresh-run-item">
+              <div class="toolbar">
+                <strong>#{{ run.id }}</strong>
+                <el-tag :type="refreshStatusType(run.status)" effect="plain">{{ run.status }}</el-tag>
+              </div>
+              <div class="slot-meta">
+                <span>configs {{ run.stats.config_count ?? 0 }}</span>
+                <span>keywords {{ run.stats.keyword_count ?? 0 }}</span>
+                <span>competitors {{ run.stats.competitor_account_count ?? 0 }}</span>
+                <span>seed_urls {{ run.stats.seed_url_count ?? 0 }}</span>
+                <span>{{ run.error_code || 'NO_ERROR' }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <el-input
           v-model="form.text"
           type="textarea"
@@ -557,6 +612,7 @@ import {
 } from '@/api/agentChat'
 import { createAccountProfile, getAccountProfiles, type AccountProfileResponse } from '@/api/account'
 import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
+import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -570,6 +626,7 @@ import type {
   ValidationIssue
 } from '@/types/agentChat'
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
+import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefreshRun'
 
 interface ExampleInput {
   label: string
@@ -617,6 +674,9 @@ const accountLoading = ref(false)
 const accounts = ref<AccountProfileResponse[]>([])
 const dataSourceLoading = ref(false)
 const dataSourceConfig = ref<DataSourceConfigResponse | null>(null)
+const refreshLoading = ref(false)
+const latestRefreshRun = ref<DataRefreshRunResponse | null>(null)
+const refreshRuns = ref<DataRefreshRunResponse[]>([])
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -867,10 +927,45 @@ const saveDataSourceConfig = async () => {
       metadata_payload: { source: 'agent_workbench_b2' }
     })
     applyDataSourceConfig(config)
+    await loadRefreshRuns()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '保存数据源配置失败'
   } finally {
     dataSourceLoading.value = false
+  }
+}
+
+const runManualRefresh = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  refreshLoading.value = true
+  errorMessage.value = ''
+  try {
+    latestRefreshRun.value = await createDataRefreshRun({
+      account_id: form.account_id,
+      trigger_type: 'USER_CLICK',
+      force: false
+    })
+    await loadRefreshRuns()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建数据刷新运行失败'
+  } finally {
+    refreshLoading.value = false
+  }
+}
+
+const loadRefreshRuns = async () => {
+  if (!form.account_id) return
+  refreshLoading.value = true
+  try {
+    refreshRuns.value = await listDataRefreshRuns(form.account_id)
+    latestRefreshRun.value = refreshRuns.value[0] || latestRefreshRun.value
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '加载刷新记录失败'
+  } finally {
+    refreshLoading.value = false
   }
 }
 
@@ -941,6 +1036,13 @@ const messageStatus = (message: ConversationMessageResponse) =>
 const riskTagType = (riskLevel?: string) => {
   if (riskLevel === 'HIGH' || riskLevel === 'BLOCKED') return 'danger'
   if (riskLevel === 'MEDIUM') return 'warning'
+  return 'info'
+}
+
+const refreshStatusType = (status: RefreshRunStatus) => {
+  if (status === 'SUCCESS') return 'success'
+  if (status === 'FAILED' || status === 'PROVIDER_NOT_CONFIGURED') return 'warning'
+  if (status === 'PARTIAL') return 'warning'
   return 'info'
 }
 
@@ -1052,6 +1154,29 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #dbeafe;
   border-radius: 8px;
   background: #f8fbff;
+}
+
+.data-refresh-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffdf4;
+}
+
+.refresh-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refresh-run-item {
+  padding: 10px;
+  border: 1px solid #fef3c7;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .account-setup-box {
