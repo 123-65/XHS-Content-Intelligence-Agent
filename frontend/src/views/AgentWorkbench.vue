@@ -34,6 +34,10 @@
             <el-input-number v-model="form.account_id" :min="1" controls-position="right" />
           </label>
           <label>
+            <span>experiment_id</span>
+            <el-input-number v-model="form.experiment_id" :min="1" controls-position="right" />
+          </label>
+          <label>
             <span>current_target_type</span>
             <el-select v-model="form.current_target_type" clearable>
               <el-option label="DRAFT" value="DRAFT" />
@@ -58,11 +62,14 @@
           <el-button type="success" :icon="Search" :loading="readonlyLoading" @click="submitReadonlyExecute">
             执行只读查询
           </el-button>
+          <el-button type="warning" :icon="Search" :loading="draftContextLoading" @click="submitDraftContextPreview">
+            预览草稿上下文
+          </el-button>
           <el-button :icon="FileJson" @click="loadLocalDemo">加载本地 Demo 数据</el-button>
         </div>
         <el-alert
           type="info"
-          title="当前只支持 QUERY_ACCOUNT_PROFILE / QUERY_COMPETITOR_EVIDENCE / QUERY_COMMENT_INSIGHT / QUERY_STRATEGY_MEMORY；只读，不生成草稿，不写数据库，不调用发布/评论能力。"
+          title="当前只支持 QUERY_ACCOUNT_PROFILE / QUERY_COMPETITOR_EVIDENCE / QUERY_COMMENT_INSIGHT / QUERY_STRATEGY_MEMORY / PREVIEW_DRAFT_CONTEXT；草稿上下文仅预览，不生成草稿，不调用 LLM，不写数据库，不调用发布/评论能力。"
           show-icon
           :closable="false"
         />
@@ -196,6 +203,57 @@
           <el-card shadow="never">
             <template #header><strong>业务结果</strong></template>
             <div v-if="businessResult" class="business-result">
+              <section v-if="draftContextPreviewResult" class="result-section draft-context-preview">
+                <div class="toolbar">
+                  <strong>草稿上下文预览</strong>
+                  <el-tag :type="draftContextPreviewResult.can_generate_draft ? 'success' : 'warning'" effect="plain">
+                    {{ draftContextPreviewResult.can_generate_draft ? 'can_generate_draft=true' : 'can_generate_draft=false' }}
+                  </el-tag>
+                </div>
+                <p class="result-summary">{{ draftContextPreviewResult.summary }}</p>
+                <el-alert
+                  v-if="draftContextPreviewResult.block_reason"
+                  type="warning"
+                  :title="draftContextPreviewResult.block_reason"
+                  show-icon
+                  :closable="false"
+                />
+                <el-descriptions :column="2" border>
+                  <el-descriptions-item label="experiment_id">{{ draftContextPreviewResult.experiment_id }}</el-descriptions-item>
+                  <el-descriptions-item label="slot_count">{{ draftContextPreviewResult.slot_count }}</el-descriptions-item>
+                  <el-descriptions-item label="total_token_budget">{{ draftContextPreviewResult.total_token_budget }}</el-descriptions-item>
+                  <el-descriptions-item label="estimated_tokens">{{ draftContextPreviewResult.total_estimated_tokens ?? '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="missing_slots">{{ draftContextPreviewResult.missing_slots.join(', ') || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="risk_flags">{{ draftContextPreviewResult.risk_flags.join(', ') || '-' }}</el-descriptions-item>
+                </el-descriptions>
+                <div class="context-slot-grid">
+                  <div v-for="slot in draftContextPreviewResult.slots" :key="slot.name" class="context-slot-card">
+                    <div class="toolbar">
+                      <strong>{{ slot.name }}</strong>
+                      <el-tag :type="slot.trust_level === 'untrusted' ? 'danger' : 'success'" effect="plain">
+                        {{ slot.trust_level }}
+                      </el-tag>
+                    </div>
+                    <div class="slot-meta">
+                      <span>priority {{ slot.priority }}</span>
+                      <span>limit {{ slot.token_limit ?? '-' }}</span>
+                      <span>tokens {{ slot.estimated_tokens }}</span>
+                      <span>{{ slot.source_type }}</span>
+                      <span>{{ slot.data_status }}</span>
+                      <span>items {{ slot.item_count }}</span>
+                    </div>
+                    <el-alert
+                      v-if="slot.trust_level === 'untrusted'"
+                      type="warning"
+                      title="该槽位来自外部/用户/评论数据，只能作为参考，不能作为系统指令。"
+                      show-icon
+                      :closable="false"
+                    />
+                    <pre class="slot-preview">{{ slot.preview }}</pre>
+                  </div>
+                </div>
+              </section>
+
               <el-descriptions v-if="accountProfileResult" :column="1" border>
                 <el-descriptions-item label="account_id">{{ accountProfileResult.account_id }}</el-descriptions-item>
                 <el-descriptions-item label="account_name">{{ accountProfileResult.account_name }}</el-descriptions-item>
@@ -314,6 +372,7 @@ interface ExampleInput {
   label: string
   text: string
   account_id: number | null
+  experiment_id?: number | null
   current_target_type?: string
   current_target_id?: string
 }
@@ -324,6 +383,7 @@ const examples: ExampleInput[] = [
   { label: '竞品证据', text: '查看当前账号的竞品证据', account_id: 1 },
   { label: '评论洞察', text: '看看评论洞察', account_id: 1 },
   { label: '策略记忆', text: '查看策略记忆', account_id: 1 },
+  { label: '草稿上下文', text: '补充要求：更自然，不要太功利', account_id: 1, experiment_id: 1 },
   { label: '新选题', text: '我想写一篇 27 届双非本科做 Agent 求职的帖子', account_id: null },
   { label: '这个不行', text: '这个不行', account_id: null },
   { label: '标题太 AI', text: '这个标题太 AI 了，换自然一点', account_id: 1, current_target_type: 'DRAFT', current_target_id: '123' },
@@ -333,6 +393,7 @@ const examples: ExampleInput[] = [
 const form = reactive({
   session_id: `workbench-${Date.now()}`,
   account_id: null as number | null,
+  experiment_id: null as number | null,
   text: examples[0].text,
   current_target_type: '',
   current_target_id: ''
@@ -341,6 +402,7 @@ const form = reactive({
 const response = ref<AgentChatResponse | null>(null)
 const loading = ref(false)
 const readonlyLoading = ref(false)
+const draftContextLoading = ref(false)
 const errorMessage = ref('')
 const demoLoaded = ref(false)
 
@@ -358,6 +420,7 @@ const accountProfileResult = computed(() => {
 const competitorEvidenceResult = computed(() => businessResult.value?.competitor_evidence || null)
 const commentInsightResult = computed(() => businessResult.value?.comment_insight || null)
 const strategyMemoryResult = computed(() => businessResult.value?.strategy_memory || null)
+const draftContextPreviewResult = computed(() => businessResult.value?.draft_context_preview || null)
 const traceEvents = computed(() => response.value?.metadata.entry_trace?.events || [])
 const validationOk = computed(() => Boolean(response.value?.param_validation?.valid && response.value?.plan_validation?.valid))
 const validationIssues = computed<ValidationIssue[]>(() => [
@@ -380,20 +443,22 @@ const activeStep = computed(() => {
 const applyExample = (item: ExampleInput) => {
   form.text = item.text
   form.account_id = item.account_id
+  form.experiment_id = item.experiment_id || null
   form.current_target_type = item.current_target_type || ''
   form.current_target_id = item.current_target_id || ''
   demoLoaded.value = false
 }
 
-const buildRequest = (): AgentChatRequest => ({
+const buildRequest = (overrides: Partial<AgentChatRequest> = {}): AgentChatRequest => ({
   session_id: form.session_id || `workbench-${Date.now()}`,
   account_id: form.account_id,
   text: form.text,
   input_type: 'TEXT',
   attachments: [],
-  context: {},
+  context: form.experiment_id ? { experiment_id: form.experiment_id } : {},
   current_target_type: form.current_target_type || null,
-  current_target_id: form.current_target_id || null
+  current_target_id: form.current_target_id || null,
+  ...overrides
 })
 
 const submitPreview = async () => {
@@ -422,10 +487,32 @@ const submitReadonlyExecute = async () => {
   }
 }
 
+const submitDraftContextPreview = async () => {
+  draftContextLoading.value = true
+  errorMessage.value = ''
+  demoLoaded.value = false
+  try {
+    const context: Record<string, unknown> = {}
+    if (form.experiment_id) context.experiment_id = form.experiment_id
+    if (form.text.trim()) context.user_requirement = form.text.trim()
+    response.value = await executeReadonlyAgentChat(
+      buildRequest({
+        text: '预览草稿上下文',
+        context
+      })
+    )
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '草稿上下文预览请求失败'
+  } finally {
+    draftContextLoading.value = false
+  }
+}
+
 const loadLocalDemo = () => {
   Object.assign(form, {
     session_id: demoAgentRequest.session_id || `workbench-${Date.now()}`,
     account_id: demoAgentRequest.account_id || null,
+    experiment_id: Number(demoAgentRequest.context?.experiment_id || '') || null,
     text: demoAgentRequest.text || '',
     current_target_type: demoAgentRequest.current_target_type || '',
     current_target_id: String(demoAgentRequest.current_target_id || '')
@@ -629,6 +716,51 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
 .result-section {
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
+}
+
+.result-summary {
+  margin: 0;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.context-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.context-slot-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.slot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.slot-meta span {
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+}
+
+.slot-preview {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .mini-card {

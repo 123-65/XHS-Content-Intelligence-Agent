@@ -110,8 +110,20 @@ class LLMUserInputRouter:
         if not text or not actions:
             return None
         account_id = agent_input.account_id
-        missing_params = [] if account_id is not None else ["account_id"]
-        extracted_params = {"account_id": account_id, "readonly_actions": [action.value for action in actions]} if account_id is not None else {}
+        experiment_id = _context_value(agent_input, "experiment_id")
+        user_requirement = _context_value(agent_input, "user_requirement")
+        missing_params = []
+        if account_id is None:
+            missing_params.append("account_id")
+        if Action.PREVIEW_DRAFT_CONTEXT in actions and experiment_id is None:
+            missing_params.append("experiment_id")
+        extracted_params = {"readonly_actions": [action.value for action in actions]}
+        if account_id is not None:
+            extracted_params["account_id"] = account_id
+        if experiment_id is not None:
+            extracted_params["experiment_id"] = experiment_id
+        if user_requirement:
+            extracted_params["user_requirement"] = user_requirement
         result = RouterResult(
             intent=Intent.QUERY_STATUS,
             confidence=0.95,
@@ -122,9 +134,9 @@ class LLMUserInputRouter:
             missing_params=missing_params,
             risk_flags=[RiskFlag.MISSING_REQUIRED_PARAM] if missing_params else [],
             requires_clarification=bool(missing_params),
-            can_execute=account_id is not None,
-            next_action=None if account_id is not None else "ask_user_to_provide_account_id",
-            clarification_question="请先选择或输入 account_id，再查询只读上下文证据。" if account_id is None else None,
+            can_execute=not missing_params,
+            next_action=None if not missing_params else "ask_user_to_provide_required_params",
+            clarification_question=f"请先补充缺失参数：{', '.join(missing_params)}。" if missing_params else None,
         )
         validated = validate_router_result(result)
         if recorder:
@@ -283,6 +295,8 @@ def _readonly_actions_for_text(text: str) -> list[Action]:
     if not text:
         return []
     actions: list[Action] = []
+    if _contains_any(text, ["预览草稿上下文", "查看草稿上下文", "生成草稿前会用哪些资料", "prompt 上下文", "draft context preview", "context preview"]):
+        actions.append(Action.PREVIEW_DRAFT_CONTEXT)
     if _contains_any(text, ["查看账号画像", "当前账号画像", "账号信息", "账号定位", "查询账号"]):
         actions.append(Action.QUERY_ACCOUNT_PROFILE)
     if _contains_any(text, ["上下文证据"]):
@@ -313,3 +327,10 @@ def _unique_actions(actions: list[Action]) -> list[Action]:
         if action not in result:
             result.append(action)
     return result
+
+
+def _context_value(agent_input: AgentInput | AgentChatRequest, key: str) -> Any:
+    if isinstance(agent_input, AgentChatRequest):
+        return agent_input.context.get(key)
+    context = agent_input.metadata.get("context") if isinstance(agent_input.metadata, dict) else None
+    return context.get(key) if isinstance(context, dict) else None

@@ -71,6 +71,14 @@ ACTION_REGISTRY: dict[str, ActionCapability] = {
         ["account_id"],
         AllowedEffect.READ_ONLY,
     ),
+    Action.PREVIEW_DRAFT_CONTEXT.value: _capability(
+        Action.PREVIEW_DRAFT_CONTEXT,
+        "预览草稿生成前会注入的上下文槽位，不调用 LLM，不生成草稿。",
+        ["account_id", "experiment_id"],
+        AllowedEffect.READ_ONLY,
+        optional_params=["user_requirement"],
+        risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
+    ),
     Action.ANALYZE_COMPETITOR.value: _capability(
         Action.ANALYZE_COMPETITOR,
         "基于已采集竞品样本生成竞品分析报告。",

@@ -104,10 +104,21 @@ class LLMTaskPlanner:
         if router_result.intent != Intent.QUERY_STATUS or router_result.target_type != "ACCOUNT" or account_id is None:
             return None
         actions = _readonly_actions_from_router(router_result) or [Action.QUERY_ACCOUNT_PROFILE]
+        experiment_id = router_result.extracted_params.get("experiment_id")
+        user_requirement = router_result.extracted_params.get("user_requirement")
         plan = Plan(
             conversation_id=agent_input.conversation_id,
             intent=router_result.intent,
-            steps=[_readonly_step(index + 1, action, account_id) for index, action in enumerate(actions)],
+            steps=[
+                _readonly_step(
+                    index + 1,
+                    action,
+                    account_id,
+                    experiment_id=experiment_id,
+                    user_requirement=user_requirement,
+                )
+                for index, action in enumerate(actions)
+            ],
             confirmation_requirement=ConfirmationRequirement.NONE,
             can_execute=True,
             summary_for_user="将执行只读查询，不生成草稿，不写数据库。",
@@ -311,24 +322,31 @@ def _readonly_actions_from_router(router_result: RouterResult) -> list[Action]:
             Action.QUERY_COMPETITOR_EVIDENCE,
             Action.QUERY_COMMENT_INSIGHT,
             Action.QUERY_STRATEGY_MEMORY,
+            Action.PREVIEW_DRAFT_CONTEXT,
         } and action not in actions:
             actions.append(action)
     return actions
 
 
-def _readonly_step(step_no: int, action: Action, account_id: int) -> PlanStep:
+def _readonly_step(step_no: int, action: Action, account_id: int, experiment_id: Any = None, user_requirement: Any = None) -> PlanStep:
     descriptions = {
         Action.QUERY_ACCOUNT_PROFILE: ("查询当前账号画像，只读读取 AccountProfile。", "账号画像摘要"),
         Action.QUERY_COMPETITOR_EVIDENCE: ("查询当前账号的竞品证据，只读读取已有报告和机会。", "竞品证据摘要"),
         Action.QUERY_COMMENT_INSIGHT: ("查询当前账号的评论洞察，只读读取已有评论和报告摘要。", "评论洞察摘要"),
         Action.QUERY_STRATEGY_MEMORY: ("查询当前账号的策略记忆，只读读取已有 memory。", "策略记忆摘要"),
+        Action.PREVIEW_DRAFT_CONTEXT: ("预览草稿生成前的上下文槽位，只读构建 Context Slot 摘要。", "草稿上下文槽位预览"),
     }
     description, expected_output = descriptions[action]
+    input_params = {"account_id": account_id}
+    if action == Action.PREVIEW_DRAFT_CONTEXT:
+        input_params["experiment_id"] = experiment_id
+        if user_requirement:
+            input_params["user_requirement"] = user_requirement
     return PlanStep(
         step_no=step_no,
         action=action,
         description=description,
-        input_params={"account_id": account_id},
+        input_params=input_params,
         expected_output=expected_output,
         allowed_effect=AllowedEffect.READ_ONLY,
         can_execute=True,

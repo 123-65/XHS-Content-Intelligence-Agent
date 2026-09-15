@@ -224,6 +224,35 @@ export interface StrategyMemoryBusinessResult {
   summary: string
 }
 
+export interface DraftContextSlotPreview {
+  name: string
+  priority: number
+  token_limit?: number | null
+  estimated_tokens: number
+  source_type: string
+  trust_level: string
+  data_status: string
+  item_count: number
+  preview: string
+  untrusted_warning?: string | null
+}
+
+export interface DraftContextPreviewBusinessResult {
+  account_id: number
+  experiment_id: number
+  can_generate_draft: boolean
+  block_reason: string | null
+  slot_count: number
+  total_token_budget: number
+  total_estimated_tokens?: number
+  slots: DraftContextSlotPreview[]
+  missing_slots: string[]
+  risk_flags: string[]
+  summary: string
+  truncation_summary?: Record<string, unknown>
+  sanitizer_summary?: Record<string, unknown>
+}
+
 export interface ReadonlyBusinessResult {
   account_id?: number
   account_name?: string
@@ -241,6 +270,7 @@ export interface ReadonlyBusinessResult {
   competitor_evidence?: CompetitorEvidenceBusinessResult
   comment_insight?: CommentInsightBusinessResult
   strategy_memory?: StrategyMemoryBusinessResult
+  draft_context_preview?: DraftContextPreviewBusinessResult
 }
 
 export interface AgentChatResponse {

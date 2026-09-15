@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
 from app.agent.product_entry.business_handlers import build_readonly_action_handler_registry
 from app.agent.product_entry.chat_service import AgentChatReadonlyExecuteService
 from app.agent.product_entry.llm_router import LLMUserInputRouter
+from app.agent.product_entry.registry import UNSUPPORTED_ACTION_REGISTRY
 from app.agent.product_entry.schemas import (
     Action,
     AllowedEffect,
@@ -19,8 +22,13 @@ from app.api.agent_chat import get_agent_chat_readonly_execute_service
 from app.core.database import SessionLocal
 from app.main import app
 from app.models.competitor_comment import CompetitorComment
+from app.models.competitor_note import CompetitorNote
 from app.models.competitors_analysis import CompetitorAnalysisReport
+from app.models.content_draft import ContentDraft
+from app.models.content_experiment import ContentExperiment
 from app.models.content_opportunity import ContentOpportunity
+from app.models.context_snapshot import ContextSnapshot
+from app.models.prompt_run_log import PromptRunLog
 from app.models.strategy_memory import StrategyMemory
 from app.schemas.account import AccountProfileCreate
 from app.services.account_sev import AccountProfileService
@@ -159,6 +167,24 @@ def _readonly_plan_for_action(action: Action, account_id: int) -> Plan:
     )
 
 
+def _preview_context_plan(account_id: int, experiment_id: int | None = None, user_requirement: str | None = None) -> Plan:
+    input_params = {"account_id": account_id}
+    if experiment_id is not None:
+        input_params["experiment_id"] = experiment_id
+    if user_requirement:
+        input_params["user_requirement"] = user_requirement
+    return _plan_for_step(
+        PlanStep(
+            step_no=1,
+            action=Action.PREVIEW_DRAFT_CONTEXT,
+            description="readonly PREVIEW_DRAFT_CONTEXT",
+            input_params=input_params,
+            allowed_effect=AllowedEffect.READ_ONLY,
+            can_execute=True,
+        )
+    )
+
+
 def _execute_fake_readonly_action(action: Action, account_id: int) -> dict:
     db = SessionLocal()
     try:
@@ -168,6 +194,166 @@ def _execute_fake_readonly_action(action: Action, account_id: int) -> dict:
             db=db,
         )
         return _post_with_service(service, _base_payload(account_id=account_id, text=action.value)).json()
+    finally:
+        db.close()
+
+
+def _execute_preview_context(account_id: int, experiment_id: int | None, user_requirement: str | None = None) -> dict:
+    db = SessionLocal()
+    try:
+        router_result = _router_result(
+            account_id=account_id,
+            extracted_params={
+                "account_id": account_id,
+                "experiment_id": experiment_id,
+                "readonly_actions": [Action.PREVIEW_DRAFT_CONTEXT.value],
+            },
+        )
+        service = AgentChatReadonlyExecuteService(
+            router=FakeRouter(router_result),
+            planner=FakePlanner(_preview_context_plan(account_id, experiment_id, user_requirement)),
+            db=db,
+        )
+        return _post_with_service(
+            service,
+            _base_payload(
+                account_id=account_id,
+                text="预览草稿上下文",
+                context={"experiment_id": experiment_id} if experiment_id is not None else {},
+            ),
+        ).json()
+    finally:
+        db.close()
+
+
+def _create_draft_context_fixture(status: str = "APPROVED", with_context: bool = False, account_id: int | None = None) -> tuple[int, int]:
+    account_id = account_id or _create_account()
+    db = SessionLocal()
+    try:
+        report = None
+        opportunity = None
+        if with_context:
+            note = CompetitorNote(
+                account_id=account_id,
+                note_id="note-7-3",
+                note_url="https://www.xiaohongshu.com/explore/note-7-3",
+                author_name="工程求职同学",
+                title="普通本科如何做 Agent 项目",
+                content="用真实项目拆解学习路线更容易被收藏。",
+                tags=["Agent", "求职"],
+                like_count=120,
+                collect_count=60,
+                comment_count=8,
+                source_type="XHS_PUBLIC_READONLY",
+                provider_name="manual",
+                is_mock=False,
+                confidence=0.9,
+                raw_snapshot={"source": "test_fixture"},
+            )
+            db.add(note)
+            db.flush()
+            report = CompetitorAnalysisReport(
+                account_id=account_id,
+                name="7.3 草稿上下文报告",
+                keyword="Agent 求职",
+                source_type="COMPETITOR",
+                target_metric="engagement",
+                note_snapshot_ids=[],
+                competitor_account_ids=[],
+                competitor_note_ids=[note.id],
+                note_count=1,
+                comment_count=3,
+                persona_patterns=[],
+                content_pillars=[{"name": "Agent 求职"}],
+                top_tags=[],
+                title_patterns=[],
+                cover_patterns=[],
+                content_structures=[],
+                comment_demands=[{"type": "学习路线", "count": 3, "examples": ["想知道路线"]}],
+                conversion_signals=[{"name": "咨询课程", "count": 2}],
+                replicability_summary={},
+                risk_points=[{"name": "避免承诺 offer", "count": 1}],
+                high_performance_notes=[],
+                content_insights=["工程拆解更受欢迎"],
+                suggestions=["用真实项目路径"],
+                summary="竞品报告摘要",
+                status="SUCCESS",
+            )
+            db.add(report)
+            db.flush()
+            opportunity = ContentOpportunity(
+                report_id=report.id,
+                opportunity_title="普通本科 Agent 项目路线",
+                suggested_angle="从项目拆解讲学习路线",
+                target_audience="AI 应用工程新人",
+                content_pillar="Agent 求职",
+                comment_demand_type="学习路线",
+                evidence_summary="评论集中问学习路线",
+                replicability_score=80,
+                risk_level="LOW",
+                risk_points=["避免保 offer"],
+                opportunity_score=90,
+            )
+            db.add(opportunity)
+            db.flush()
+            db.add(
+                CompetitorComment(
+                    account_id=account_id,
+                    competitor_note_id=note.id,
+                    comment_id="c-7-3",
+                    user_name="用户A",
+                    content="想知道普通本科怎么做 Agent 项目",
+                    like_count=9,
+                    source_type="XHS_PUBLIC_READONLY",
+                    provider_name="manual",
+                    is_mock=False,
+                    confidence=0.9,
+                    raw_snapshot={"demand_type": "学习路线"},
+                )
+            )
+            db.add(
+                StrategyMemory(
+                    account_id=account_id,
+                    memory_type="TITLE_MEMORY",
+                    status="VALIDATED",
+                    summary="标题要具体到普通本科项目场景",
+                    pattern="人群 + 项目阶段 + 具体收益",
+                    confidence=Decimal("0.8000"),
+                    support_count=2,
+                    evidence_count=1,
+                    risk_level="LOW",
+                    metadata_payload={"content_pillar": "Agent 求职", "verified": True},
+                )
+            )
+
+        experiment = ContentExperiment(
+            account_id=account_id,
+            analysis_report_id=report.id if report else None,
+            content_opportunity_id=opportunity.id if opportunity else None,
+            experiment_name="7.3 草稿上下文实验",
+            hypothesis="普通本科项目路线能提升收藏。",
+            content_pillar="Agent 求职",
+            content_format="图文笔记",
+            main_variable="标题角度",
+            control_variables=[],
+            primary_metric="collect",
+            secondary_metrics=["comment"],
+            success_criteria={"collect": 50},
+            failure_criteria={"collect": 10},
+            fallback_strategy="改成更具体的项目拆解",
+            risk_level="LOW",
+            target_metric="collect",
+            expected_result="收藏提升",
+            topic_angle="普通本科 Agent 项目路线",
+            selected_topic="普通本科如何做 Agent 项目",
+            target_values={"collect": 50},
+            source_type="COMPETITOR_ANALYSIS",
+            status=status,
+        )
+        db.add(experiment)
+        db.commit()
+        db.refresh(experiment)
+        return account_id, experiment.id
     finally:
         db.close()
 
@@ -279,6 +465,139 @@ def test_context_evidence_text_routes_and_plans_without_calling_real_model():
     assert data["metadata"]["business_result"]["strategy_memory"]["data_status"] == "NOT_PROVIDED"
 
 
+def test_preview_draft_context_can_be_triggered_through_execute_readonly():
+    account_id, experiment_id = _create_draft_context_fixture(with_context=True)
+    data = _execute_preview_context(account_id, experiment_id, user_requirement="更自然，不要太功利")
+
+    assert data["status"] == "SUCCESS"
+    assert data["metadata"]["execution"]["mode"] == "REAL"
+    assert data["metadata"]["execution"]["step_results"][0]["action"] == "PREVIEW_DRAFT_CONTEXT"
+    result = data["metadata"]["business_result"]["draft_context_preview"]
+    assert result["account_id"] == account_id
+    assert result["experiment_id"] == experiment_id
+    assert result["can_generate_draft"] is True
+    assert result["slot_count"] >= 7
+    slot_names = {slot["name"] for slot in result["slots"]}
+    assert "ACCOUNT_PROFILE" in slot_names
+    assert "WORKFLOW_STATE" in slot_names
+    assert "COMPETITOR_EVIDENCE" in slot_names
+    assert "COMMENT_INSIGHT" in slot_names
+    assert "STRATEGY_MEMORY" in slot_names
+    assert any(slot["trust_level"] == "untrusted" for slot in result["slots"])
+    stages = [event["stage"] for event in data["metadata"]["entry_trace"]["events"]]
+    assert "EXECUTION_STARTED" in stages
+    assert "STEP_EXECUTION_STARTED" in stages
+    assert "STEP_EXECUTION_FINISHED" in stages
+    assert "EXECUTION_FINISHED" in stages
+
+
+def test_preview_draft_context_missing_account_id_returns_need_clarification():
+    db = SessionLocal()
+    try:
+        service, llm = _service_with_fake_llm(db)
+        data = _post_with_service(
+            service,
+            _base_payload(account_id=None, text="预览草稿上下文", context={"experiment_id": 1}),
+        ).json()
+    finally:
+        db.close()
+
+    assert data["status"] == "NEED_CLARIFICATION"
+    assert "account_id" in data["router_result"]["missing_params"]
+    assert llm.calls == []
+
+
+def test_preview_draft_context_missing_experiment_id_returns_need_clarification():
+    account_id = _create_account()
+    db = SessionLocal()
+    try:
+        service, llm = _service_with_fake_llm(db)
+        data = _post_with_service(
+            service,
+            _base_payload(account_id=account_id, text="预览草稿上下文", context={}),
+        ).json()
+    finally:
+        db.close()
+
+    assert data["status"] == "NEED_CLARIFICATION"
+    assert "experiment_id" in data["router_result"]["missing_params"]
+    assert llm.calls == []
+
+
+def test_preview_draft_context_nonexistent_experiment_returns_failed():
+    account_id = _create_account()
+    data = _execute_preview_context(account_id, 999999999)
+
+    assert data["status"] == "FAILED"
+    assert data["metadata"]["execution"]["mode"] == "REAL"
+    assert data["metadata"]["execution"]["step_results"][0]["status"] == "FAILED"
+    assert data["metadata"]["execution"]["step_results"][0]["error_code"] == "HANDLER_FAILED"
+
+
+def test_preview_draft_context_experiment_account_mismatch_fails():
+    owner_account_id, experiment_id = _create_draft_context_fixture(with_context=False)
+    other_account_id = _create_account()
+    assert other_account_id != owner_account_id
+
+    data = _execute_preview_context(other_account_id, experiment_id)
+
+    assert data["status"] == "FAILED"
+    assert data["metadata"]["execution"]["step_results"][0]["status"] == "FAILED"
+    assert "does not belong" in data["metadata"]["execution"]["step_results"][0]["message"]
+
+
+def test_preview_draft_context_unapproved_experiment_returns_block_reason_without_draft():
+    account_id, experiment_id = _create_draft_context_fixture(status="DRAFT", with_context=True)
+    db = SessionLocal()
+    try:
+        before_drafts = db.query(ContentDraft).count()
+    finally:
+        db.close()
+    data = _execute_preview_context(account_id, experiment_id)
+    db = SessionLocal()
+    try:
+        after_drafts = db.query(ContentDraft).count()
+    finally:
+        db.close()
+
+    result = data["metadata"]["business_result"]["draft_context_preview"]
+    assert data["status"] == "SUCCESS"
+    assert result["can_generate_draft"] is False
+    assert result["block_reason"] == "experiment is not APPROVED"
+    assert "EXPERIMENT_NOT_APPROVED" in result["risk_flags"]
+    assert after_drafts == before_drafts
+
+
+def test_preview_draft_context_does_not_call_llm_or_write_draft_prompt_or_context_snapshot():
+    account_id, experiment_id = _create_draft_context_fixture(with_context=True)
+    db = SessionLocal()
+    try:
+        service, llm = _service_with_fake_llm(db)
+        before_drafts = db.query(ContentDraft).count()
+        before_prompt_runs = db.query(PromptRunLog).count()
+        before_context_snapshots = db.query(ContextSnapshot).count()
+        data = _post_with_service(
+            service,
+            _base_payload(
+                account_id=account_id,
+                text="预览草稿上下文",
+                context={"experiment_id": experiment_id, "user_requirement": "别太像广告"},
+            ),
+        ).json()
+        after_drafts = db.query(ContentDraft).count()
+        after_prompt_runs = db.query(PromptRunLog).count()
+        after_context_snapshots = db.query(ContextSnapshot).count()
+    finally:
+        db.close()
+
+    assert data["status"] == "SUCCESS"
+    assert data["metadata"]["execution"]["mode"] == "REAL"
+    assert llm.calls == []
+    assert after_drafts == before_drafts
+    assert after_prompt_runs == before_prompt_runs
+    assert after_context_snapshots == before_context_snapshots
+
+
 def test_readonly_registry_registers_only_safe_readonly_actions_not_generation_or_memory_write():
     db = SessionLocal()
     try:
@@ -292,11 +611,15 @@ def test_readonly_registry_registers_only_safe_readonly_actions_not_generation_o
     assert registry.is_registered(Action.QUERY_COMPETITOR_EVIDENCE)
     assert registry.is_registered(Action.QUERY_COMMENT_INSIGHT)
     assert registry.is_registered(Action.QUERY_STRATEGY_MEMORY)
+    assert registry.is_registered(Action.PREVIEW_DRAFT_CONTEXT)
     assert not registry.is_registered(Action.GENERATE_DRAFT)
     assert not registry.is_registered(Action.REVIEW_DRAFT)
     assert not registry.is_registered(Action.GENERATE_CONTENT_OPPORTUNITY)
     assert not registry.is_registered(Action.CREATE_CONTENT_EXPERIMENT)
     assert not registry.is_registered(Action.CREATE_CANDIDATE_MEMORY)
+    for action_name in ["AUTO_PUBLISH_XHS", "AUTO_REPLY_COMMENT", "DELETE_NOTE", "MODIFY_EXTERNAL_ACCOUNT"]:
+        assert action_name in UNSUPPORTED_ACTION_REGISTRY
+        assert UNSUPPORTED_ACTION_REGISTRY[action_name].supported_in_current_stage is False
 
 
 def test_generate_draft_is_not_real_executed():

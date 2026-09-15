@@ -82,7 +82,7 @@ class AgentChatReadonlyExecuteService:
             plan_validation=plan_validation,
             mode=ExecutionMode.REAL,
             recorder=recorder,
-            context={"db": self.db, "account_id": request.account_id},
+            context={"db": self.db, "account_id": request.account_id, "request_context": request.context},
         )
         response = build_response_from_execution(plan, execution_result, confirmation_card)
         response = response.model_copy(
@@ -108,6 +108,7 @@ class AgentChatReadonlyExecuteService:
                 Action.QUERY_COMPETITOR_EVIDENCE.value,
                 Action.QUERY_COMMENT_INSIGHT.value,
                 Action.QUERY_STRATEGY_MEMORY.value,
+                Action.PREVIEW_DRAFT_CONTEXT.value,
             ],
         }
         return response.model_copy(update={"metadata": metadata})
@@ -137,6 +138,8 @@ def _business_result(execution_result: PlanExecutionResult) -> dict | None:
             result["comment_insight"] = step.output
         if step.action == Action.QUERY_STRATEGY_MEMORY and step.output:
             result["strategy_memory"] = step.output
+        if step.action == Action.PREVIEW_DRAFT_CONTEXT and step.output:
+            result["draft_context_preview"] = step.output
     if not result:
         return None
     if set(result) == {"account_profile"}:
