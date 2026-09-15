@@ -514,10 +514,71 @@
               <el-alert
                 v-if="b7DraftContextPreviewResult.ready_for_draft_generation"
                 type="success"
-                title="下一步可生成草稿，但本阶段不实现生成按钮。"
+                title="上下文已就绪，确认后才会通过统一 LLMClient 生成本地草稿。"
                 show-icon
                 :closable="false"
               />
+              <section class="draft-generation-card">
+                <div class="toolbar">
+                  <strong>草稿生成确认</strong>
+                  <el-tag
+                    v-if="draftGenerationResult"
+                    :type="draftGenerationStatusType(draftGenerationResult.status)"
+                    effect="plain"
+                  >
+                    {{ draftGenerationResult.status }}
+                  </el-tag>
+                  <el-tag v-else type="warning" effect="plain">Manual Confirmation</el-tag>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span>tone</span>
+                    <el-select v-model="draftGenerationForm.tone">
+                      <el-option label="natural" value="natural" />
+                      <el-option label="practical" value="practical" />
+                      <el-option label="sharp" value="sharp" />
+                    </el-select>
+                  </label>
+                  <label>
+                    <span>model_profile</span>
+                    <el-select v-model="draftGenerationForm.model_profile">
+                      <el-option label="default" value="default" />
+                    </el-select>
+                  </label>
+                </div>
+                <el-button
+                  size="small"
+                  type="primary"
+                  :loading="draftGenerationLoading"
+                  :disabled="!b7DraftContextPreviewResult.ready_for_draft_generation"
+                  @click="confirmDraftGeneration"
+                >
+                  确认生成本地草稿
+                </el-button>
+                <el-alert
+                  type="warning"
+                  title="本步骤只生成本地草稿，不会发布到小红书，不会自动评论，不会访问外部链接。"
+                  show-icon
+                  :closable="false"
+                />
+                <div v-if="draftGenerationResult" class="mini-card">
+                  <strong>generation_result</strong>
+                  <div class="slot-meta">
+                    <span>draft {{ draftGenerationResult.draft_id || '-' }}</span>
+                    <span>provider {{ draftGenerationResult.provider }}</span>
+                    <span>preview {{ draftGenerationResult.context_preview_status || '-' }}</span>
+                  </div>
+                  <p v-if="draftGenerationResult.error_message">{{ draftGenerationResult.error_message }}</p>
+                  <template v-if="draftGenerationResult.draft">
+                    <p>{{ draftGenerationResult.draft.title }}</p>
+                    <p>{{ draftGenerationResult.draft.content }}</p>
+                    <div class="slot-meta">
+                      <span v-for="tag in draftGenerationResult.draft.tags" :key="tag">{{ tag }}</span>
+                    </div>
+                    <p>{{ displayValue(draftGenerationResult.draft.cta) }}</p>
+                  </template>
+                </div>
+              </section>
             </div>
             <el-alert
               type="info"
@@ -945,6 +1006,7 @@ import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenc
 import { createOperationRun, listOperationRuns } from '@/api/operationRun'
 import { createOperationExperiment, previewOperationExperiment } from '@/api/operationExperiment'
 import { previewDraftContext } from '@/api/draftContextPreview'
+import { generateDraft } from '@/api/draftGeneration'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -963,6 +1025,7 @@ import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/typ
 import type { OperationRecommendation, OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
 import type { OperationExperimentResponse } from '@/types/operationExperiment'
 import type { DraftContextPreviewResponse, DraftContextPreviewStatus } from '@/types/draftContextPreview'
+import type { DraftGenerationResponse, DraftGenerationStatus } from '@/types/draftGeneration'
 
 interface ExampleInput {
   label: string
@@ -1023,6 +1086,8 @@ const operationExperimentLoading = ref(false)
 const operationExperimentResult = ref<OperationExperimentResponse | null>(null)
 const draftContextPreviewLoading = ref(false)
 const b7DraftContextPreviewResult = ref<DraftContextPreviewResponse | null>(null)
+const draftGenerationLoading = ref(false)
+const draftGenerationResult = ref<DraftGenerationResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1051,6 +1116,10 @@ const draftContextPreviewForm = reactive({
   user_requirements: '',
   include_strategy_memory: true,
   include_comments: true
+})
+const draftGenerationForm = reactive({
+  tone: 'natural',
+  model_profile: 'default'
 })
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
@@ -1469,10 +1538,43 @@ const runDraftContextPreview = async () => {
       include_strategy_memory: draftContextPreviewForm.include_strategy_memory,
       include_comments: draftContextPreviewForm.include_comments
     })
+    draftGenerationResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
     draftContextPreviewLoading.value = false
+  }
+}
+
+const confirmDraftGeneration = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const experimentId = b7DraftContextPreviewResult.value?.experiment_id || form.experiment_id
+  if (!experimentId) {
+    errorMessage.value = '请先选择或创建内容实验'
+    return
+  }
+  if (!b7DraftContextPreviewResult.value?.ready_for_draft_generation) {
+    errorMessage.value = '请先完成 READY 状态的草稿上下文预览'
+    return
+  }
+  draftGenerationLoading.value = true
+  errorMessage.value = ''
+  try {
+    draftGenerationResult.value = await generateDraft(experimentId, {
+      account_id: form.account_id,
+      confirmed: true,
+      user_requirements: draftContextPreviewForm.user_requirements.trim() || null,
+      draft_type: 'xhs_note',
+      tone: draftGenerationForm.tone,
+      model_profile: draftGenerationForm.model_profile
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
+  } finally {
+    draftGenerationLoading.value = false
   }
 }
 
@@ -1570,6 +1672,13 @@ const operationStatusType = (status: OperationRunStatus) => {
 const draftContextStatusType = (status: DraftContextPreviewStatus) => {
   if (status === 'READY') return 'success'
   if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT' || status === 'BLOCKED') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const draftGenerationStatusType = (status: DraftGenerationStatus) => {
+  if (status === 'CREATED') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'DATA_INSUFFICIENT' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -1750,6 +1859,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #bae6fd;
   border-radius: 8px;
   background: #f7fcff;
+}
+
+.draft-generation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: #f7fef9;
 }
 
 .inline-controls {

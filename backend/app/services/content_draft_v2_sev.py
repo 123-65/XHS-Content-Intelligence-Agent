@@ -790,9 +790,9 @@ class ContentDraftV2Service:
         }
 
     def _ensure_experiment_approved(self, experiment) -> None:
-        """确保只有已批准的内容实验才能生成草稿。"""
-        if experiment.status != "APPROVED":
-            raise ValueError("Only APPROVED content experiments can generate drafts")
+        """确保只有已确认的内容实验才能生成草稿。"""
+        if experiment.status not in {"APPROVED", "READY"}:
+            raise ValueError("Only APPROVED or READY content experiments can generate drafts")
 
     def _ensure_risk_safe(self, result: DraftGenerateV2Result) -> None:
         """对生成草稿的字段做基础风险短语扫描。"""

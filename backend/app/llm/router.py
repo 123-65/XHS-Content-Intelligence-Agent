@@ -4,6 +4,7 @@ from app.llm.providers.deepseek_provider import DeepSeekProvider
 from app.llm.providers.mock_provider import MockLLMProvider
 from app.llm.providers.qwen_provider import QwenProvider
 from app.llm.providers.zhipu_provider import ZhipuProvider
+from app.schemas.provider_status import ProviderErrorCode
 
 
 PROVIDER_CLASSES: dict[str, type[BaseLLMProvider]] = {
@@ -16,7 +17,10 @@ PROVIDER_CLASSES: dict[str, type[BaseLLMProvider]] = {
 
 def configured_provider_name(provider_name: str | None = None) -> str:
     """Return the configured provider name without using OPENAI_* env names."""
-    return (provider_name or settings.llm_provider or "mock").lower()
+    if provider_name is not None:
+        return provider_name.lower()
+    configured = (settings.llm_provider or "").lower()
+    return configured if configured and configured != "mock" else "deepseek"
 
 
 def build_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
@@ -33,7 +37,7 @@ def build_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
 def get_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
     """Select an LLM Provider; no API key automatically falls back to Mock."""
     provider = build_llm_provider(provider_name)
-    return provider if provider.available() else MockLLMProvider()
+    return provider
 
 
 def llm_health() -> dict:
@@ -41,16 +45,40 @@ def llm_health() -> dict:
     requested = configured_provider_name()
     provider = build_llm_provider(requested)
     configured = bool(settings.llm_api_key and settings.llm_base_url and settings.llm_model)
-    active = provider if provider.available() else MockLLMProvider()
-    return {
-        **active.health(),
+    production_provider_candidates = [name for name in PROVIDER_CLASSES if name != "mock"]
+    base_payload = {
         "requested_provider": requested,
         "configured": configured,
         "base_url_configured": bool(settings.llm_base_url),
         "api_key_configured": bool(settings.llm_api_key),
-        "fallback_provider": "mock",
-        "fallback_active": active.is_mock and requested != "mock",
+        "model_configured": bool(settings.llm_model),
+        "fallback_provider": None,
+        "fallback_active": False,
         "provider_candidates": list(PROVIDER_CLASSES),
+        "production_provider_candidates": production_provider_candidates,
         "config_keys": ["LLM_PROVIDER", "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_TIMEOUT_SECONDS", "LLM_MAX_RETRIES"],
+    }
+    if provider.is_mock and requested != "mock":
+        return {
+            **base_payload,
+            "active_provider": None,
+            "model": settings.llm_model,
+            "available": False,
+            "is_mock": False,
+            "error_code": ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value,
+        }
+    if not provider.available():
+        return {
+            **base_payload,
+            "active_provider": None,
+            "model": provider.model,
+            "available": False,
+            "is_mock": False,
+            "error_code": ProviderErrorCode.LLM_CONFIG_MISSING.value,
+        }
+    return {
+        **provider.health(),
+        **base_payload,
+        "error_code": None,
     }
 

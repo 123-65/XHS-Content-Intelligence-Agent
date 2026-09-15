@@ -31,6 +31,7 @@ class ContextUsageLogger:
             {
                 "slot_name": slot.name,
                 "tokens": slot.injected_tokens,
+                "budget_tokens": (slot.metadata.get("budget_meta") or {}).get("budget_tokens", 0),
                 "ratio": round(slot.injected_tokens / max(1, built_context.total_tokens), 4),
                 "truncated": slot.was_truncated,
             }
