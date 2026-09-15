@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from app.agent.product_entry.prompts import build_user_input_router_system_prompt, build_user_input_router_user_prompt
 from app.agent.product_entry.schemas import (
+    Action,
     AgentChatRequest,
     AgentInput,
     InputAttachment,
@@ -30,7 +31,7 @@ class LLMUserInputRouter:
 
     def route(self, agent_input: AgentInput | AgentChatRequest, recorder: AgentEntryTraceRecorder | None = None) -> RouterResult:
         """调用 LLM 识别用户意图，并返回经过校验的 RouterResult。"""
-        deterministic_result = self._route_query_account_profile(agent_input, recorder)
+        deterministic_result = self._route_readonly_query(agent_input, recorder)
         if deterministic_result:
             return deterministic_result
         if self._is_image_only_without_text(agent_input):
@@ -98,30 +99,32 @@ class LLMUserInputRouter:
 
         return self._parse_and_validate(self._result_text(llm_result), agent_input, recorder)
 
-    def _route_query_account_profile(
+    def _route_readonly_query(
         self,
         agent_input: AgentInput | AgentChatRequest,
         recorder: AgentEntryTraceRecorder | None = None,
     ) -> RouterResult | None:
-        """对账号画像查询做确定性路由，不调用真实 LLM。"""
+        """对明确的只读查询做确定性路由，不调用真实 LLM。"""
         text = (self._input_text(agent_input) or "").strip()
-        if not text or not _is_account_profile_query(text):
+        actions = _readonly_actions_for_text(text)
+        if not text or not actions:
             return None
         account_id = agent_input.account_id
         missing_params = [] if account_id is not None else ["account_id"]
+        extracted_params = {"account_id": account_id, "readonly_actions": [action.value for action in actions]} if account_id is not None else {}
         result = RouterResult(
             intent=Intent.QUERY_STATUS,
             confidence=0.95,
             input_type=agent_input.input_type,
             target_type=TargetType.ACCOUNT,
             target_id=account_id,
-            extracted_params={"account_id": account_id} if account_id is not None else {},
+            extracted_params=extracted_params,
             missing_params=missing_params,
             risk_flags=[RiskFlag.MISSING_REQUIRED_PARAM] if missing_params else [],
             requires_clarification=bool(missing_params),
             can_execute=account_id is not None,
             next_action=None if account_id is not None else "ask_user_to_provide_account_id",
-            clarification_question="请先选择或输入 account_id，再查询账号画像。" if account_id is None else None,
+            clarification_question="请先选择或输入 account_id，再查询只读上下文证据。" if account_id is None else None,
         )
         validated = validate_router_result(result)
         if recorder:
@@ -276,12 +279,37 @@ class LLMUserInputRouter:
         return ProviderErrorCode.LLM_OUTPUT_FAILED.value
 
 
-def _is_account_profile_query(text: str) -> bool:
-    keywords = [
-        "查看账号画像",
-        "当前账号画像",
-        "账号信息",
-        "账号定位",
-        "查询账号",
-    ]
+def _readonly_actions_for_text(text: str) -> list[Action]:
+    if not text:
+        return []
+    actions: list[Action] = []
+    if _contains_any(text, ["查看账号画像", "当前账号画像", "账号信息", "账号定位", "查询账号"]):
+        actions.append(Action.QUERY_ACCOUNT_PROFILE)
+    if _contains_any(text, ["上下文证据"]):
+        actions.extend(
+            [
+                Action.QUERY_COMPETITOR_EVIDENCE,
+                Action.QUERY_COMMENT_INSIGHT,
+                Action.QUERY_STRATEGY_MEMORY,
+            ]
+        )
+    else:
+        if _contains_any(text, ["竞品证据"]):
+            actions.append(Action.QUERY_COMPETITOR_EVIDENCE)
+        if _contains_any(text, ["评论洞察", "评论需求"]):
+            actions.append(Action.QUERY_COMMENT_INSIGHT)
+        if _contains_any(text, ["策略记忆", "历史经验", "记忆"]):
+            actions.append(Action.QUERY_STRATEGY_MEMORY)
+    return _unique_actions(actions)
+
+
+def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(keyword in text for keyword in keywords)
+
+
+def _unique_actions(actions: list[Action]) -> list[Action]:
+    result: list[Action] = []
+    for action in actions:
+        if action not in result:
+            result.append(action)
+    return result

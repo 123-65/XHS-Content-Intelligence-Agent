@@ -163,6 +163,86 @@ export interface AccountProfileBusinessResult {
   summary: string
 }
 
+export interface CompetitorEvidenceItem {
+  source_type?: string
+  opportunity_id?: number
+  report_id?: number
+  title?: string
+  summary?: string
+  content_pillar?: string
+  target_audience?: string
+  comment_demand_type?: string
+  confidence?: number
+  risk_level?: string
+}
+
+export interface CompetitorEvidenceBusinessResult {
+  items: CompetitorEvidenceItem[]
+  total: number
+  data_status?: string
+  summary: string
+}
+
+export interface CommentInsightSummaryItem {
+  type?: string
+  name?: string
+  count?: number
+}
+
+export interface RepresentativeComment {
+  untrusted_text: string
+  like_count?: number
+  source?: string
+  source_type?: string
+  demand_type?: string
+}
+
+export interface CommentInsightBusinessResult {
+  demand_summary: CommentInsightSummaryItem[]
+  representative_comments: RepresentativeComment[]
+  conversion_signal_summary: CommentInsightSummaryItem[]
+  risk_summary: CommentInsightSummaryItem[]
+  data_status: string
+  summary: string
+}
+
+export interface StrategyMemoryItem {
+  memory_id?: number
+  memory_type?: string
+  status?: string
+  summary?: string
+  pattern?: string
+  confidence?: number
+  support_count?: number
+  risk_level?: string
+}
+
+export interface StrategyMemoryBusinessResult {
+  items: StrategyMemoryItem[]
+  total: number
+  data_status?: string
+  summary: string
+}
+
+export interface ReadonlyBusinessResult {
+  account_id?: number
+  account_name?: string
+  platform?: string
+  content_domain?: string | null
+  positioning?: string
+  target_audience?: string
+  persona?: string | null
+  tone_preference?: string | null
+  risk_preference?: string
+  account_stage?: string
+  primary_goal?: string
+  summary?: string
+  account_profile?: AccountProfileBusinessResult
+  competitor_evidence?: CompetitorEvidenceBusinessResult
+  comment_insight?: CommentInsightBusinessResult
+  strategy_memory?: StrategyMemoryBusinessResult
+}
+
 export interface AgentChatResponse {
   session_id: string | null
   router_result: RouterResult | null
@@ -178,7 +258,7 @@ export interface AgentChatResponse {
   trace_id: string | null
   metadata: {
     execution?: AgentExecutionResult
-    business_result?: AccountProfileBusinessResult | null
+    business_result?: ReadonlyBusinessResult | null
     entry_trace?: EntryTrace
     demo_source?: string
     [key: string]: unknown

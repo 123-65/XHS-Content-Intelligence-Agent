@@ -51,7 +51,7 @@ class AgentChatReadonlyExecuteService:
         self.db = db
 
     def execute_readonly(self, request: AgentChatRequest) -> AgentChatResponse:
-        """执行只读 Agent Action，目前仅支持 QUERY_ACCOUNT_PROFILE。"""
+        """执行只读 Agent Action，仅允许只读白名单 Action 进入 REAL。"""
         agent_input = build_agent_input_from_chat_request(request)
         recorder = AgentEntryTraceRecorder(session_id=request.session_id)
         recorder.user_id = request.user_id
@@ -105,6 +105,9 @@ class AgentChatReadonlyExecuteService:
                 Action.NOOP.value,
                 Action.ASK_CLARIFICATION.value,
                 Action.QUERY_ACCOUNT_PROFILE.value,
+                Action.QUERY_COMPETITOR_EVIDENCE.value,
+                Action.QUERY_COMMENT_INSIGHT.value,
+                Action.QUERY_STRATEGY_MEMORY.value,
             ],
         }
         return response.model_copy(update={"metadata": metadata})
@@ -124,10 +127,21 @@ def _business_result(execution_result: PlanExecutionResult) -> dict | None:
     """提取只读业务结果，供前端展示。"""
     if execution_result.status != ExecutionStatus.SUCCESS:
         return None
+    result = {}
     for step in execution_result.step_results:
         if step.action == Action.QUERY_ACCOUNT_PROFILE and step.output:
-            return step.output
-    return None
+            result["account_profile"] = step.output
+        if step.action == Action.QUERY_COMPETITOR_EVIDENCE and step.output:
+            result["competitor_evidence"] = step.output
+        if step.action == Action.QUERY_COMMENT_INSIGHT and step.output:
+            result["comment_insight"] = step.output
+        if step.action == Action.QUERY_STRATEGY_MEMORY and step.output:
+            result["strategy_memory"] = step.output
+    if not result:
+        return None
+    if set(result) == {"account_profile"}:
+        return {**result["account_profile"], **result}
+    return result
 
 
 def _message_for_readonly_response(response: AgentChatResponse, execution_result: PlanExecutionResult) -> str:

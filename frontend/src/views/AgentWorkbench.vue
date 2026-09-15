@@ -62,7 +62,7 @@
         </div>
         <el-alert
           type="info"
-          title="当前只支持 QUERY_ACCOUNT_PROFILE，只读，不写数据库。"
+          title="当前只支持 QUERY_ACCOUNT_PROFILE / QUERY_COMPETITOR_EVIDENCE / QUERY_COMMENT_INSIGHT / QUERY_STRATEGY_MEMORY；只读，不生成草稿，不写数据库，不调用发布/评论能力。"
           show-icon
           :closable="false"
         />
@@ -195,20 +195,80 @@
 
           <el-card shadow="never">
             <template #header><strong>业务结果</strong></template>
-            <el-descriptions v-if="businessResult" :column="1" border>
-              <el-descriptions-item label="account_id">{{ businessResult.account_id }}</el-descriptions-item>
-              <el-descriptions-item label="account_name">{{ businessResult.account_name }}</el-descriptions-item>
-              <el-descriptions-item label="platform">{{ businessResult.platform }}</el-descriptions-item>
-              <el-descriptions-item label="content_domain">{{ businessResult.content_domain || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="positioning">{{ businessResult.positioning }}</el-descriptions-item>
-              <el-descriptions-item label="target_audience">{{ businessResult.target_audience }}</el-descriptions-item>
-              <el-descriptions-item label="tone_preference">{{ businessResult.tone_preference || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="risk_preference">{{ businessResult.risk_preference }}</el-descriptions-item>
-              <el-descriptions-item label="account_stage">{{ businessResult.account_stage }}</el-descriptions-item>
-              <el-descriptions-item label="primary_goal">{{ businessResult.primary_goal }}</el-descriptions-item>
-              <el-descriptions-item label="summary">{{ businessResult.summary }}</el-descriptions-item>
-            </el-descriptions>
-            <el-empty v-else description="暂无账号画像结果" />
+            <div v-if="businessResult" class="business-result">
+              <el-descriptions v-if="accountProfileResult" :column="1" border>
+                <el-descriptions-item label="account_id">{{ accountProfileResult.account_id }}</el-descriptions-item>
+                <el-descriptions-item label="account_name">{{ accountProfileResult.account_name }}</el-descriptions-item>
+                <el-descriptions-item label="platform">{{ accountProfileResult.platform }}</el-descriptions-item>
+                <el-descriptions-item label="content_domain">{{ accountProfileResult.content_domain || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="positioning">{{ accountProfileResult.positioning }}</el-descriptions-item>
+                <el-descriptions-item label="target_audience">{{ accountProfileResult.target_audience }}</el-descriptions-item>
+                <el-descriptions-item label="tone_preference">{{ accountProfileResult.tone_preference || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="risk_preference">{{ accountProfileResult.risk_preference }}</el-descriptions-item>
+                <el-descriptions-item label="account_stage">{{ accountProfileResult.account_stage }}</el-descriptions-item>
+                <el-descriptions-item label="primary_goal">{{ accountProfileResult.primary_goal }}</el-descriptions-item>
+                <el-descriptions-item label="summary">{{ accountProfileResult.summary }}</el-descriptions-item>
+              </el-descriptions>
+
+              <section v-if="competitorEvidenceResult" class="result-section">
+                <div class="toolbar">
+                  <strong>竞品证据</strong>
+                  <el-tag effect="plain">{{ competitorEvidenceResult.data_status || 'UNKNOWN' }}</el-tag>
+                </div>
+                <div v-if="competitorEvidenceResult.items.length" class="mini-card-list">
+                  <div v-for="item in competitorEvidenceResult.items" :key="`${item.report_id || '-'}-${item.opportunity_id || item.title}`" class="mini-card">
+                    <strong>{{ item.title || '-' }}</strong>
+                    <p>{{ item.summary || '-' }}</p>
+                    <div class="tag-row">
+                      <el-tag v-if="item.content_pillar" effect="plain">{{ item.content_pillar }}</el-tag>
+                      <el-tag v-if="item.comment_demand_type" type="warning" effect="plain">{{ item.comment_demand_type }}</el-tag>
+                      <el-tag v-if="item.risk_level" :type="riskTagType(item.risk_level)" effect="plain">{{ item.risk_level }}</el-tag>
+                      <el-tag v-if="item.confidence !== undefined" type="success" effect="plain">{{ percent(item.confidence) }}</el-tag>
+                    </div>
+                  </div>
+                </div>
+                <el-empty v-else description="暂无竞品证据" />
+              </section>
+
+              <section v-if="commentInsightResult" class="result-section">
+                <div class="toolbar">
+                  <strong>评论洞察</strong>
+                  <el-tag type="warning" effect="plain">{{ commentInsightResult.data_status }}</el-tag>
+                </div>
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="demand_summary">{{ summaryList(commentInsightResult.demand_summary) }}</el-descriptions-item>
+                  <el-descriptions-item label="conversion_signal_summary">{{ summaryList(commentInsightResult.conversion_signal_summary) }}</el-descriptions-item>
+                  <el-descriptions-item label="risk_summary">{{ summaryList(commentInsightResult.risk_summary) }}</el-descriptions-item>
+                </el-descriptions>
+                <div v-if="commentInsightResult.representative_comments.length" class="mini-card-list">
+                  <div v-for="item in commentInsightResult.representative_comments" :key="item.untrusted_text" class="mini-card">
+                    <el-tag type="danger" effect="plain">untrusted_text</el-tag>
+                    <p>{{ item.untrusted_text }}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section v-if="strategyMemoryResult" class="result-section">
+                <div class="toolbar">
+                  <strong>策略记忆</strong>
+                  <el-tag effect="plain">{{ strategyMemoryResult.data_status || 'UNKNOWN' }}</el-tag>
+                </div>
+                <div v-if="strategyMemoryResult.items.length" class="mini-card-list">
+                  <div v-for="item in strategyMemoryResult.items" :key="item.memory_id || item.summary" class="mini-card">
+                    <strong>{{ item.memory_type || '-' }} / {{ item.status || '-' }}</strong>
+                    <p>{{ item.summary || '-' }}</p>
+                    <p v-if="item.pattern">{{ item.pattern }}</p>
+                    <div class="tag-row">
+                      <el-tag v-if="item.support_count !== undefined" effect="plain">support {{ item.support_count }}</el-tag>
+                      <el-tag v-if="item.risk_level" :type="riskTagType(item.risk_level)" effect="plain">{{ item.risk_level }}</el-tag>
+                      <el-tag v-if="item.confidence !== undefined" type="success" effect="plain">{{ percent(item.confidence) }}</el-tag>
+                    </div>
+                  </div>
+                </div>
+                <el-empty v-else description="暂无策略记忆" />
+              </section>
+            </div>
+            <el-empty v-else description="暂无只读业务结果" />
           </el-card>
 
           <el-card shadow="never">
@@ -241,7 +301,14 @@ import { FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-v
 import PageHeader from '@/components/PageHeader.vue'
 import { executeReadonlyAgentChat, previewAgentChat } from '@/api/agentChat'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
-import type { AgentChatRequest, AgentChatResponse, EntryTraceEvent, ValidationIssue } from '@/types/agentChat'
+import type {
+  AccountProfileBusinessResult,
+  AgentChatRequest,
+  AgentChatResponse,
+  CommentInsightSummaryItem,
+  EntryTraceEvent,
+  ValidationIssue
+} from '@/types/agentChat'
 
 interface ExampleInput {
   label: string
@@ -253,6 +320,10 @@ interface ExampleInput {
 
 const examples: ExampleInput[] = [
   { label: '账号画像', text: '查看当前账号画像', account_id: 1 },
+  { label: '上下文证据', text: '查看这个账号最近能用于写作的上下文证据', account_id: 1 },
+  { label: '竞品证据', text: '查看当前账号的竞品证据', account_id: 1 },
+  { label: '评论洞察', text: '看看评论洞察', account_id: 1 },
+  { label: '策略记忆', text: '查看策略记忆', account_id: 1 },
   { label: '新选题', text: '我想写一篇 27 届双非本科做 Agent 求职的帖子', account_id: null },
   { label: '这个不行', text: '这个不行', account_id: null },
   { label: '标题太 AI', text: '这个标题太 AI 了，换自然一点', account_id: 1, current_target_type: 'DRAFT', current_target_id: '123' },
@@ -277,6 +348,16 @@ const routerIntent = computed(() => response.value?.router_result?.intent || '-'
 const planSteps = computed(() => response.value?.plan?.steps || [])
 const execution = computed(() => response.value?.metadata.execution || null)
 const businessResult = computed(() => response.value?.metadata.business_result || null)
+const accountProfileResult = computed(() => {
+  const result = businessResult.value
+  if (!result) return null
+  if (result.account_profile) return result.account_profile
+  if (typeof result.account_id === 'number') return result as AccountProfileBusinessResult
+  return null
+})
+const competitorEvidenceResult = computed(() => businessResult.value?.competitor_evidence || null)
+const commentInsightResult = computed(() => businessResult.value?.comment_insight || null)
+const strategyMemoryResult = computed(() => businessResult.value?.strategy_memory || null)
 const traceEvents = computed(() => response.value?.metadata.entry_trace?.events || [])
 const validationOk = computed(() => Boolean(response.value?.param_validation?.valid && response.value?.plan_validation?.valid))
 const validationIssues = computed<ValidationIssue[]>(() => [
@@ -369,6 +450,15 @@ const traceEventType = (stage: EntryTraceEvent['stage']) => {
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
+
+const summaryList = (items: CommentInsightSummaryItem[]) =>
+  items.length ? items.map((item) => `${item.type || item.name || '-'}:${item.count ?? 0}`).join(' / ') : '-'
+
+const riskTagType = (riskLevel?: string) => {
+  if (riskLevel === 'HIGH' || riskLevel === 'BLOCKED') return 'danger'
+  if (riskLevel === 'MEDIUM') return 'warning'
+  return 'info'
+}
 
 const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
 </script>
@@ -525,6 +615,38 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
 .issue-list p {
   margin: 6px 0 0;
   color: #374151;
+  line-height: 1.6;
+}
+
+.business-result,
+.result-section,
+.mini-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-section {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mini-card {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.mini-card strong {
+  display: block;
+  color: #111827;
+  font-size: 13px;
+}
+
+.mini-card p {
+  margin: 6px 0 0;
+  color: #475569;
   line-height: 1.6;
 }
 

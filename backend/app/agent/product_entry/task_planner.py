@@ -38,7 +38,7 @@ class LLMTaskPlanner:
             if recorder:
                 recorder.record_plan(plan, AgentEntryTraceStage.PLAN_VALIDATED)
             return plan
-        deterministic_plan = self._plan_query_account_profile(agent_input, checked_router, recorder)
+        deterministic_plan = self._plan_readonly_query(agent_input, checked_router, recorder)
         if deterministic_plan:
             return deterministic_plan
 
@@ -93,33 +93,24 @@ class LLMTaskPlanner:
 
         return self._parse_and_validate(self._result_text(llm_result), checked_router, recorder)
 
-    def _plan_query_account_profile(
+    def _plan_readonly_query(
         self,
         agent_input: AgentInput,
         router_result: RouterResult,
         recorder: AgentEntryTraceRecorder | None = None,
     ) -> Plan | None:
-        """对账号画像查询做确定性规划，不调用真实 LLM。"""
+        """对只读查询做确定性规划，不调用真实 LLM。"""
         account_id = router_result.extracted_params.get("account_id") or agent_input.account_id
         if router_result.intent != Intent.QUERY_STATUS or router_result.target_type != "ACCOUNT" or account_id is None:
             return None
+        actions = _readonly_actions_from_router(router_result) or [Action.QUERY_ACCOUNT_PROFILE]
         plan = Plan(
             conversation_id=agent_input.conversation_id,
             intent=router_result.intent,
-            steps=[
-                PlanStep(
-                    step_no=1,
-                    action=Action.QUERY_ACCOUNT_PROFILE,
-                    description="查询当前账号画像，只读读取 AccountProfile。",
-                    input_params={"account_id": account_id},
-                    expected_output="账号画像摘要",
-                    allowed_effect=AllowedEffect.READ_ONLY,
-                    can_execute=True,
-                )
-            ],
+            steps=[_readonly_step(index + 1, action, account_id) for index, action in enumerate(actions)],
             confirmation_requirement=ConfirmationRequirement.NONE,
             can_execute=True,
-            summary_for_user="将只读查询当前账号画像。",
+            summary_for_user="将执行只读查询，不生成草稿，不写数据库。",
         )
         constrained = apply_action_registry_constraints(plan)
         validated = validate_plan_result(constrained)
@@ -302,6 +293,45 @@ def apply_action_registry_constraints(plan: Plan) -> Plan:
             "blocked_reason": blocked_reason,
             "can_execute": not missing_params and confirmation_requirement == ConfirmationRequirement.NONE,
         }
+    )
+
+
+def _readonly_actions_from_router(router_result: RouterResult) -> list[Action]:
+    raw_actions = router_result.extracted_params.get("readonly_actions") or []
+    if isinstance(raw_actions, str):
+        raw_actions = [raw_actions]
+    actions: list[Action] = []
+    for raw_action in raw_actions:
+        try:
+            action = Action(raw_action)
+        except ValueError:
+            continue
+        if action in {
+            Action.QUERY_ACCOUNT_PROFILE,
+            Action.QUERY_COMPETITOR_EVIDENCE,
+            Action.QUERY_COMMENT_INSIGHT,
+            Action.QUERY_STRATEGY_MEMORY,
+        } and action not in actions:
+            actions.append(action)
+    return actions
+
+
+def _readonly_step(step_no: int, action: Action, account_id: int) -> PlanStep:
+    descriptions = {
+        Action.QUERY_ACCOUNT_PROFILE: ("查询当前账号画像，只读读取 AccountProfile。", "账号画像摘要"),
+        Action.QUERY_COMPETITOR_EVIDENCE: ("查询当前账号的竞品证据，只读读取已有报告和机会。", "竞品证据摘要"),
+        Action.QUERY_COMMENT_INSIGHT: ("查询当前账号的评论洞察，只读读取已有评论和报告摘要。", "评论洞察摘要"),
+        Action.QUERY_STRATEGY_MEMORY: ("查询当前账号的策略记忆，只读读取已有 memory。", "策略记忆摘要"),
+    }
+    description, expected_output = descriptions[action]
+    return PlanStep(
+        step_no=step_no,
+        action=action,
+        description=description,
+        input_params={"account_id": account_id},
+        expected_output=expected_output,
+        allowed_effect=AllowedEffect.READ_ONLY,
+        can_execute=True,
     )
 
 

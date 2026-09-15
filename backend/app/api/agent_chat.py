@@ -81,7 +81,7 @@ def execute_readonly_agent_chat(
     request: AgentChatRequest,
     service: AgentChatReadonlyExecuteService = Depends(get_agent_chat_readonly_execute_service),
 ) -> AgentChatResponse:
-    """执行 Agent Chat 只读链路，目前仅允许 QUERY_ACCOUNT_PROFILE 进入 REAL。"""
+    """执行 Agent Chat 只读链路，仅允许白名单查询类 Action 进入 REAL。"""
     try:
         return service.execute_readonly(request)
     except Exception as exc:
