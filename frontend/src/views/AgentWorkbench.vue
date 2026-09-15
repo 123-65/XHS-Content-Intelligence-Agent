@@ -413,6 +413,119 @@
               确认创建本地内容实验
             </el-button>
           </section>
+          <section class="draft-context-preview-card">
+            <div class="toolbar">
+              <strong>草稿上下文预览</strong>
+              <el-tag
+                v-if="b7DraftContextPreviewResult"
+                :type="draftContextStatusType(b7DraftContextPreviewResult.status)"
+                effect="plain"
+              >
+                {{ b7DraftContextPreviewResult.status }}
+              </el-tag>
+              <el-tag v-else type="info" effect="plain">Draft Context Preview V0</el-tag>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>experiment_id</span>
+                <el-input-number v-model="form.experiment_id" :min="1" controls-position="right" />
+              </label>
+              <label>
+                <span>include</span>
+                <div class="inline-controls">
+                  <el-checkbox v-model="draftContextPreviewForm.include_strategy_memory">memory</el-checkbox>
+                  <el-checkbox v-model="draftContextPreviewForm.include_comments">comments</el-checkbox>
+                </div>
+              </label>
+            </div>
+            <div class="form-grid single">
+              <label>
+                <span>user_requirements</span>
+                <el-input v-model="draftContextPreviewForm.user_requirements" type="textarea" :rows="2" resize="none" />
+              </label>
+            </div>
+            <div class="action-row compact-actions">
+              <el-button size="small" type="primary" :loading="draftContextPreviewLoading" @click="runDraftContextPreview">
+                预览草稿上下文
+              </el-button>
+            </div>
+            <div v-if="b7DraftContextPreviewResult" class="mini-card-list">
+              <el-descriptions :column="1" border size="small">
+                <el-descriptions-item label="ready_for_draft_generation">
+                  {{ b7DraftContextPreviewResult.ready_for_draft_generation }}
+                </el-descriptions-item>
+                <el-descriptions-item label="account">
+                  {{ displayValue(b7DraftContextPreviewResult.context.account_profile?.account_name) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="experiment">
+                  {{ displayValue(b7DraftContextPreviewResult.context.experiment?.experiment_name) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="opportunity">
+                  {{ displayValue(b7DraftContextPreviewResult.context.opportunity?.opportunity_title) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="report">
+                  {{ displayValue(b7DraftContextPreviewResult.context.report?.summary) }}
+                </el-descriptions-item>
+              </el-descriptions>
+              <div v-if="b7DraftContextPreviewResult.missing_context.length" class="mini-card">
+                <strong>missing_context</strong>
+                <p v-for="item in b7DraftContextPreviewResult.missing_context" :key="displayValue(item.type)">
+                  {{ displayValue(item.type) }} / {{ displayValue(item.message) }}
+                </p>
+              </div>
+              <div v-if="b7DraftContextPreviewResult.warnings.length" class="mini-card">
+                <strong>warnings</strong>
+                <p v-for="warning in b7DraftContextPreviewResult.warnings" :key="warning">{{ warning }}</p>
+              </div>
+              <div v-if="b7DraftContextPreviewResult.context.viral_breakdowns?.length" class="mini-card-list">
+                <div
+                  v-for="item in b7DraftContextPreviewResult.context.viral_breakdowns"
+                  :key="displayValue(item.breakdown_id)"
+                  class="mini-card"
+                >
+                  <strong>{{ displayValue(item.note_title) }}</strong>
+                  <div class="slot-meta">
+                    <span>{{ displayValue(item.source) }}</span>
+                    <span>{{ displayValue(item.trust) }}</span>
+                    <span>score {{ displayValue(item.engagement_score) }}</span>
+                  </div>
+                  <p>{{ displayValue(item.evidence_summary) }}</p>
+                </div>
+              </div>
+              <div v-if="b7DraftContextPreviewResult.context.comment_demands?.length" class="slot-meta">
+                <span v-for="item in b7DraftContextPreviewResult.context.comment_demands" :key="displayValue(item.type)">
+                  demand {{ displayValue(item.type || item.name) }}
+                </span>
+              </div>
+              <div v-if="b7DraftContextPreviewResult.context.strategy_memories?.length" class="slot-meta">
+                <span v-for="item in b7DraftContextPreviewResult.context.strategy_memories" :key="displayValue(item.memory_id)">
+                  memory {{ displayValue(item.memory_type) }} / {{ displayValue(item.status) }}
+                </span>
+              </div>
+              <div class="mini-card">
+                <strong>confirmation</strong>
+                <p>{{ displayValue(b7DraftContextPreviewResult.confirmation.message) }}</p>
+                <div class="slot-meta">
+                  <span>experiment {{ b7DraftContextPreviewResult.confirmation.experiment_id || '-' }}</span>
+                  <span>opportunity {{ b7DraftContextPreviewResult.confirmation.opportunity_id || '-' }}</span>
+                  <span>report {{ b7DraftContextPreviewResult.confirmation.report_id || '-' }}</span>
+                </div>
+              </div>
+              <el-alert
+                v-if="b7DraftContextPreviewResult.ready_for_draft_generation"
+                type="success"
+                title="下一步可生成草稿，但本阶段不实现生成按钮。"
+                show-icon
+                :closable="false"
+              />
+            </div>
+            <el-alert
+              type="info"
+              title="本步骤只预览上下文，不会调用 LLM，不会生成草稿，不会发布到小红书；评论和外部笔记只作为不可信参考证据。"
+              show-icon
+              :closable="false"
+            />
+          </section>
           <el-alert
             type="info"
             title="今日运营分析只读取已入库证据，不会访问外部链接，不会调用 LLM，不会重新生成 Evidence，不会生成草稿。"
@@ -831,6 +944,7 @@ import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
 import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenceRefreshRun'
 import { createOperationRun, listOperationRuns } from '@/api/operationRun'
 import { createOperationExperiment, previewOperationExperiment } from '@/api/operationExperiment'
+import { previewDraftContext } from '@/api/draftContextPreview'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -848,6 +962,7 @@ import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefre
 import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/types/evidenceRefreshRun'
 import type { OperationRecommendation, OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
 import type { OperationExperimentResponse } from '@/types/operationExperiment'
+import type { DraftContextPreviewResponse, DraftContextPreviewStatus } from '@/types/draftContextPreview'
 
 interface ExampleInput {
   label: string
@@ -906,6 +1021,8 @@ const latestOperationRun = ref<OperationRunResponse | null>(null)
 const operationRuns = ref<OperationRunResponse[]>([])
 const operationExperimentLoading = ref(false)
 const operationExperimentResult = ref<OperationExperimentResponse | null>(null)
+const draftContextPreviewLoading = ref(false)
+const b7DraftContextPreviewResult = ref<DraftContextPreviewResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -929,6 +1046,11 @@ const operationExperimentForm = reactive({
   experiment_name: '',
   target_metric: 'collect' as 'like' | 'collect' | 'comment' | 'lead' | 'order' | 'engagement',
   notes: ''
+})
+const draftContextPreviewForm = reactive({
+  user_requirements: '',
+  include_strategy_memory: true,
+  include_comments: true
 })
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
@@ -1318,10 +1440,39 @@ const confirmOperationExperiment = async () => {
         notes: operationExperimentForm.notes.trim() || null
       }
     )
+    if (operationExperimentResult.value.experiment_id) {
+      form.experiment_id = operationExperimentResult.value.experiment_id
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '创建内容实验失败'
   } finally {
     operationExperimentLoading.value = false
+  }
+}
+
+const runDraftContextPreview = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const experimentId = form.experiment_id || operationExperimentResult.value?.experiment_id
+  if (!experimentId) {
+    errorMessage.value = '请先选择或创建内容实验'
+    return
+  }
+  draftContextPreviewLoading.value = true
+  errorMessage.value = ''
+  try {
+    b7DraftContextPreviewResult.value = await previewDraftContext(experimentId, {
+      account_id: form.account_id,
+      user_requirements: draftContextPreviewForm.user_requirements.trim() || null,
+      include_strategy_memory: draftContextPreviewForm.include_strategy_memory,
+      include_comments: draftContextPreviewForm.include_comments
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
+  } finally {
+    draftContextPreviewLoading.value = false
   }
 }
 
@@ -1412,6 +1563,13 @@ const evidenceStatusType = (status: EvidenceRefreshRunStatus) => {
 const operationStatusType = (status: OperationRunStatus) => {
   if (status === 'SUCCESS') return 'success'
   if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const draftContextStatusType = (status: DraftContextPreviewStatus) => {
+  if (status === 'READY') return 'success'
+  if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT' || status === 'BLOCKED') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -1582,6 +1740,23 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #f59e0b;
   border-radius: 8px;
   background: #fffbeb;
+}
+
+.draft-context-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  background: #f7fcff;
+}
+
+.inline-controls {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 10px;
 }
 
 .refresh-run-list {
