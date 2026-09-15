@@ -6,7 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ExperimentStatus = Literal["DRAFT", "READY", "PUBLISHED", "METRICS_COLLECTED", "ANALYZED", "FAILED"]
 ExperimentTargetMetric = Literal["like", "collect", "comment", "lead", "order", "engagement"]
-ExperimentSourceType = Literal["COMPETITOR_ANALYSIS", "USER_IDEA", "MANUAL_TOPIC", "STRATEGY_RECOMMENDATION"]
+ExperimentSourceType = Literal[
+    "COMPETITOR_ANALYSIS",
+    "USER_IDEA",
+    "MANUAL_TOPIC",
+    "STRATEGY_RECOMMENDATION",
+    "OPERATION_RUN_RECOMMENDATION",
+]
 
 
 class ContentExperimentCreate(BaseModel):

@@ -336,6 +336,15 @@
                   <span>{{ item.suggested_next_action }}</span>
                 </div>
                 <p>{{ item.evidence }}</p>
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :loading="operationExperimentLoading"
+                  @click="previewExperimentFromRecommendation(item)"
+                >
+                  创建内容实验
+                </el-button>
               </div>
             </div>
             <div v-if="latestOperationRun.data_gaps.length" class="mini-card-list">
@@ -351,6 +360,59 @@
               </span>
             </div>
           </div>
+          <section v-if="operationExperimentResult" class="operation-experiment-card">
+            <div class="toolbar">
+              <strong>内容实验确认</strong>
+              <el-tag :type="operationExperimentResult.status === 'CREATED' ? 'success' : 'warning'" effect="plain">
+                {{ operationExperimentResult.status }}
+              </el-tag>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>experiment_name</span>
+                <el-input v-model="operationExperimentForm.experiment_name" />
+              </label>
+              <label>
+                <span>target_metric</span>
+                <el-select v-model="operationExperimentForm.target_metric">
+                  <el-option label="collect" value="collect" />
+                  <el-option label="comment" value="comment" />
+                  <el-option label="like" value="like" />
+                  <el-option label="lead" value="lead" />
+                  <el-option label="engagement" value="engagement" />
+                </el-select>
+              </label>
+            </div>
+            <div class="form-grid single">
+              <label>
+                <span>notes</span>
+                <el-input v-model="operationExperimentForm.notes" type="textarea" :rows="2" resize="none" />
+              </label>
+            </div>
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="title">{{ displayValue(operationExperimentResult.confirmation.title) }}</el-descriptions-item>
+              <el-descriptions-item label="reason">{{ displayValue(operationExperimentResult.confirmation.reason) }}</el-descriptions-item>
+              <el-descriptions-item label="evidence">{{ displayValue(operationExperimentResult.confirmation.evidence) }}</el-descriptions-item>
+              <el-descriptions-item label="opportunity_id">{{ operationExperimentResult.opportunity_id || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="risk_level">{{ displayValue(operationExperimentResult.confirmation.risk_level) }}</el-descriptions-item>
+              <el-descriptions-item label="confidence">{{ displayValue(operationExperimentResult.confirmation.confidence) }}</el-descriptions-item>
+              <el-descriptions-item label="experiment_id">{{ operationExperimentResult.experiment_id || '-' }}</el-descriptions-item>
+            </el-descriptions>
+            <el-alert
+              type="warning"
+              title="这是本地创建内容实验，不会发布到小红书，不会生成草稿，不会调用 LLM。"
+              show-icon
+              :closable="false"
+            />
+            <el-button
+              type="primary"
+              :loading="operationExperimentLoading"
+              :disabled="operationExperimentResult.status === 'CREATED'"
+              @click="confirmOperationExperiment"
+            >
+              确认创建本地内容实验
+            </el-button>
+          </section>
           <el-alert
             type="info"
             title="今日运营分析只读取已入库证据，不会访问外部链接，不会调用 LLM，不会重新生成 Evidence，不会生成草稿。"
@@ -768,6 +830,7 @@ import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/data
 import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
 import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenceRefreshRun'
 import { createOperationRun, listOperationRuns } from '@/api/operationRun'
+import { createOperationExperiment, previewOperationExperiment } from '@/api/operationExperiment'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -783,7 +846,8 @@ import type {
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefreshRun'
 import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/types/evidenceRefreshRun'
-import type { OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
+import type { OperationRecommendation, OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
+import type { OperationExperimentResponse } from '@/types/operationExperiment'
 
 interface ExampleInput {
   label: string
@@ -840,6 +904,8 @@ const evidenceRuns = ref<EvidenceRefreshRunResponse[]>([])
 const operationLoading = ref(false)
 const latestOperationRun = ref<OperationRunResponse | null>(null)
 const operationRuns = ref<OperationRunResponse[]>([])
+const operationExperimentLoading = ref(false)
+const operationExperimentResult = ref<OperationExperimentResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -858,6 +924,11 @@ const evidenceRefreshForm = reactive({
   target_metric: 'composite',
   limit: 20,
   data_refresh_run_id: null as number | null
+})
+const operationExperimentForm = reactive({
+  experiment_name: '',
+  target_metric: 'collect' as 'like' | 'collect' | 'comment' | 'lead' | 'order' | 'engagement',
+  notes: ''
 })
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
@@ -1208,6 +1279,52 @@ const loadOperationRuns = async () => {
   }
 }
 
+const previewExperimentFromRecommendation = async (recommendation: OperationRecommendation) => {
+  if (!form.account_id || !latestOperationRun.value) {
+    errorMessage.value = '请先创建今日运营分析'
+    return
+  }
+  operationExperimentLoading.value = true
+  errorMessage.value = ''
+  try {
+    operationExperimentResult.value = await previewOperationExperiment(latestOperationRun.value.id, recommendation.rank, {
+      account_id: form.account_id,
+      confirmed: false,
+      experiment_name: operationExperimentForm.experiment_name.trim() || recommendation.title,
+      target_metric: operationExperimentForm.target_metric,
+      notes: operationExperimentForm.notes.trim() || null
+    })
+    operationExperimentForm.experiment_name = displayValue(operationExperimentResult.value.preview.experiment_name)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '预览内容实验失败'
+  } finally {
+    operationExperimentLoading.value = false
+  }
+}
+
+const confirmOperationExperiment = async () => {
+  if (!form.account_id || !operationExperimentResult.value) return
+  operationExperimentLoading.value = true
+  errorMessage.value = ''
+  try {
+    operationExperimentResult.value = await createOperationExperiment(
+      operationExperimentResult.value.run_id,
+      operationExperimentResult.value.rank,
+      {
+        account_id: form.account_id,
+        confirmed: true,
+        experiment_name: operationExperimentForm.experiment_name.trim() || null,
+        target_metric: operationExperimentForm.target_metric,
+        notes: operationExperimentForm.notes.trim() || null
+      }
+    )
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '创建内容实验失败'
+  } finally {
+    operationExperimentLoading.value = false
+  }
+}
+
 const applyDataSourceConfig = (config: DataSourceConfigResponse) => {
   dataSourceConfig.value = config
   dataSourceForm.platform = config.platform
@@ -1298,6 +1415,8 @@ const operationStatusType = (status: OperationRunStatus) => {
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
+
+const displayValue = (value: unknown) => (value === null || value === undefined || value === '' ? '-' : String(value))
 
 const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
 </script>
@@ -1453,6 +1572,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   margin: 0;
   color: #475569;
   line-height: 1.6;
+}
+
+.operation-experiment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
 }
 
 .refresh-run-list {
