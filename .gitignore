@@ -10,3 +10,5 @@ __pycache__/
 frontend/node_modules/
 frontend/dist/
 idea_to_post_todos.zip
+
+.pytest_tmp/
