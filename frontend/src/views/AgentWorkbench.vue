@@ -828,6 +828,125 @@
                   </section>
                 </section>
               </section>
+              <section v-if="finalDraftId" class="publish-package-card">
+                <div class="toolbar">
+                  <strong>Publish Package V0</strong>
+                  <el-tag
+                    v-if="publishPackageResult"
+                    :type="publishPackageStatusType(publishPackageResult.status)"
+                    effect="plain"
+                  >
+                    {{ publishPackageResult.status }}
+                  </el-tag>
+                  <el-tag v-else type="info" effect="plain">manual only</el-tag>
+                </div>
+                <el-descriptions :column="1" border size="small">
+                  <el-descriptions-item label="final_draft_id">{{ finalDraftId }}</el-descriptions-item>
+                  <el-descriptions-item label="review_report_id">{{ publishPackageReviewReportId || '-' }}</el-descriptions-item>
+                  <el-descriptions-item label="boundary">manual package, no auto publish, no comments, no LLM</el-descriptions-item>
+                </el-descriptions>
+                <div class="form-grid">
+                  <label>
+                    <span>card_count</span>
+                    <el-input-number v-model="publishPackageForm.card_count" :min="2" :max="6" controls-position="right" />
+                  </label>
+                  <label>
+                    <span>style</span>
+                    <el-select v-model="publishPackageForm.style">
+                      <el-option label="clean knowledge card" value="clean_knowledge_card" />
+                      <el-option label="plain checklist" value="plain_checklist" />
+                    </el-select>
+                  </label>
+                </div>
+                <el-alert
+                  type="info"
+                  title="This only creates local copy, checklist, and renderable image-card data. You still publish manually in XHS."
+                  show-icon
+                  :closable="false"
+                />
+                <el-button
+                  size="small"
+                  type="primary"
+                  :loading="publishPackageLoading"
+                  :disabled="!finalDraftId"
+                  @click="generatePublishPackage"
+                >
+                  Create manual publish package
+                </el-button>
+                <div v-if="publishPackageResult" class="publish-package-result">
+                  <el-alert
+                    v-if="publishPackageResult.warnings.length"
+                    type="warning"
+                    :title="publishPackageResult.warnings.join(' / ')"
+                    show-icon
+                    :closable="false"
+                  />
+                  <el-alert
+                    v-if="publishPackageResult.error_message"
+                    type="warning"
+                    :title="publishPackageResult.error_message"
+                    show-icon
+                    :closable="false"
+                  />
+                  <div class="publish-copy-grid">
+                    <div class="mini-card">
+                      <div class="toolbar">
+                        <strong>Title</strong>
+                        <el-button size="small" circle :icon="Copy" @click="copyPublishText(publishPackageResult.title)" />
+                      </div>
+                      <p>{{ publishPackageResult.title || '-' }}</p>
+                    </div>
+                    <div class="mini-card">
+                      <div class="toolbar">
+                        <strong>Tags</strong>
+                        <el-button size="small" circle :icon="Copy" @click="copyPublishText(tagsText(publishPackageResult.tags))" />
+                      </div>
+                      <p>{{ tagsText(publishPackageResult.tags) || '-' }}</p>
+                    </div>
+                    <div class="mini-card">
+                      <div class="toolbar">
+                        <strong>Body</strong>
+                        <el-button size="small" circle :icon="Copy" @click="copyPublishText(publishPackageResult.body)" />
+                      </div>
+                      <p>{{ publishPackageResult.body || '-' }}</p>
+                    </div>
+                    <div class="mini-card">
+                      <div class="toolbar">
+                        <strong>CTA</strong>
+                        <el-button size="small" circle :icon="Copy" @click="copyPublishText(publishPackageResult.cta)" />
+                      </div>
+                      <p>{{ publishPackageResult.cta || '-' }}</p>
+                    </div>
+                  </div>
+                  <div class="toolbar">
+                    <strong>Image Cards</strong>
+                    <el-button size="small" :icon="Download" @click="downloadAllPublishCards">Download all PNG</el-button>
+                  </div>
+                  <div class="publish-card-grid">
+                    <div v-for="card in publishPackageResult.image_cards" :key="card.order" class="publish-card-preview">
+                      <span>{{ card.order }} / {{ card.card_type }}</span>
+                      <strong>{{ card.title }}</strong>
+                      <p v-if="card.subtitle">{{ card.subtitle }}</p>
+                      <ul v-if="card.items.length">
+                        <li v-for="item in card.items" :key="item">{{ item }}</li>
+                      </ul>
+                      <el-button size="small" :icon="Download" @click="downloadPublishCard(card)">PNG</el-button>
+                    </div>
+                  </div>
+                  <div class="publish-copy-grid">
+                    <div class="mini-card">
+                      <strong>Checklist</strong>
+                      <p v-for="item in publishPackageResult.publish_checklist" :key="item.item">
+                        {{ item.passed ? 'OK' : 'CHECK' }} / {{ item.level }} / {{ item.item }}
+                      </p>
+                    </div>
+                    <div class="mini-card">
+                      <strong>Manual steps</strong>
+                      <p v-for="item in publishPackageResult.manual_publish_steps" :key="item">{{ item }}</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
             <el-alert
               type="info"
@@ -1238,7 +1357,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
+import { Copy, Download, FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
+import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import {
   createAgentConversation,
@@ -1259,6 +1379,7 @@ import { generateDraft } from '@/api/draftGeneration'
 import { reviewDraft } from '@/api/draftReview'
 import { createDraftRevisionPlan } from '@/api/draftRevision'
 import { applyDraftRevisionPlan } from '@/api/draftRevisionApply'
+import { createPublishPackage } from '@/api/publishPackage'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1281,6 +1402,7 @@ import type { DraftGenerationResponse, DraftGenerationStatus } from '@/types/dra
 import type { DraftReviewResponse, DraftReviewStatus } from '@/types/draftReview'
 import type { DraftRevisionPlanResponse, DraftRevisionPlanStatus } from '@/types/draftRevision'
 import type { DraftRevisionApplyResponse, DraftRevisionApplyStatus } from '@/types/draftRevisionApply'
+import type { PublishCard, PublishPackageResponse, PublishPackageStatus } from '@/types/publishPackage'
 
 interface ExampleInput {
   label: string
@@ -1349,6 +1471,8 @@ const draftRevisionLoading = ref(false)
 const draftRevisionPlanResult = ref<DraftRevisionPlanResponse | null>(null)
 const draftRevisionApplyLoading = ref(false)
 const draftRevisionApplyResult = ref<DraftRevisionApplyResponse | null>(null)
+const publishPackageLoading = ref(false)
+const publishPackageResult = ref<PublishPackageResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1388,6 +1512,10 @@ const draftRevisionForm = reactive({
 const draftRevisionApplyForm = reactive({
   user_extra_requirements: ''
 })
+const publishPackageForm = reactive({
+  style: 'clean_knowledge_card',
+  card_count: 5
+})
 const draftRevisionQuickFeedback = ['标题太 AI', '正文太长', '表达太营销', 'CTA 太硬', '不符合账号人设', '证据不足']
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
@@ -1405,6 +1533,10 @@ const competitorEvidenceResult = computed(() => businessResult.value?.competitor
 const commentInsightResult = computed(() => businessResult.value?.comment_insight || null)
 const strategyMemoryResult = computed(() => businessResult.value?.strategy_memory || null)
 const draftContextPreviewResult = computed(() => businessResult.value?.draft_context_preview || null)
+const finalDraftId = computed(() => draftRevisionApplyResult.value?.revised_draft_id || draftGenerationResult.value?.draft_id || null)
+const publishPackageReviewReportId = computed(() =>
+  finalDraftId.value && finalDraftId.value === draftGenerationResult.value?.draft_id ? draftReviewResult.value?.review_report_id || null : null
+)
 const traceEvents = computed(() => response.value?.metadata.entry_trace?.events || [])
 const validationOk = computed(() => Boolean(response.value?.param_validation?.valid && response.value?.plan_validation?.valid))
 const validationIssues = computed<ValidationIssue[]>(() => [
@@ -1810,6 +1942,7 @@ const runDraftContextPreview = async () => {
     draftReviewResult.value = null
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
+    publishPackageResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -1845,6 +1978,7 @@ const confirmDraftGeneration = async () => {
     draftReviewResult.value = null
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
+    publishPackageResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -1875,6 +2009,7 @@ const confirmDraftReview = async () => {
     })
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
+    publishPackageResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
@@ -1912,6 +2047,7 @@ const generateDraftRevisionPlan = async () => {
       feedback_text: draftRevisionForm.feedback_text.trim()
     })
     draftRevisionApplyResult.value = null
+    publishPackageResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
@@ -1944,12 +2080,135 @@ const applyDraftRevision = async () => {
       form.current_target_type = 'DRAFT'
       form.current_target_id = String(draftRevisionApplyResult.value.revised_draft_id)
     }
+    publishPackageResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '应用修改计划失败'
   } finally {
     draftRevisionApplyLoading.value = false
   }
+}
+
+const generatePublishPackage = async () => {
+  if (!form.account_id) {
+    errorMessage.value = 'Select an account first'
+    return
+  }
+  const draftId = finalDraftId.value
+  if (!draftId) {
+    errorMessage.value = 'Generate a draft before creating a publish package'
+    return
+  }
+  publishPackageLoading.value = true
+  errorMessage.value = ''
+  try {
+    publishPackageResult.value = await createPublishPackage(draftId, {
+      account_id: form.account_id,
+      confirmed: true,
+      review_report_id: publishPackageReviewReportId.value,
+      style: publishPackageForm.style,
+      card_count: publishPackageForm.card_count
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to create publish package'
+  } finally {
+    publishPackageLoading.value = false
+  }
+}
+
+const tagsText = (tags: string[]) => tags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ')
+
+const copyPublishText = async (value: string | null | undefined) => {
+  const text = value || ''
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('Copied')
+  } catch {
+    errorMessage.value = 'Clipboard is not available in this browser'
+  }
+}
+
+const drawWrappedText = (
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number
+) => {
+  const characters = Array.from(text)
+  let line = ''
+  let currentY = y
+  let lines = 0
+  for (const char of characters) {
+    const nextLine = line + char
+    if (context.measureText(nextLine).width > maxWidth && line) {
+      context.fillText(line, x, currentY)
+      currentY += lineHeight
+      lines += 1
+      line = char
+      if (lines >= maxLines) return currentY
+    } else {
+      line = nextLine
+    }
+  }
+  if (line && lines < maxLines) {
+    context.fillText(line, x, currentY)
+    currentY += lineHeight
+  }
+  return currentY
+}
+
+const downloadPublishCard = (card: PublishCard) => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1080
+  canvas.height = 1440
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  context.fillStyle = '#f8fafc'
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.fillStyle = '#ffffff'
+  context.fillRect(72, 72, 936, 1296)
+  context.strokeStyle = '#111827'
+  context.lineWidth = 8
+  context.strokeRect(72, 72, 936, 1296)
+
+  context.fillStyle = '#0f172a'
+  context.font = '700 72px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+  let y = drawWrappedText(context, card.title, 132, 220, 816, 86, 4)
+  if (card.subtitle) {
+    context.fillStyle = '#475569'
+    context.font = '500 42px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+    y = drawWrappedText(context, card.subtitle, 132, y + 36, 816, 56, 4)
+  }
+
+  context.fillStyle = '#111827'
+  context.font = '500 38px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+  const items = card.items.length ? card.items : card.card_type === 'cover' ? ['Manual publish package'] : []
+  items.slice(0, 5).forEach((item) => {
+    context.fillStyle = '#0f766e'
+    context.beginPath()
+    context.arc(148, y + 14, 10, 0, Math.PI * 2)
+    context.fill()
+    context.fillStyle = '#111827'
+    y = drawWrappedText(context, item, 180, y + 28, 740, 50, 2) + 20
+  })
+
+  context.fillStyle = '#64748b'
+  context.font = '600 28px system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+  context.fillText(`Card ${card.order} / ${card.card_type}`, 132, 1296)
+
+  const link = document.createElement('a')
+  link.href = canvas.toDataURL('image/png')
+  link.download = `xhs-publish-card-${card.order}.png`
+  link.click()
+}
+
+const downloadAllPublishCards = () => {
+  publishPackageResult.value?.image_cards.forEach((card) => downloadPublishCard(card))
 }
 
 const applyDataSourceConfig = (config: DataSourceConfigResponse) => {
@@ -2074,6 +2333,13 @@ const draftRevisionStatusType = (status: DraftRevisionPlanStatus) => {
 const draftRevisionApplyStatusType = (status: DraftRevisionApplyStatus) => {
   if (status === 'CREATED') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'STALE_PLAN' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const publishPackageStatusType = (status: PublishPackageStatus) => {
+  if (status === 'READY') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'NEEDS_REVIEW' || status === 'DATA_INSUFFICIENT') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -2294,6 +2560,68 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #99f6e4;
   border-radius: 8px;
   background: #f6fffd;
+}
+
+.publish-package-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fffaf5;
+}
+
+.publish-package-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.publish-copy-grid,
+.publish-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.publish-card-preview {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.publish-card-preview span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.publish-card-preview strong {
+  color: #0f172a;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.publish-card-preview p,
+.publish-card-preview li {
+  margin: 0;
+  color: #475569;
+  line-height: 1.55;
+}
+
+.publish-card-preview ul {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
 }
 
 .inline-controls {

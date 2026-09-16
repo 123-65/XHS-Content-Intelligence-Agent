@@ -37,6 +37,7 @@ from app.models.private_conversion_snapshot import PrivateConversionSnapshot
 from app.models.prompt_run_log import PromptRunLog
 from app.models.prompt_template import PromptTemplate
 from app.models.public_metric_snapshot import PublicMetricSnapshot
+from app.models.publish_package import PublishPackage
 from app.models.published_note import PublishedNote
 from app.models.review_report import ReviewReport
 from app.models.startup_strategy import StartupStrategy
@@ -70,6 +71,7 @@ __all__ = [
     "ContentDraftVersion",
     "PublishedNote",
     "PublicMetricSnapshot",
+    "PublishPackage",
     "PrivateConversionSnapshot",
     "NoteCommentSnapshot",
     "DraftGenerationContext",
