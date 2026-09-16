@@ -1,10 +1,18 @@
 class LLMError(Exception):
-    """模型调用基础异常。"""
+    """Base exception for LLM calls."""
 
 
 class LLMConfigError(LLMError):
-    """模型配置异常。"""
+    """LLM configuration exception."""
 
 
 class LLMResponseError(LLMError):
-    """模型响应解析异常。"""
+    """LLM response parsing or validation exception."""
+
+
+class LLMOutputParseError(LLMResponseError):
+    """Model output is not valid JSON or cannot be parsed."""
+
+
+class LLMSchemaValidationError(LLMResponseError):
+    """Model output JSON does not match the requested schema."""

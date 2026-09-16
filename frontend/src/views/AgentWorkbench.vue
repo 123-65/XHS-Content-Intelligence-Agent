@@ -578,6 +578,67 @@
                     <p>{{ displayValue(draftGenerationResult.draft.cta) }}</p>
                   </template>
                 </div>
+                <section v-if="draftGenerationResult?.draft_id" class="draft-review-card">
+                  <div class="toolbar">
+                    <strong>草稿审核</strong>
+                    <el-tag
+                      v-if="draftReviewResult"
+                      :type="draftReviewStatusType(draftReviewResult.status)"
+                      effect="plain"
+                    >
+                      {{ draftReviewResult.status }}
+                    </el-tag>
+                    <el-tag v-else type="info" effect="plain">Draft Review V0</el-tag>
+                  </div>
+                  <el-descriptions :column="1" border size="small">
+                    <el-descriptions-item label="draft_id">{{ draftGenerationResult.draft_id }}</el-descriptions-item>
+                    <el-descriptions-item label="review_report_id">{{ draftReviewResult?.review_report_id || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="risk_level">{{ draftReviewResult?.risk_level || '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="score">{{ draftReviewResult?.score ?? '-' }}</el-descriptions-item>
+                    <el-descriptions-item label="can_enter_publish_preparation">
+                      {{ draftReviewResult?.can_enter_publish_preparation ?? '-' }}
+                    </el-descriptions-item>
+                  </el-descriptions>
+                  <el-alert
+                    type="warning"
+                    title="本步骤可能调用模型并消耗额度；只审核草稿，不会修改草稿，不会发布到小红书，不会自动评论。"
+                    show-icon
+                    :closable="false"
+                  />
+                  <el-button
+                    size="small"
+                    type="primary"
+                    :loading="draftReviewLoading"
+                    :disabled="draftGenerationResult.status !== 'CREATED'"
+                    @click="confirmDraftReview"
+                  >
+                    审核草稿
+                  </el-button>
+                  <div v-if="draftReviewResult" class="mini-card-list">
+                    <el-alert
+                      v-if="draftReviewResult.status === 'PROVIDER_NOT_CONFIGURED'"
+                      type="warning"
+                      :title="draftReviewResult.error_message || 'Provider 未配置，无法完成真实审核。'"
+                      show-icon
+                      :closable="false"
+                    />
+                    <p class="result-summary">{{ draftReviewResult.summary || draftReviewResult.error_message || '-' }}</p>
+                    <div v-if="draftReviewResult.issues.length" class="mini-card-list">
+                      <div v-for="issue in draftReviewResult.issues" :key="`${issue.field}-${issue.category}-${issue.message}`" class="mini-card">
+                        <strong>{{ issue.category }} / {{ issue.level }}</strong>
+                        <p>{{ issue.field }}：{{ issue.message }}</p>
+                        <p v-if="issue.evidence">{{ issue.evidence }}</p>
+                      </div>
+                    </div>
+                    <div v-if="draftReviewResult.suggestions.length" class="slot-meta">
+                      <span v-for="item in draftReviewResult.suggestions" :key="item">{{ item }}</span>
+                    </div>
+                    <div v-if="draftReviewResult.must_fix_before_publish.length" class="mini-card">
+                      <strong>must_fix_before_publish</strong>
+                      <p v-for="item in draftReviewResult.must_fix_before_publish" :key="item">{{ item }}</p>
+                    </div>
+                  </div>
+                </section>
               </section>
             </div>
             <el-alert
@@ -1007,6 +1068,7 @@ import { createOperationRun, listOperationRuns } from '@/api/operationRun'
 import { createOperationExperiment, previewOperationExperiment } from '@/api/operationExperiment'
 import { previewDraftContext } from '@/api/draftContextPreview'
 import { generateDraft } from '@/api/draftGeneration'
+import { reviewDraft } from '@/api/draftReview'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1026,6 +1088,7 @@ import type { OperationRecommendation, OperationRunResponse, OperationRunStatus 
 import type { OperationExperimentResponse } from '@/types/operationExperiment'
 import type { DraftContextPreviewResponse, DraftContextPreviewStatus } from '@/types/draftContextPreview'
 import type { DraftGenerationResponse, DraftGenerationStatus } from '@/types/draftGeneration'
+import type { DraftReviewResponse, DraftReviewStatus } from '@/types/draftReview'
 
 interface ExampleInput {
   label: string
@@ -1088,6 +1151,8 @@ const draftContextPreviewLoading = ref(false)
 const b7DraftContextPreviewResult = ref<DraftContextPreviewResponse | null>(null)
 const draftGenerationLoading = ref(false)
 const draftGenerationResult = ref<DraftGenerationResponse | null>(null)
+const draftReviewLoading = ref(false)
+const draftReviewResult = ref<DraftReviewResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1539,6 +1604,7 @@ const runDraftContextPreview = async () => {
       include_comments: draftContextPreviewForm.include_comments
     })
     draftGenerationResult.value = null
+    draftReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -1571,10 +1637,39 @@ const confirmDraftGeneration = async () => {
       tone: draftGenerationForm.tone,
       model_profile: draftGenerationForm.model_profile
     })
+    draftReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
     draftGenerationLoading.value = false
+  }
+}
+
+const confirmDraftReview = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const draftId = draftGenerationResult.value?.draft_id
+  if (!draftId) {
+    errorMessage.value = '请先生成本地草稿'
+    return
+  }
+  draftReviewLoading.value = true
+  errorMessage.value = ''
+  try {
+    draftReviewResult.value = await reviewDraft(draftId, {
+      account_id: form.account_id,
+      confirmed: true,
+      review_mode: 'standard',
+      check_ai_tone: true,
+      check_risk: true,
+      check_evidence_consistency: true
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
+  } finally {
+    draftReviewLoading.value = false
   }
 }
 
@@ -1679,6 +1774,13 @@ const draftContextStatusType = (status: DraftContextPreviewStatus) => {
 const draftGenerationStatusType = (status: DraftGenerationStatus) => {
   if (status === 'CREATED') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'DATA_INSUFFICIENT' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const draftReviewStatusType = (status: DraftReviewStatus) => {
+  if (status === 'REVIEWED') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -1869,6 +1971,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #a7f3d0;
   border-radius: 8px;
   background: #f7fef9;
+}
+
+.draft-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fffafa;
 }
 
 .inline-controls {
