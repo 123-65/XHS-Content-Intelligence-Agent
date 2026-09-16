@@ -731,6 +731,99 @@
                       <div v-if="draftRevisionPlanResult.risk_fixes.length" class="slot-meta">
                         <span v-for="item in draftRevisionPlanResult.risk_fixes" :key="item">风险修复：{{ item }}</span>
                       </div>
+                      <section
+                        v-if="draftRevisionPlanResult.status === 'READY' && draftRevisionPlanResult.plan_id"
+                        class="draft-revision-apply-card"
+                      >
+                        <div class="toolbar">
+                          <strong>应用修改计划</strong>
+                          <el-tag
+                            v-if="draftRevisionApplyResult"
+                            :type="draftRevisionApplyStatusType(draftRevisionApplyResult.status)"
+                            effect="plain"
+                          >
+                            {{ draftRevisionApplyResult.status }}
+                          </el-tag>
+                          <el-tag v-else type="info" effect="plain">Revision Apply V0</el-tag>
+                        </div>
+                        <el-descriptions :column="1" border size="small">
+                          <el-descriptions-item label="plan_id">{{ draftRevisionPlanResult.plan_id }}</el-descriptions-item>
+                          <el-descriptions-item label="source_draft_id">{{ draftRevisionPlanResult.draft_id }}</el-descriptions-item>
+                          <el-descriptions-item label="plan_summary">{{ draftRevisionPlanResult.summary }}</el-descriptions-item>
+                        </el-descriptions>
+                        <el-input
+                          v-model="draftRevisionApplyForm.user_extra_requirements"
+                          type="textarea"
+                          :rows="2"
+                          resize="none"
+                          maxlength="1000"
+                          show-word-limit
+                          placeholder="可选：补充这次改稿还要注意什么"
+                        />
+                        <el-alert
+                          type="warning"
+                          title="本步骤会调用模型，会创建新草稿版本，但不会覆盖原稿。"
+                          show-icon
+                          :closable="false"
+                        />
+                        <el-alert
+                          type="info"
+                          title="不会覆盖原草稿，不会发布到小红书，不会自动评论，不会写长期记忆。"
+                          show-icon
+                          :closable="false"
+                        />
+                        <el-button
+                          size="small"
+                          type="primary"
+                          :loading="draftRevisionApplyLoading"
+                          @click="applyDraftRevision"
+                        >
+                          确认并生成新版本
+                        </el-button>
+                        <div v-if="draftRevisionApplyResult" class="mini-card-list">
+                          <el-alert
+                            v-if="draftRevisionApplyResult.status === 'STALE_PLAN'"
+                            type="warning"
+                            title="原草稿已变化，请重新生成修改计划。"
+                            show-icon
+                            :closable="false"
+                          />
+                          <el-alert
+                            v-else-if="draftRevisionApplyResult.status === 'PROVIDER_NOT_CONFIGURED'"
+                            type="warning"
+                            :title="draftRevisionApplyResult.error_message || 'Provider 未配置，无法生成新版本。'"
+                            show-icon
+                            :closable="false"
+                          />
+                          <p class="result-summary">
+                            {{ draftRevisionApplyResult.summary || draftRevisionApplyResult.error_message || '-' }}
+                          </p>
+                          <div class="slot-meta">
+                            <span>revised {{ draftRevisionApplyResult.revised_draft_id || '-' }}</span>
+                            <span>source {{ draftRevisionApplyResult.source_draft_id || '-' }}</span>
+                          </div>
+                          <template v-if="draftRevisionApplyResult.draft">
+                            <div class="mini-card">
+                              <strong>{{ draftRevisionApplyResult.draft.title }}</strong>
+                              <p>{{ draftRevisionApplyResult.draft.content }}</p>
+                              <div class="slot-meta">
+                                <span v-for="tag in draftRevisionApplyResult.draft.tags" :key="tag">{{ tag }}</span>
+                              </div>
+                              <p>{{ displayValue(draftRevisionApplyResult.draft.cta) }}</p>
+                            </div>
+                          </template>
+                          <div v-if="draftRevisionApplyResult.applied_operations.length" class="mini-card-list">
+                            <div
+                              v-for="operation in draftRevisionApplyResult.applied_operations"
+                              :key="`${operation.operation_order}-${operation.target}-${operation.action}`"
+                              class="mini-card"
+                            >
+                              <strong>{{ operation.operation_order }}. {{ operation.target }} / {{ operation.action }}</strong>
+                              <p>{{ operation.result }}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
                     </div>
                   </section>
                 </section>
@@ -1165,6 +1258,7 @@ import { previewDraftContext } from '@/api/draftContextPreview'
 import { generateDraft } from '@/api/draftGeneration'
 import { reviewDraft } from '@/api/draftReview'
 import { createDraftRevisionPlan } from '@/api/draftRevision'
+import { applyDraftRevisionPlan } from '@/api/draftRevisionApply'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1186,6 +1280,7 @@ import type { DraftContextPreviewResponse, DraftContextPreviewStatus } from '@/t
 import type { DraftGenerationResponse, DraftGenerationStatus } from '@/types/draftGeneration'
 import type { DraftReviewResponse, DraftReviewStatus } from '@/types/draftReview'
 import type { DraftRevisionPlanResponse, DraftRevisionPlanStatus } from '@/types/draftRevision'
+import type { DraftRevisionApplyResponse, DraftRevisionApplyStatus } from '@/types/draftRevisionApply'
 
 interface ExampleInput {
   label: string
@@ -1252,6 +1347,8 @@ const draftReviewLoading = ref(false)
 const draftReviewResult = ref<DraftReviewResponse | null>(null)
 const draftRevisionLoading = ref(false)
 const draftRevisionPlanResult = ref<DraftRevisionPlanResponse | null>(null)
+const draftRevisionApplyLoading = ref(false)
+const draftRevisionApplyResult = ref<DraftRevisionApplyResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1287,6 +1384,9 @@ const draftGenerationForm = reactive({
 })
 const draftRevisionForm = reactive({
   feedback_text: ''
+})
+const draftRevisionApplyForm = reactive({
+  user_extra_requirements: ''
 })
 const draftRevisionQuickFeedback = ['标题太 AI', '正文太长', '表达太营销', 'CTA 太硬', '不符合账号人设', '证据不足']
 
@@ -1709,6 +1809,7 @@ const runDraftContextPreview = async () => {
     draftGenerationResult.value = null
     draftReviewResult.value = null
     draftRevisionPlanResult.value = null
+    draftRevisionApplyResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -1743,6 +1844,7 @@ const confirmDraftGeneration = async () => {
     })
     draftReviewResult.value = null
     draftRevisionPlanResult.value = null
+    draftRevisionApplyResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -1772,6 +1874,7 @@ const confirmDraftReview = async () => {
       check_evidence_consistency: true
     })
     draftRevisionPlanResult.value = null
+    draftRevisionApplyResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
@@ -1808,11 +1911,44 @@ const generateDraftRevisionPlan = async () => {
       conversation_id: form.conversation_id,
       feedback_text: draftRevisionForm.feedback_text.trim()
     })
+    draftRevisionApplyResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
   } finally {
     draftRevisionLoading.value = false
+  }
+}
+
+const applyDraftRevision = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const planId = draftRevisionPlanResult.value?.plan_id
+  if (!planId || !draftRevisionPlanResult.value?.draft_id) {
+    errorMessage.value = '请先生成 READY 状态的修改计划'
+    return
+  }
+  draftRevisionApplyLoading.value = true
+  errorMessage.value = ''
+  try {
+    draftRevisionApplyResult.value = await applyDraftRevisionPlan(planId, {
+      account_id: form.account_id,
+      confirmed: true,
+      user_extra_requirements: draftRevisionApplyForm.user_extra_requirements.trim() || null,
+      save_as: 'NEW_DRAFT',
+      source_draft_id: draftRevisionPlanResult.value.draft_id
+    })
+    if (draftRevisionApplyResult.value.revised_draft_id) {
+      form.current_target_type = 'DRAFT'
+      form.current_target_id = String(draftRevisionApplyResult.value.revised_draft_id)
+    }
+    await refreshConversationData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '应用修改计划失败'
+  } finally {
+    draftRevisionApplyLoading.value = false
   }
 }
 
@@ -1931,6 +2067,13 @@ const draftReviewStatusType = (status: DraftReviewStatus) => {
 const draftRevisionStatusType = (status: DraftRevisionPlanStatus) => {
   if (status === 'READY') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'PROVIDER_NOT_CONFIGURED') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const draftRevisionApplyStatusType = (status: DraftRevisionApplyStatus) => {
+  if (status === 'CREATED') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'STALE_PLAN' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -2141,6 +2284,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #c4b5fd;
   border-radius: 8px;
   background: #fbfaff;
+}
+
+.draft-revision-apply-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  background: #f6fffd;
 }
 
 .inline-controls {
