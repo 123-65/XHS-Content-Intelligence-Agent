@@ -1026,6 +1026,86 @@
                         <span v-for="item in manualPublishResult.next_actions" :key="item.action">{{ item.label }}</span>
                       </div>
                     </div>
+                    <section v-if="manualPublishResult?.published_note_id" class="post-publish-review-card">
+                      <div class="toolbar">
+                        <strong>Post Publish Review V0</strong>
+                        <el-tag
+                          v-if="postPublishReviewResult"
+                          :type="postPublishReviewStatusType(postPublishReviewResult.status)"
+                          effect="plain"
+                        >
+                          {{ postPublishReviewResult.status }}
+                        </el-tag>
+                        <el-tag v-else type="info" effect="plain">manual snapshot only</el-tag>
+                      </div>
+                      <el-descriptions :column="1" border size="small">
+                        <el-descriptions-item label="published_note_id">{{ manualPublishResult.published_note_id }}</el-descriptions-item>
+                        <el-descriptions-item label="boundary">
+                          no XHS access, no auto scrape, no LLM, no memory write
+                        </el-descriptions-item>
+                      </el-descriptions>
+                      <div class="form-grid single">
+                        <label>
+                          <span>review notes</span>
+                          <el-input v-model="postPublishReviewForm.notes" type="textarea" :rows="2" resize="none" />
+                        </label>
+                      </div>
+                      <el-button
+                        size="small"
+                        type="primary"
+                        :loading="postPublishReviewLoading"
+                        @click="generatePostPublishReview"
+                      >
+                        Generate post publish review
+                      </el-button>
+                      <div v-if="postPublishReviewResult" class="mini-card-list">
+                        <div class="mini-card">
+                          <strong>{{ postPublishReviewResult.summary || '-' }}</strong>
+                          <div class="slot-meta">
+                            <span>review {{ postPublishReviewResult.review_id || '-' }}</span>
+                            <span>package {{ postPublishReviewResult.package_id || '-' }}</span>
+                            <span>{{ postPublishReviewResult.error_code || 'NO_ERROR' }}</span>
+                          </div>
+                        </div>
+                        <div v-if="postPublishReviewResult.error_message" class="mini-card">
+                          <strong>{{ postPublishReviewResult.error_code || 'ERROR' }}</strong>
+                          <p>{{ postPublishReviewResult.error_message }}</p>
+                        </div>
+                        <div class="publish-copy-grid">
+                          <div class="mini-card">
+                            <strong>metric_summary</strong>
+                            <pre class="slot-preview">{{ formatJson(postPublishReviewResult.metric_summary) }}</pre>
+                          </div>
+                          <div class="mini-card">
+                            <strong>target_comparison</strong>
+                            <pre class="slot-preview">{{ formatJson(postPublishReviewResult.target_comparison) }}</pre>
+                          </div>
+                          <div class="mini-card">
+                            <strong>conversion_summary</strong>
+                            <pre class="slot-preview">{{ formatJson(postPublishReviewResult.conversion_summary) }}</pre>
+                          </div>
+                          <div class="mini-card">
+                            <strong>strategy_memory_candidates</strong>
+                            <pre class="slot-preview">{{ formatJson(postPublishReviewResult.strategy_memory_candidates) }}</pre>
+                          </div>
+                        </div>
+                        <div v-if="postPublishReviewResult.insights.length" class="mini-card">
+                          <strong>insights</strong>
+                          <p v-for="item in postPublishReviewResult.insights" :key="item">{{ item }}</p>
+                        </div>
+                        <div v-if="postPublishReviewResult.data_gaps.length" class="mini-card">
+                          <strong>data_gaps</strong>
+                          <p v-for="item in postPublishReviewResult.data_gaps" :key="`${item.type}-${item.message}`">
+                            {{ item.type }} / {{ item.message }}
+                          </p>
+                        </div>
+                        <div v-if="postPublishReviewResult.next_actions.length" class="slot-meta">
+                          <span v-for="item in postPublishReviewResult.next_actions" :key="item.action">
+                            {{ item.label }} / {{ item.enabled ? 'enabled' : 'disabled' }}
+                          </span>
+                        </div>
+                      </div>
+                    </section>
                   </section>
                 </div>
               </section>
@@ -1463,6 +1543,7 @@ import { createDraftRevisionPlan } from '@/api/draftRevision'
 import { applyDraftRevisionPlan } from '@/api/draftRevisionApply'
 import { createPublishPackage } from '@/api/publishPackage'
 import { recordManualPublish } from '@/api/manualPublishBackfill'
+import { createPostPublishReview } from '@/api/postPublishReview'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1487,6 +1568,7 @@ import type { DraftRevisionPlanResponse, DraftRevisionPlanStatus } from '@/types
 import type { DraftRevisionApplyResponse, DraftRevisionApplyStatus } from '@/types/draftRevisionApply'
 import type { PublishCard, PublishPackageResponse, PublishPackageStatus } from '@/types/publishPackage'
 import type { ManualPublishBackfillResponse } from '@/types/manualPublishBackfill'
+import type { PostPublishReviewResponse, PostPublishReviewStatus } from '@/types/postPublishReview'
 
 interface ExampleInput {
   label: string
@@ -1559,6 +1641,8 @@ const publishPackageLoading = ref(false)
 const publishPackageResult = ref<PublishPackageResponse | null>(null)
 const manualPublishLoading = ref(false)
 const manualPublishResult = ref<ManualPublishBackfillResponse | null>(null)
+const postPublishReviewLoading = ref(false)
+const postPublishReviewResult = ref<PostPublishReviewResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1613,6 +1697,9 @@ const manualPublishForm = reactive({
   follower_gain: 0,
   lead_count: 0,
   remark: ''
+})
+const postPublishReviewForm = reactive({
+  notes: ''
 })
 const draftRevisionQuickFeedback = ['标题太 AI', '正文太长', '表达太营销', 'CTA 太硬', '不符合账号人设', '证据不足']
 
@@ -2042,6 +2129,7 @@ const runDraftContextPreview = async () => {
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -2079,6 +2167,7 @@ const confirmDraftGeneration = async () => {
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -2111,6 +2200,7 @@ const confirmDraftReview = async () => {
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
@@ -2150,6 +2240,7 @@ const generateDraftRevisionPlan = async () => {
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
@@ -2184,6 +2275,7 @@ const applyDraftRevision = async () => {
     }
     publishPackageResult.value = null
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '应用修改计划失败'
@@ -2213,6 +2305,7 @@ const generatePublishPackage = async () => {
       card_count: publishPackageForm.card_count
     })
     manualPublishResult.value = null
+    postPublishReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to create publish package'
   } finally {
@@ -2250,10 +2343,37 @@ const saveManualPublishBackfill = async () => {
       remark: manualPublishForm.remark.trim() || null,
       snapshot_window: 'manual'
     })
+    postPublishReviewResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to save manual publish backfill'
   } finally {
     manualPublishLoading.value = false
+  }
+}
+
+const generatePostPublishReview = async () => {
+  if (!form.account_id) {
+    errorMessage.value = 'Select an account first'
+    return
+  }
+  const publishedNoteId = manualPublishResult.value?.published_note_id
+  if (!publishedNoteId) {
+    errorMessage.value = 'Record manual publish metrics before generating a post publish review'
+    return
+  }
+  postPublishReviewLoading.value = true
+  errorMessage.value = ''
+  try {
+    postPublishReviewResult.value = await createPostPublishReview(publishedNoteId, {
+      account_id: form.account_id,
+      confirmed: true,
+      review_window: 'MANUAL_SNAPSHOT',
+      notes: postPublishReviewForm.notes.trim() || null
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to generate post publish review'
+  } finally {
+    postPublishReviewLoading.value = false
   }
 }
 
@@ -2481,6 +2601,13 @@ const draftRevisionApplyStatusType = (status: DraftRevisionApplyStatus) => {
 const publishPackageStatusType = (status: PublishPackageStatus) => {
   if (status === 'READY') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'NEEDS_REVIEW' || status === 'DATA_INSUFFICIENT') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const postPublishReviewStatusType = (status: PostPublishReviewStatus) => {
+  if (status === 'REVIEWED') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'DATA_INSUFFICIENT') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -2721,6 +2848,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #bbf7d0;
   border-radius: 8px;
   background: #f7fef9;
+}
+
+.post-publish-review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  background: #f7fcff;
 }
 
 .publish-package-result {

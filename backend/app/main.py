@@ -39,6 +39,7 @@ from app.api.draft_revision_plan import router as draft_revision_plan_router
 from app.api.draft_revision_apply import router as draft_revision_apply_router
 from app.api.publish_package import router as publish_package_router
 from app.api.manual_publish_backfill import router as manual_publish_backfill_router
+from app.api.post_publish_review_v0 import router as post_publish_review_v0_router
 
 def create_app():
     """创建 FastAPI 应用实例。"""
@@ -82,6 +83,7 @@ def create_app():
     app.include_router(draft_revision_apply_router)
     app.include_router(publish_package_router)
     app.include_router(manual_publish_backfill_router)
+    app.include_router(post_publish_review_v0_router)
     return app
 
 app=create_app()
