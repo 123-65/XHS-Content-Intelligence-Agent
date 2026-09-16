@@ -38,6 +38,9 @@ class LLMTaskPlanner:
             if recorder:
                 recorder.record_plan(plan, AgentEntryTraceStage.PLAN_VALIDATED)
             return plan
+        competitor_collection_plan = self._plan_competitor_collection_analysis(agent_input, checked_router, recorder)
+        if competitor_collection_plan:
+            return competitor_collection_plan
         deterministic_plan = self._plan_readonly_query(agent_input, checked_router, recorder)
         if deterministic_plan:
             return deterministic_plan
@@ -122,6 +125,83 @@ class LLMTaskPlanner:
             confirmation_requirement=ConfirmationRequirement.NONE,
             can_execute=True,
             summary_for_user="将执行只读查询，不生成草稿，不写数据库。",
+        )
+        constrained = apply_action_registry_constraints(plan)
+        validated = validate_plan_result(constrained)
+        if recorder:
+            recorder.record_plan(validated, AgentEntryTraceStage.PLAN_VALIDATED)
+        return validated
+
+    def _plan_competitor_collection_analysis(
+        self,
+        agent_input: AgentInput,
+        router_result: RouterResult,
+        recorder: AgentEntryTraceRecorder | None = None,
+    ) -> Plan | None:
+        if router_result.intent != Intent.ANALYZE_COMPETITOR:
+            return None
+        params = router_result.extracted_params
+        note_urls = params.get("note_urls") or []
+        account_values = params.get("competitor_account_ids_or_urls") or []
+        if not note_urls and not account_values:
+            return None
+        account_id = params.get("account_id") or agent_input.account_id
+        steps: list[PlanStep] = []
+        if note_urls:
+            steps.append(
+                PlanStep(
+                    step_no=len(steps) + 1,
+                    action=Action.COLLECT_XHS_NOTES,
+                    description="采集用户提供的小红书笔记链接、评论、图片和互动指标。",
+                    input_params={
+                        "account_id": account_id,
+                        "note_urls": note_urls,
+                        "collect_comments": params.get("collect_comments", True),
+                        "max_comments": params.get("max_comments", 20),
+                        "enable_ocr": params.get("enable_ocr", True),
+                    },
+                    expected_output="真实笔记、评论、图片和 OCR 结果入库摘要",
+                    allowed_effect=AllowedEffect.EXTERNAL_READ,
+                    risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
+                    can_execute=True,
+                )
+            )
+        if account_values:
+            steps.append(
+                PlanStep(
+                    step_no=len(steps) + 1,
+                    action=Action.COLLECT_XHS_ACCOUNTS,
+                    description="采集用户提供的同行账号 ID 或主页链接。",
+                    input_params={
+                        "account_id": account_id,
+                        "competitor_account_ids_or_urls": account_values,
+                        "recent_note_limit": params.get("recent_note_limit", 10),
+                    },
+                    expected_output="真实同行账号和近期笔记入库摘要",
+                    allowed_effect=AllowedEffect.EXTERNAL_READ,
+                    risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
+                    can_execute=True,
+                )
+            )
+        steps.append(
+            PlanStep(
+                step_no=len(steps) + 1,
+                action=Action.ANALYZE_COMPETITOR_DATA,
+                description="复用现有竞品分析服务，基于已入库真实数据生成竞品分析结果。",
+                input_params={"account_id": account_id, "keyword": params.get("keyword"), "limit": params.get("limit", 20)},
+                depends_on=[step.step_no for step in steps],
+                expected_output="竞品分析报告、评论需求和内容机会摘要",
+                allowed_effect=AllowedEffect.EXTERNAL_READ,
+                can_execute=True,
+            )
+        )
+        plan = Plan(
+            conversation_id=agent_input.conversation_id,
+            intent=router_result.intent,
+            steps=steps,
+            confirmation_requirement=ConfirmationRequirement.NONE,
+            can_execute=True,
+            summary_for_user="我会自动采集你提供的真实小红书笔记和同行账号，再生成竞品分析结果。",
         )
         constrained = apply_action_registry_constraints(plan)
         validated = validate_plan_result(constrained)

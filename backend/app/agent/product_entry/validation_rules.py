@@ -41,6 +41,23 @@ ACTION_PARAM_SPECS: dict[Action, list[ParamSpec]] = {
         _spec("experiment_id", ParamType.ID),
         _spec("user_requirement", ParamType.TEXT, required=False, allow_untrusted=True),
     ],
+    Action.COLLECT_XHS_NOTES: [
+        _spec("account_id", ParamType.ID),
+        _spec("note_urls", ParamType.LIST, allow_untrusted=True),
+        _spec("collect_comments", ParamType.BOOL, required=False),
+        _spec("max_comments", ParamType.INT, required=False),
+        _spec("enable_ocr", ParamType.BOOL, required=False),
+    ],
+    Action.COLLECT_XHS_ACCOUNTS: [
+        _spec("account_id", ParamType.ID),
+        _spec("competitor_account_ids_or_urls", ParamType.LIST, allow_untrusted=True),
+        _spec("recent_note_limit", ParamType.INT, required=False),
+    ],
+    Action.ANALYZE_COMPETITOR_DATA: [
+        _spec("account_id", ParamType.ID),
+        _spec("keyword", ParamType.TEXT, required=False, allow_untrusted=True),
+        _spec("limit", ParamType.INT, required=False),
+    ],
     Action.ANALYZE_COMPETITOR: [
         _spec("account_id", ParamType.ID),
         _spec("competitor_account_id", ParamType.ID, required=False),

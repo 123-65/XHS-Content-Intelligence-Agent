@@ -15,7 +15,10 @@ from app.models.competitor_comment import CompetitorComment
 from app.models.competitors_analysis import CompetitorAnalysisReport
 from app.models.content_opportunity import ContentOpportunity
 from app.models.strategy_memory import StrategyMemory
+from app.schemas.competitor_report import CompetitorReportCreate
 from app.services.account_sev import AccountProfileService
+from app.services.competitor_report_sev import CompetitorReportService
+from app.services.xhs_collector_sev import XhsCollectorService
 
 
 def query_account_profile_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
@@ -123,6 +126,61 @@ def preview_draft_context_handler(step: PlanStep, context: dict[str, Any]) -> di
     return service.preview(account_id=account_id, experiment_id=experiment_id, user_requirement=user_requirement)
 
 
+def collect_xhs_notes_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
+    """Agent Tool: collect real XHS notes through the configured external provider."""
+    params = _params(step)
+    service = _xhs_collector_service(context)
+    return service.collect_notes(
+        _account_id(step, context),
+        _string_list(params.get("note_urls")),
+        collect_comments=bool(params.get("collect_comments", True)),
+        max_comments=_int_or_default(params.get("max_comments"), 20),
+        enable_ocr=bool(params.get("enable_ocr", True)),
+    )
+
+
+def collect_xhs_accounts_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
+    """Agent Tool: collect real XHS competitor accounts through the configured external provider."""
+    params = _params(step)
+    service = _xhs_collector_service(context)
+    return service.collect_accounts(
+        _account_id(step, context),
+        _string_list(params.get("competitor_account_ids_or_urls")),
+        recent_note_limit=_int_or_default(params.get("recent_note_limit"), 10),
+    )
+
+
+def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
+    """Agent Tool: reuse existing competitor report service without adding new semantic rules."""
+    params = _params(step)
+    account_id = _account_id(step, context)
+    report = CompetitorReportService(_db_session(context)).create_report(
+        CompetitorReportCreate(
+            account_id=account_id,
+            name="Agent Competitor Analysis",
+            keyword=params.get("keyword"),
+            limit=_int_or_default(params.get("limit"), 20),
+        )
+    )
+    return {
+        "report_id": report.id,
+        "account_id": account_id,
+        "note_count": report.note_count,
+        "comment_count": report.comment_count,
+        "summary": report.summary,
+        "persona_patterns": report.persona_patterns,
+        "content_pillars": report.content_pillars,
+        "comment_demands": report.comment_demands,
+        "opportunity_count": len(report.content_insights or []),
+        "evidence": {
+            "competitor_account_ids": report.competitor_account_ids,
+            "competitor_note_ids": report.competitor_note_ids,
+            "note_snapshot_ids": report.note_snapshot_ids,
+        },
+        "semantic_rule_baseline": "SEMANTIC_RULE_BASELINE",
+    }
+
+
 def build_readonly_action_handler_registry(db: Session) -> ActionHandlerRegistry:
     """构建只读 REAL 执行白名单，只注册安全的查询类 Action。"""
     registry = ActionHandlerRegistry()
@@ -131,6 +189,15 @@ def build_readonly_action_handler_registry(db: Session) -> ActionHandlerRegistry
     registry.register(Action.QUERY_COMMENT_INSIGHT, query_comment_insight_handler)
     registry.register(Action.QUERY_STRATEGY_MEMORY, query_strategy_memory_handler)
     registry.register(Action.PREVIEW_DRAFT_CONTEXT, preview_draft_context_handler)
+    return registry
+
+
+def build_competitor_workflow_handler_registry(db: Session) -> ActionHandlerRegistry:
+    """Build Agent workflow handlers for real XHS collection and competitor analysis."""
+    registry = build_readonly_action_handler_registry(db)
+    registry.register(Action.COLLECT_XHS_NOTES, collect_xhs_notes_handler)
+    registry.register(Action.COLLECT_XHS_ACCOUNTS, collect_xhs_accounts_handler)
+    registry.register(Action.ANALYZE_COMPETITOR_DATA, analyze_competitor_data_handler)
     return registry
 
 
@@ -174,6 +241,28 @@ def _db_session(context: dict[str, Any]) -> Session:
     if db is None:
         raise ValueError("db session is required")
     return db
+
+
+def _xhs_collector_service(context: dict[str, Any]) -> XhsCollectorService:
+    service = context.get("xhs_collector_service")
+    if isinstance(service, XhsCollectorService):
+        return service
+    return XhsCollectorService(_db_session(context))
+
+
+def _string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _int_or_default(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def _competitor_opportunity_items(db: Session, account_id: int) -> list[dict[str, Any]]:

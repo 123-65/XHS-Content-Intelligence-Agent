@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.agent.product_entry.chat_service import (
     AgentChatPreviewService,
     AgentChatReadonlyExecuteService,
+    AgentChatWorkflowExecuteService,
     build_agent_chat_preview_service,
     build_agent_chat_readonly_execute_service,
+    build_agent_chat_workflow_execute_service,
 )
 from app.agent.product_entry.schemas import AgentChatRequest, AgentChatResponse, AgentResponseStatus
 from app.agent.product_entry.trace import mask_sensitive_text
@@ -40,6 +42,16 @@ class _UnavailableReadonlyExecuteService:
         raise self.error
 
 
+class _UnavailableWorkflowExecuteService:
+    """不可用的 workflow 执行服务，用于延迟处理依赖构建错误。"""
+
+    def __init__(self, error: Exception):
+        self.error = error
+
+    def execute_workflow(self, request: AgentChatRequest) -> AgentChatResponse:
+        raise self.error
+
+
 def get_agent_chat_preview_service(db: Session = Depends(get_db)) -> AgentChatPreviewService:
     """获取 Agent Chat 预览服务，方便测试替换依赖。"""
     try:
@@ -54,6 +66,14 @@ def get_agent_chat_readonly_execute_service(db: Session = Depends(get_db)) -> Ag
         return build_agent_chat_readonly_execute_service(db)
     except Exception as exc:
         return _UnavailableReadonlyExecuteService(exc)  # type: ignore[return-value]
+
+
+def get_agent_chat_workflow_execute_service(db: Session = Depends(get_db)) -> AgentChatWorkflowExecuteService:
+    """获取 Agent Chat workflow 执行服务，方便测试替换依赖。"""
+    try:
+        return build_agent_chat_workflow_execute_service(db)
+    except Exception as exc:
+        return _UnavailableWorkflowExecuteService(exc)  # type: ignore[return-value]
 
 
 @router.post("/preview", response_model=AgentChatResponse)
@@ -94,5 +114,26 @@ def execute_readonly_agent_chat(
             requires_confirmation=False,
             message="Agent Chat readonly execution failed",
             trace_id=f"entry_readonly_failed_{uuid4().hex}",
+            metadata={"error": {"type": type(exc).__name__, "message": mask_sensitive_text(str(exc))}},
+        )
+
+
+@router.post("/execute-workflow", response_model=AgentChatResponse)
+def execute_workflow_agent_chat(
+    request: AgentChatRequest,
+    service: AgentChatWorkflowExecuteService = Depends(get_agent_chat_workflow_execute_service),
+) -> AgentChatResponse:
+    """执行 Agent Chat workflow 链路：真实采集、入库、竞品分析。"""
+    try:
+        return service.execute_workflow(request)
+    except Exception as exc:
+        return AgentChatResponse(
+            session_id=request.session_id,
+            conversation_id=request.conversation_id,
+            status=AgentResponseStatus.FAILED,
+            can_execute=False,
+            requires_confirmation=False,
+            message="Agent Chat workflow execution failed",
+            trace_id=f"entry_workflow_failed_{uuid4().hex}",
             metadata={"error": {"type": type(exc).__name__, "message": mask_sensitive_text(str(exc))}},
         )

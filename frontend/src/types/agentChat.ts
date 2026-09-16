@@ -7,7 +7,7 @@ export interface AgentChatRequest {
   session_id?: string | null
   text?: string | null
   input_type: AgentInputType
-  attachments: Record<string, unknown>[]
+  attachments: Record<string, unknown>[] | Record<string, unknown>
   context: Record<string, unknown>
   current_target_type?: string | null
   current_target_id?: string | number | null
@@ -272,6 +272,25 @@ export interface ReadonlyBusinessResult {
   comment_insight?: CommentInsightBusinessResult
   strategy_memory?: StrategyMemoryBusinessResult
   draft_context_preview?: DraftContextPreviewBusinessResult
+  xhs_notes_collection?: Record<string, unknown>
+  xhs_accounts_collection?: Record<string, unknown>
+  competitor_analysis?: Record<string, unknown>
+}
+
+export interface WorkflowTimelineItem {
+  step_order: number
+  action: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  duration_ms: number | null
+  input_summary: string | null
+  output_summary: string | null
+  data_count: Record<string, number>
+  evidence_ids: Record<string, unknown>
+  warnings: string[]
+  error_code: string | null
+  error_message: string | null
 }
 
 export interface AgentChatResponse {
@@ -292,6 +311,7 @@ export interface AgentChatResponse {
     execution?: AgentExecutionResult
     business_result?: ReadonlyBusinessResult | null
     entry_trace?: EntryTrace
+    workflow_timeline?: WorkflowTimelineItem[]
     demo_source?: string
     [key: string]: unknown
   }

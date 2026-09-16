@@ -13,6 +13,9 @@ export const previewAgentChat = (data: AgentChatRequest) =>
 export const executeReadonlyAgentChat = (data: AgentChatRequest) =>
   apiClient.post<unknown, AgentChatResponse>('/agent/chat/execute-readonly', data)
 
+export const executeWorkflowAgentChat = (data: AgentChatRequest) =>
+  apiClient.post<unknown, AgentChatResponse>('/agent/chat/execute-workflow', data)
+
 export const createAgentConversation = (data: { account_id?: number | null; title?: string | null }) =>
   apiClient.post<unknown, ConversationResponse>('/agent/conversations', data)
 

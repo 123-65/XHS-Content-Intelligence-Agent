@@ -1,4 +1,5 @@
 import json
+import re
 from json import JSONDecodeError
 from typing import Any
 
@@ -31,6 +32,9 @@ class LLMUserInputRouter:
 
     def route(self, agent_input: AgentInput | AgentChatRequest, recorder: AgentEntryTraceRecorder | None = None) -> RouterResult:
         """调用 LLM 识别用户意图，并返回经过校验的 RouterResult。"""
+        competitor_collection_result = self._route_competitor_collection_analysis(agent_input, recorder)
+        if competitor_collection_result:
+            return competitor_collection_result
         deterministic_result = self._route_readonly_query(agent_input, recorder)
         if deterministic_result:
             return deterministic_result
@@ -133,6 +137,51 @@ class LLMUserInputRouter:
             extracted_params=extracted_params,
             missing_params=missing_params,
             risk_flags=[RiskFlag.MISSING_REQUIRED_PARAM] if missing_params else [],
+            requires_clarification=bool(missing_params),
+            can_execute=not missing_params,
+            next_action=None if not missing_params else "ask_user_to_provide_required_params",
+            clarification_question=f"请先补充缺失参数：{', '.join(missing_params)}。" if missing_params else None,
+        )
+        validated = validate_router_result(result)
+        if recorder:
+            recorder.record_router_result(validated)
+        return validated
+
+    def _route_competitor_collection_analysis(
+        self,
+        agent_input: AgentInput | AgentChatRequest,
+        recorder: AgentEntryTraceRecorder | None = None,
+    ) -> RouterResult | None:
+        text = (self._input_text(agent_input) or "").strip()
+        note_urls = _note_urls_from_input(agent_input, text)
+        account_values = _competitor_accounts_from_input(agent_input)
+        if not _looks_like_competitor_analysis_request(text) and not (note_urls and account_values):
+            return None
+        missing_params = []
+        if agent_input.account_id is None:
+            missing_params.append("account_id")
+        if not note_urls:
+            missing_params.append("note_urls")
+        if not account_values:
+            missing_params.append("competitor_account_ids_or_urls")
+        result = RouterResult(
+            intent=Intent.ANALYZE_COMPETITOR,
+            confidence=0.94,
+            input_type=agent_input.input_type,
+            target_type=TargetType.ACCOUNT,
+            target_id=agent_input.account_id,
+            extracted_params={
+                "account_id": agent_input.account_id,
+                "note_urls": note_urls,
+                "competitor_account_ids_or_urls": account_values,
+                "collect_comments": True,
+                "max_comments": 20,
+                "enable_ocr": True,
+                "recent_note_limit": 10,
+                "limit": 20,
+            },
+            missing_params=missing_params,
+            risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT, *([RiskFlag.MISSING_REQUIRED_PARAM] if missing_params else [])],
             requires_clarification=bool(missing_params),
             can_execute=not missing_params,
             next_action=None if not missing_params else "ask_user_to_provide_required_params",
@@ -317,6 +366,40 @@ def _readonly_actions_for_text(text: str) -> list[Action]:
     return _unique_actions(actions)
 
 
+def _looks_like_competitor_analysis_request(text: str) -> bool:
+    if not text:
+        return False
+    return _contains_any(text, ["分析这些", "小红书笔记", "同行账号", "竞品分析", "人设", "评论区", "用户需求"])
+
+
+def _note_urls_from_input(agent_input: AgentInput | AgentChatRequest, text: str) -> list[str]:
+    values = []
+    context = agent_input.context if isinstance(agent_input, AgentChatRequest) else agent_input.metadata
+    raw_context_values = context.get("note_urls") if isinstance(context, dict) else None
+    if isinstance(raw_context_values, list):
+        values.extend(str(item) for item in raw_context_values)
+    for attachment in agent_input.attachments:
+        if attachment.metadata.get("attachment_role") == "note_url" and attachment.url:
+            values.append(attachment.url)
+    values.extend(re.findall(r"https?://[^\s，,]+", text or ""))
+    return _unique_texts(value for value in values if "xiaohongshu.com" in value or "xhslink.com" in value)
+
+
+def _competitor_accounts_from_input(agent_input: AgentInput | AgentChatRequest) -> list[str]:
+    values = []
+    context = agent_input.context if isinstance(agent_input, AgentChatRequest) else agent_input.metadata
+    if isinstance(context, dict):
+        raw = context.get("competitor_account_ids_or_urls") or context.get("competitor_account_ids") or context.get("profile_urls")
+        if isinstance(raw, list):
+            values.extend(str(item) for item in raw)
+    for attachment in agent_input.attachments:
+        if attachment.metadata.get("attachment_role") == "competitor_account_id_or_url":
+            value = attachment.metadata.get("value") or attachment.url or attachment.name
+            if value:
+                values.append(str(value))
+    return _unique_texts(values)
+
+
 def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(keyword in text for keyword in keywords)
 
@@ -327,6 +410,10 @@ def _unique_actions(actions: list[Action]) -> list[Action]:
         if action not in result:
             result.append(action)
     return result
+
+
+def _unique_texts(values) -> list[str]:
+    return list(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
 
 
 def _context_value(agent_input: AgentInput | AgentChatRequest, key: str) -> Any:

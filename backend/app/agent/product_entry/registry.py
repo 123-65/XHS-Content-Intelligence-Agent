@@ -79,6 +79,29 @@ ACTION_REGISTRY: dict[str, ActionCapability] = {
         optional_params=["user_requirement"],
         risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
     ),
+    Action.COLLECT_XHS_NOTES.value: _capability(
+        Action.COLLECT_XHS_NOTES,
+        "通过已配置的外部小红书采集工具读取用户提供的真实笔记链接，并写入现有业务表。",
+        ["account_id", "note_urls"],
+        AllowedEffect.EXTERNAL_READ,
+        optional_params=["collect_comments", "max_comments", "enable_ocr"],
+        risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
+    ),
+    Action.COLLECT_XHS_ACCOUNTS.value: _capability(
+        Action.COLLECT_XHS_ACCOUNTS,
+        "通过已配置的外部小红书采集工具读取用户提供的真实同行账号 ID 或主页链接，并写入现有业务表。",
+        ["account_id", "competitor_account_ids_or_urls"],
+        AllowedEffect.EXTERNAL_READ,
+        optional_params=["recent_note_limit"],
+        risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
+    ),
+    Action.ANALYZE_COMPETITOR_DATA.value: _capability(
+        Action.ANALYZE_COMPETITOR_DATA,
+        "复用现有 CompetitorReportService 基于已入库真实竞品数据生成分析结果。",
+        ["account_id"],
+        AllowedEffect.EXTERNAL_READ,
+        optional_params=["keyword", "limit"],
+    ),
     Action.ANALYZE_COMPETITOR.value: _capability(
         Action.ANALYZE_COMPETITOR,
         "基于已采集竞品样本生成竞品分析报告。",
@@ -211,9 +234,9 @@ INTENT_ACTION_MAPPING: dict[Intent, list[Action]] = {
     ],
     Intent.ANALYZE_COMPETITOR: [
         Action.QUERY_ACCOUNT_PROFILE,
-        Action.ANALYZE_COMPETITOR,
-        Action.ANALYZE_VIRAL_NOTE,
-        Action.GENERATE_CONTENT_OPPORTUNITY,
+        Action.COLLECT_XHS_NOTES,
+        Action.COLLECT_XHS_ACCOUNTS,
+        Action.ANALYZE_COMPETITOR_DATA,
     ],
     Intent.ANALYZE_PUBLISHED_PERFORMANCE: [
         Action.QUERY_ANALYTICS,

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictSchema(BaseModel):
@@ -94,6 +94,9 @@ class Action(StrEnum):
     QUERY_COMMENT_INSIGHT = "QUERY_COMMENT_INSIGHT"
     QUERY_STRATEGY_MEMORY = "QUERY_STRATEGY_MEMORY"
     PREVIEW_DRAFT_CONTEXT = "PREVIEW_DRAFT_CONTEXT"
+    COLLECT_XHS_NOTES = "COLLECT_XHS_NOTES"
+    COLLECT_XHS_ACCOUNTS = "COLLECT_XHS_ACCOUNTS"
+    ANALYZE_COMPETITOR_DATA = "ANALYZE_COMPETITOR_DATA"
     ANALYZE_COMPETITOR = "ANALYZE_COMPETITOR"
     ANALYZE_VIRAL_NOTE = "ANALYZE_VIRAL_NOTE"
     GENERATE_CONTENT_OPPORTUNITY = "GENERATE_CONTENT_OPPORTUNITY"
@@ -238,6 +241,58 @@ class AgentChatRequest(StrictSchema):
     current_target_type: TargetType | None = Field(default=None, description="当前交互对象类型")
     current_target_id: str | int | None = Field(default=None, description="当前交互对象 ID")
     metadata: dict[str, Any] = Field(default_factory=dict, description="请求扩展元数据")
+
+    @field_validator("attachments", mode="before")
+    @classmethod
+    def normalize_structured_attachments(cls, value):
+        """Allow product chat clients to send structured note/account lists in attachments."""
+        if not isinstance(value, dict):
+            return value
+        attachments: list[dict[str, Any]] = []
+        for index, url in enumerate(value.get("note_urls") or []):
+            attachments.append(
+                {
+                    "attachment_id": f"note_url_{index + 1}",
+                    "input_type": InputType.URL.value,
+                    "url": url,
+                    "trust_level": TrustLevel.EXTERNAL_UNTRUSTED.value,
+                    "metadata": {"attachment_role": "note_url"},
+                }
+            )
+        account_values = value.get("competitor_account_ids_or_urls") or value.get("competitor_account_ids") or value.get("profile_urls") or []
+        for index, account in enumerate(account_values):
+            attachments.append(
+                {
+                    "attachment_id": f"competitor_account_{index + 1}",
+                    "input_type": InputType.URL.value if str(account).startswith(("http://", "https://")) else InputType.TEXT.value,
+                    "url": account if str(account).startswith(("http://", "https://")) else None,
+                    "name": str(account),
+                    "trust_level": TrustLevel.USER_TRUSTED.value,
+                    "metadata": {"attachment_role": "competitor_account_id_or_url", "value": account},
+                }
+            )
+        return attachments
+
+    @model_validator(mode="after")
+    def merge_attachment_context(self):
+        note_urls = [
+            attachment.url
+            for attachment in self.attachments
+            if attachment.metadata.get("attachment_role") == "note_url" and attachment.url
+        ]
+        account_values = [
+            attachment.metadata.get("value") or attachment.url or attachment.name
+            for attachment in self.attachments
+            if attachment.metadata.get("attachment_role") == "competitor_account_id_or_url"
+        ]
+        update = {}
+        if note_urls:
+            update["note_urls"] = note_urls
+        if account_values:
+            update["competitor_account_ids_or_urls"] = [str(item) for item in account_values if item]
+        if update:
+            self.context = {**self.context, **update}
+        return self
 
 
 class RouterResult(StrictSchema):

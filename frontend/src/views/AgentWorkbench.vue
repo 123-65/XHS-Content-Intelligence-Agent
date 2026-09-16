@@ -1340,6 +1340,41 @@
           show-word-limit
         />
 
+        <section class="agent-workflow-card">
+          <div class="toolbar">
+            <strong>Agent 竞品分析 Workflow</strong>
+            <el-tag type="success" effect="plain">Conversation First</el-tag>
+          </div>
+          <div class="form-grid single">
+            <label>
+              <span>note_urls</span>
+              <el-input
+                v-model="xhsWorkflowForm.noteUrlsText"
+                type="textarea"
+                :rows="3"
+                resize="none"
+                placeholder="一行一个小红书笔记链接"
+              />
+            </label>
+            <label>
+              <span>competitor_account_ids_or_urls</span>
+              <el-input
+                v-model="xhsWorkflowForm.competitorAccountsText"
+                type="textarea"
+                :rows="3"
+                resize="none"
+                placeholder="一行一个同行账号 ID 或主页链接"
+              />
+            </label>
+          </div>
+          <el-alert
+            type="info"
+            title="Agent 会自动采集笔记、账号、评论和图片 OCR，再基于真实入库数据生成竞品分析；失败会显示真实错误，不使用 Mock 补齐。"
+            show-icon
+            :closable="false"
+          />
+        </section>
+
         <div class="form-grid">
           <label>
             <span>session_id</span>
@@ -1378,6 +1413,9 @@
           <el-button type="success" :icon="Search" :loading="readonlyLoading" @click="submitReadonlyExecute">
             执行只读查询
           </el-button>
+          <el-button type="primary" :icon="Send" :loading="workflowLoading" @click="submitXhsCompetitorWorkflow">
+            执行竞品分析 Workflow
+          </el-button>
           <el-button type="warning" :icon="Search" :loading="draftContextLoading" @click="submitDraftContextPreview">
             预览草稿上下文
           </el-button>
@@ -1385,7 +1423,7 @@
         </div>
         <el-alert
           type="info"
-          title="当前只支持 QUERY_ACCOUNT_PROFILE / QUERY_COMPETITOR_EVIDENCE / QUERY_COMMENT_INSIGHT / QUERY_STRATEGY_MEMORY / PREVIEW_DRAFT_CONTEXT；草稿上下文仅预览，不生成草稿，不调用 LLM，不写数据库，不调用发布/评论能力。"
+          title="主路径请使用 Agent Workflow；旧的只读、预览和手工采集入口仅保留为 Developer / Manual Tools。"
           show-icon
           :closable="false"
         />
@@ -1426,6 +1464,50 @@
             <el-tag v-if="response?.trace_id" type="info" effect="plain">{{ response.trace_id }}</el-tag>
           </div>
         </div>
+
+        <el-card class="result-section" shadow="never">
+          <template #header>
+            <div class="toolbar">
+              <strong>Workflow Timeline</strong>
+              <el-tag v-if="workflowTimeline.length" type="success" effect="plain">{{ workflowTimeline.length }} steps</el-tag>
+              <el-tag v-else type="info" effect="plain">waiting</el-tag>
+            </div>
+          </template>
+          <el-timeline v-if="workflowTimeline.length">
+            <el-timeline-item
+              v-for="step in workflowTimeline"
+              :key="`${step.step_order}-${step.action}`"
+              :type="statusType(step.status)"
+              :timestamp="step.duration_ms === null ? '' : `${step.duration_ms}ms`"
+            >
+              <div class="mini-card">
+                <div class="toolbar">
+                  <strong>{{ step.step_order }}. {{ step.action }}</strong>
+                  <el-tag :type="statusType(step.status)" effect="plain">{{ step.status }}</el-tag>
+                </div>
+                <div class="slot-meta">
+                  <span v-for="(value, key) in step.data_count" :key="key">{{ key }} {{ value }}</span>
+                  <span v-if="step.error_code">{{ step.error_code }}</span>
+                </div>
+                <p>{{ step.output_summary || step.input_summary || '-' }}</p>
+                <pre v-if="Object.keys(step.evidence_ids || {}).length" class="slot-preview">{{ formatJson(step.evidence_ids) }}</pre>
+                <p v-if="step.error_message">{{ step.error_message }}</p>
+                <p v-if="step.warnings.length">{{ step.warnings.join(' / ') }}</p>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+          <el-empty v-else description="暂无 Workflow Timeline" />
+        </el-card>
+
+        <el-card v-if="competitorAnalysisResult" class="result-section" shadow="never">
+          <template #header>
+            <div class="toolbar">
+              <strong>竞品分析结果</strong>
+              <el-tag type="success" effect="plain">real data</el-tag>
+            </div>
+          </template>
+          <pre class="slot-preview">{{ formatJson(competitorAnalysisResult) }}</pre>
+        </el-card>
 
         <el-steps class="chain-steps" :active="activeStep" finish-status="success" process-status="process" align-center>
           <el-step title="Input" />
@@ -1716,6 +1798,7 @@ import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import {
   createAgentConversation,
+  executeWorkflowAgentChat,
   executeReadonlyAgentChat,
   getAgentConversation,
   getAgentConversationState,
@@ -1748,6 +1831,7 @@ import type {
   ConversationMessageResponse,
   ConversationResponse,
   EntryTraceEvent,
+  WorkflowTimelineItem,
   ValidationIssue
 } from '@/types/agentChat'
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
@@ -1808,6 +1892,7 @@ const form = reactive({
 const response = ref<AgentChatResponse | null>(null)
 const loading = ref(false)
 const readonlyLoading = ref(false)
+const workflowLoading = ref(false)
 const draftContextLoading = ref(false)
 const conversationLoading = ref(false)
 const errorMessage = ref('')
@@ -1871,6 +1956,10 @@ const xhsUrlCollectForm = reactive({
   collect_comments: true,
   max_comments: 20
 })
+const xhsWorkflowForm = reactive({
+  noteUrlsText: '',
+  competitorAccountsText: ''
+})
 const evidenceRefreshForm = reactive({
   keyword: '',
   target_metric: 'composite',
@@ -1922,6 +2011,7 @@ const routerIntent = computed(() => response.value?.router_result?.intent || '-'
 const planSteps = computed(() => response.value?.plan?.steps || [])
 const execution = computed(() => response.value?.metadata.execution || null)
 const businessResult = computed(() => response.value?.metadata.business_result || null)
+const workflowTimeline = computed<WorkflowTimelineItem[]>(() => response.value?.metadata.workflow_timeline || [])
 const accountProfileResult = computed(() => {
   const result = businessResult.value
   if (!result) return null
@@ -1933,6 +2023,7 @@ const competitorEvidenceResult = computed(() => businessResult.value?.competitor
 const commentInsightResult = computed(() => businessResult.value?.comment_insight || null)
 const strategyMemoryResult = computed(() => businessResult.value?.strategy_memory || null)
 const draftContextPreviewResult = computed(() => businessResult.value?.draft_context_preview || null)
+const competitorAnalysisResult = computed(() => businessResult.value?.competitor_analysis || null)
 const finalDraftId = computed(() => draftRevisionApplyResult.value?.revised_draft_id || draftGenerationResult.value?.draft_id || null)
 const publishPackageReviewReportId = computed(() =>
   finalDraftId.value && finalDraftId.value === draftGenerationResult.value?.draft_id ? draftReviewResult.value?.review_report_id || null : null
@@ -2003,6 +2094,43 @@ const submitReadonlyExecute = async () => {
     errorMessage.value = error instanceof Error ? error.message : 'Agent Chat execute-readonly 请求失败'
   } finally {
     readonlyLoading.value = false
+  }
+}
+
+const submitXhsCompetitorWorkflow = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const noteUrls = splitSourceLines(xhsWorkflowForm.noteUrlsText || dataSourceForm.noteUrlsText)
+  const accountIds = splitSourceLines(xhsWorkflowForm.competitorAccountsText || dataSourceForm.competitorAccountsText)
+  if (!noteUrls.length || !accountIds.length) {
+    errorMessage.value = '请提供小红书笔记链接和同行账号 ID / 主页链接'
+    return
+  }
+  workflowLoading.value = true
+  errorMessage.value = ''
+  demoLoaded.value = false
+  try {
+    response.value = await executeWorkflowAgentChat(
+      buildRequest({
+        text: form.text || '分析这些小红书笔记和同行账号，看看他们的人设、内容方向、用户在评论区关心什么',
+        attachments: {
+          note_urls: noteUrls,
+          competitor_account_ids: accountIds
+        },
+        context: {
+          ...(form.experiment_id ? { experiment_id: form.experiment_id } : {}),
+          note_urls: noteUrls,
+          competitor_account_ids_or_urls: accountIds
+        }
+      })
+    )
+    await refreshConversationData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Agent workflow 请求失败'
+  } finally {
+    workflowLoading.value = false
   }
 }
 
@@ -3096,6 +3224,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #99f6e4;
   border-radius: 8px;
   background: #f6fffd;
+}
+
+.agent-workflow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: #f7fef9;
 }
 
 .evidence-refresh-box {

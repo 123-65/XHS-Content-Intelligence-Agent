@@ -200,8 +200,21 @@ class ExecutionOrchestrator:
                 )
             try:
                 output = self.handler_registry.get(step.action)(step, context)  # type: ignore[misc]
-                finished = _step_result(step, ExecutionStatus.SUCCESS, "步骤执行完成。", output, started_at=started, finished_at=utc_now(), dry_run=False)
-                success_steps.add(step.step_no)
+                if isinstance(output, dict) and output.get("status") == "FAILED":
+                    finished = _step_result(
+                        step,
+                        ExecutionStatus.FAILED,
+                        output.get("error_message") or "步骤执行失败。",
+                        output,
+                        error_code=output.get("error_code") or _first_output_error_code(output),
+                        started_at=started,
+                        finished_at=utc_now(),
+                        dry_run=False,
+                    )
+                    failed = True
+                else:
+                    finished = _step_result(step, ExecutionStatus.SUCCESS, "步骤执行完成。", output, started_at=started, finished_at=utc_now(), dry_run=False)
+                    success_steps.add(step.step_no)
             except Exception as exc:
                 finished = _step_result(step, ExecutionStatus.FAILED, str(exc), error_code="HANDLER_FAILED", started_at=started, finished_at=utc_now(), dry_run=False)
                 failed = True
@@ -356,6 +369,15 @@ def _next_action_for_execution(status: ExecutionStatus) -> str | None:
         ExecutionStatus.FAILED: "show_execution_error",
     }
     return mapping.get(status)
+
+
+def _first_output_error_code(output: dict[str, Any]) -> str | None:
+    errors = output.get("errors")
+    if isinstance(errors, list):
+        for item in errors:
+            if isinstance(item, dict) and item.get("error_code"):
+                return str(item["error_code"])
+    return None
 
 
 def _unique_flags(flags: list[RiskFlag]) -> list[RiskFlag]:
