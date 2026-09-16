@@ -1105,6 +1105,112 @@
                           </span>
                         </div>
                       </div>
+                      <section v-if="postPublishReviewResult?.review_id" class="strategy-memory-confirmation-card">
+                        <div class="toolbar">
+                          <strong>Strategy Memory Confirmation V0</strong>
+                          <el-tag
+                            v-if="strategyMemoryConfirmationResult"
+                            :type="strategyMemoryConfirmationStatusType(strategyMemoryConfirmationResult.status)"
+                            effect="plain"
+                          >
+                            {{ strategyMemoryConfirmationResult.status }}
+                          </el-tag>
+                          <el-tag v-else type="info" effect="plain">user confirmed only</el-tag>
+                        </div>
+                        <el-alert
+                          type="warning"
+                          title="Only candidates you explicitly select and save will enter long-term StrategyMemory."
+                          show-icon
+                          :closable="false"
+                        />
+                        <div v-if="strategyMemoryCandidates.length" class="mini-card-list">
+                          <div
+                            v-for="candidate in strategyMemoryCandidates"
+                            :key="candidate.candidate_index"
+                            class="mini-card"
+                          >
+                            <div class="toolbar">
+                              <el-checkbox v-model="candidate.selected">
+                                save #{{ candidate.candidate_index }}
+                              </el-checkbox>
+                              <el-tag type="info" effect="plain">{{ candidate.memory_type }}</el-tag>
+                            </div>
+                            <div class="form-grid">
+                              <label>
+                                <span>memory_type</span>
+                                <el-select v-model="candidate.memory_type">
+                                  <el-option label="CONTENT_DIRECTION" value="CONTENT_DIRECTION" />
+                                  <el-option label="TITLE_STYLE" value="TITLE_STYLE" />
+                                  <el-option label="CTA_STYLE" value="CTA_STYLE" />
+                                  <el-option label="AUDIENCE_PAIN_POINT" value="AUDIENCE_PAIN_POINT" />
+                                  <el-option label="FORMAT_PREFERENCE" value="FORMAT_PREFERENCE" />
+                                  <el-option label="RISK_AVOIDANCE" value="RISK_AVOIDANCE" />
+                                  <el-option label="CONVERSION_SIGNAL" value="CONVERSION_SIGNAL" />
+                                  <el-option label="DATA_GAP" value="DATA_GAP" />
+                                </el-select>
+                              </label>
+                              <label>
+                                <span>confidence</span>
+                                <el-select v-model="candidate.confidence">
+                                  <el-option label="LOW" value="LOW" />
+                                  <el-option label="MEDIUM" value="MEDIUM" />
+                                  <el-option label="HIGH" value="HIGH" />
+                                </el-select>
+                              </label>
+                            </div>
+                            <div class="form-grid single">
+                              <label>
+                                <span>content</span>
+                                <el-input v-model="candidate.content" type="textarea" :rows="2" resize="none" />
+                              </label>
+                              <label>
+                                <span>evidence</span>
+                                <el-input v-model="candidate.evidence" type="textarea" :rows="2" resize="none" />
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                        <el-alert
+                          v-else
+                          type="info"
+                          title="No strategy memory candidates are available for this review."
+                          show-icon
+                          :closable="false"
+                        />
+                        <el-button
+                          size="small"
+                          type="primary"
+                          :loading="strategyMemoryConfirmationLoading"
+                          @click="saveSelectedStrategyMemories"
+                        >
+                          Save selected strategy memories
+                        </el-button>
+                        <div v-if="strategyMemoryConfirmationResult" class="mini-card-list">
+                          <div class="mini-card">
+                            <strong>Confirmation result</strong>
+                            <p>created_memory_ids: {{ strategyMemoryConfirmationResult.created_memory_ids.join(', ') || '-' }}</p>
+                            <p>error: {{ strategyMemoryConfirmationResult.error_code || 'NO_ERROR' }}</p>
+                            <p v-if="strategyMemoryConfirmationResult.error_message">
+                              {{ strategyMemoryConfirmationResult.error_message }}
+                            </p>
+                          </div>
+                          <div v-if="strategyMemoryConfirmationResult.skipped_duplicates.length" class="mini-card">
+                            <strong>skipped_duplicates</strong>
+                            <pre class="slot-preview">{{ formatJson(strategyMemoryConfirmationResult.skipped_duplicates) }}</pre>
+                          </div>
+                        </div>
+                        <div v-if="confirmedStrategyMemories.length" class="mini-card-list">
+                          <div v-for="memory in confirmedStrategyMemories" :key="memory.id" class="mini-card">
+                            <strong>#{{ memory.id }} {{ memory.memory_type }} / {{ memory.status }}</strong>
+                            <p>{{ memory.summary }}</p>
+                            <div class="slot-meta">
+                              <span>review {{ memory.source_review_report_id || '-' }}</span>
+                              <span>confidence {{ memory.confidence }}</span>
+                              <span>{{ memory.metadata_payload.source_type || 'strategy_memory' }}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
                     </section>
                   </section>
                 </div>
@@ -1544,6 +1650,7 @@ import { applyDraftRevisionPlan } from '@/api/draftRevisionApply'
 import { createPublishPackage } from '@/api/publishPackage'
 import { recordManualPublish } from '@/api/manualPublishBackfill'
 import { createPostPublishReview } from '@/api/postPublishReview'
+import { confirmStrategyMemories, listAccountStrategyMemories } from '@/api/strategyMemoryConfirmation'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1569,6 +1676,14 @@ import type { DraftRevisionApplyResponse, DraftRevisionApplyStatus } from '@/typ
 import type { PublishCard, PublishPackageResponse, PublishPackageStatus } from '@/types/publishPackage'
 import type { ManualPublishBackfillResponse } from '@/types/manualPublishBackfill'
 import type { PostPublishReviewResponse, PostPublishReviewStatus } from '@/types/postPublishReview'
+import type {
+  StrategyMemoryCandidate,
+  StrategyMemoryConfirmationResponse,
+  StrategyMemoryConfirmationStatus,
+  StrategyMemoryItem,
+  StrategyMemoryType,
+  StrategyMemoryConfidence
+} from '@/types/strategyMemoryConfirmation'
 
 interface ExampleInput {
   label: string
@@ -1643,6 +1758,10 @@ const manualPublishLoading = ref(false)
 const manualPublishResult = ref<ManualPublishBackfillResponse | null>(null)
 const postPublishReviewLoading = ref(false)
 const postPublishReviewResult = ref<PostPublishReviewResponse | null>(null)
+const strategyMemoryConfirmationLoading = ref(false)
+const strategyMemoryConfirmationResult = ref<StrategyMemoryConfirmationResponse | null>(null)
+const strategyMemoryCandidates = ref<StrategyMemoryCandidate[]>([])
+const confirmedStrategyMemories = ref<StrategyMemoryItem[]>([])
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -2130,6 +2249,7 @@ const runDraftContextPreview = async () => {
     publishPackageResult.value = null
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -2168,6 +2288,7 @@ const confirmDraftGeneration = async () => {
     publishPackageResult.value = null
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -2201,6 +2322,7 @@ const confirmDraftReview = async () => {
     publishPackageResult.value = null
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
@@ -2241,6 +2363,7 @@ const generateDraftRevisionPlan = async () => {
     publishPackageResult.value = null
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
@@ -2276,6 +2399,7 @@ const applyDraftRevision = async () => {
     publishPackageResult.value = null
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '应用修改计划失败'
@@ -2306,6 +2430,7 @@ const generatePublishPackage = async () => {
     })
     manualPublishResult.value = null
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to create publish package'
   } finally {
@@ -2344,6 +2469,7 @@ const saveManualPublishBackfill = async () => {
       snapshot_window: 'manual'
     })
     postPublishReviewResult.value = null
+    resetStrategyMemoryConfirmation()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to save manual publish backfill'
   } finally {
@@ -2370,11 +2496,80 @@ const generatePostPublishReview = async () => {
       review_window: 'MANUAL_SNAPSHOT',
       notes: postPublishReviewForm.notes.trim() || null
     })
+    prepareStrategyMemoryCandidates(postPublishReviewResult.value.strategy_memory_candidates)
+    await loadConfirmedStrategyMemories()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to generate post publish review'
   } finally {
     postPublishReviewLoading.value = false
   }
+}
+
+const resetStrategyMemoryConfirmation = () => {
+  strategyMemoryConfirmationResult.value = null
+  strategyMemoryCandidates.value = []
+  confirmedStrategyMemories.value = []
+}
+
+const prepareStrategyMemoryCandidates = (
+  candidates: Array<{ type: string; content: string; evidence: string; confidence: string }>
+) => {
+  strategyMemoryConfirmationResult.value = null
+  strategyMemoryCandidates.value = candidates.map((candidate, index) => ({
+    candidate_index: index,
+    memory_type: candidate.type as StrategyMemoryType,
+    content: candidate.content,
+    evidence: candidate.evidence,
+    confidence: candidate.confidence as StrategyMemoryConfidence,
+    selected: false
+  }))
+}
+
+const saveSelectedStrategyMemories = async () => {
+  if (!form.account_id) {
+    errorMessage.value = 'Select an account first'
+    return
+  }
+  const reviewId = postPublishReviewResult.value?.review_id
+  if (!reviewId) {
+    errorMessage.value = 'Generate a post publish review before saving strategy memory'
+    return
+  }
+  const selected = strategyMemoryCandidates.value
+    .filter((candidate) => candidate.selected)
+    .map((candidate) => ({
+      candidate_index: candidate.candidate_index,
+      memory_type: candidate.memory_type,
+      content: candidate.content.trim(),
+      evidence: candidate.evidence.trim(),
+      confidence: candidate.confidence
+    }))
+  strategyMemoryConfirmationLoading.value = true
+  errorMessage.value = ''
+  try {
+    strategyMemoryConfirmationResult.value = await confirmStrategyMemories(reviewId, {
+      account_id: form.account_id,
+      confirmed: true,
+      selected_candidates: selected,
+      conversation_id: form.conversation_id
+    })
+    await loadConfirmedStrategyMemories()
+    if (strategyMemoryConfirmationResult.value.created_memory_ids.length) {
+      const createdIds = strategyMemoryConfirmationResult.value.created_memory_ids
+      form.current_target_type = 'STRATEGY_MEMORY'
+      form.current_target_id = String(createdIds[createdIds.length - 1] || '')
+      await refreshConversationData()
+    }
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to save strategy memories'
+  } finally {
+    strategyMemoryConfirmationLoading.value = false
+  }
+}
+
+const loadConfirmedStrategyMemories = async () => {
+  if (!form.account_id) return
+  confirmedStrategyMemories.value = await listAccountStrategyMemories(form.account_id)
 }
 
 const tagsText = (tags: string[]) => tags.map((tag) => `#${tag.replace(/^#/, '')}`).join(' ')
@@ -2609,6 +2804,13 @@ const postPublishReviewStatusType = (status: PostPublishReviewStatus) => {
   if (status === 'REVIEWED') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'DATA_INSUFFICIENT') return 'warning'
   if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const strategyMemoryConfirmationStatusType = (status: StrategyMemoryConfirmationStatus) => {
+  if (status === 'SAVED') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'DATA_INSUFFICIENT' || status === 'BLOCKED') return 'warning'
+  if (status === 'VALIDATION_ERROR') return 'danger'
   return 'info'
 }
 
@@ -2858,6 +3060,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #bae6fd;
   border-radius: 8px;
   background: #f7fcff;
+}
+
+.strategy-memory-confirmation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  background: #fbfaff;
 }
 
 .publish-package-result {
