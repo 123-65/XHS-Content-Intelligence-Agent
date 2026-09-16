@@ -945,6 +945,88 @@
                       <p v-for="item in publishPackageResult.manual_publish_steps" :key="item">{{ item }}</p>
                     </div>
                   </div>
+                  <section v-if="publishPackageResult.package_id" class="manual-publish-card">
+                    <div class="toolbar">
+                      <strong>Manual Publish Backfill V0</strong>
+                      <el-tag v-if="manualPublishResult" type="success" effect="plain">{{ manualPublishResult.status }}</el-tag>
+                      <el-tag v-else type="info" effect="plain">manual metrics only</el-tag>
+                    </div>
+                    <el-descriptions :column="1" border size="small">
+                      <el-descriptions-item label="package_id">{{ publishPackageResult.package_id }}</el-descriptions-item>
+                      <el-descriptions-item label="boundary">no XHS access, no auto scrape, no auto publish, no LLM</el-descriptions-item>
+                    </el-descriptions>
+                    <el-alert
+                      type="warning"
+                      title="Publish manually in XHS first, then paste the note link and metrics here. The system will not open XHS or fetch metrics."
+                      show-icon
+                      :closable="false"
+                    />
+                    <div class="form-grid">
+                      <label>
+                        <span>note_url</span>
+                        <el-input v-model="manualPublishForm.note_url" placeholder="https://www.xiaohongshu.com/explore/..." />
+                      </label>
+                      <label>
+                        <span>published_at</span>
+                        <el-date-picker
+                          v-model="manualPublishForm.published_at"
+                          type="datetime"
+                          value-format="YYYY-MM-DDTHH:mm:ss"
+                          style="width: 100%"
+                        />
+                      </label>
+                      <label>
+                        <span>published title</span>
+                        <el-input v-model="manualPublishForm.title" :placeholder="publishPackageResult.title" />
+                      </label>
+                      <label>
+                        <span>remark</span>
+                        <el-input v-model="manualPublishForm.remark" placeholder="manual backfill note" />
+                      </label>
+                      <label>
+                        <span>likes</span>
+                        <el-input-number v-model="manualPublishForm.like_count" :min="0" controls-position="right" />
+                      </label>
+                      <label>
+                        <span>collects</span>
+                        <el-input-number v-model="manualPublishForm.collect_count" :min="0" controls-position="right" />
+                      </label>
+                      <label>
+                        <span>comments</span>
+                        <el-input-number v-model="manualPublishForm.comment_count" :min="0" controls-position="right" />
+                      </label>
+                      <label>
+                        <span>shares</span>
+                        <el-input-number v-model="manualPublishForm.share_count" :min="0" controls-position="right" />
+                      </label>
+                      <label>
+                        <span>follower_gain</span>
+                        <el-input-number v-model="manualPublishForm.follower_gain" :min="0" controls-position="right" />
+                      </label>
+                      <label>
+                        <span>lead_count</span>
+                        <el-input-number v-model="manualPublishForm.lead_count" :min="0" controls-position="right" />
+                      </label>
+                    </div>
+                    <el-button
+                      size="small"
+                      type="primary"
+                      :loading="manualPublishLoading"
+                      @click="saveManualPublishBackfill"
+                    >
+                      Save manual publish backfill
+                    </el-button>
+                    <div v-if="manualPublishResult" class="mini-card">
+                      <strong>Recorded</strong>
+                      <p>published_note_id: {{ manualPublishResult.published_note_id || '-' }}</p>
+                      <p>metric_snapshot_id: {{ manualPublishResult.metric_snapshot_id || '-' }}</p>
+                      <p>private_conversion_snapshot_id: {{ manualPublishResult.private_conversion_snapshot_id || '-' }}</p>
+                      <p>note_url: {{ manualPublishResult.note_url || '-' }}</p>
+                      <div v-if="manualPublishResult.next_actions.length" class="slot-meta">
+                        <span v-for="item in manualPublishResult.next_actions" :key="item.action">{{ item.label }}</span>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </section>
             </div>
@@ -1380,6 +1462,7 @@ import { reviewDraft } from '@/api/draftReview'
 import { createDraftRevisionPlan } from '@/api/draftRevision'
 import { applyDraftRevisionPlan } from '@/api/draftRevisionApply'
 import { createPublishPackage } from '@/api/publishPackage'
+import { recordManualPublish } from '@/api/manualPublishBackfill'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1403,6 +1486,7 @@ import type { DraftReviewResponse, DraftReviewStatus } from '@/types/draftReview
 import type { DraftRevisionPlanResponse, DraftRevisionPlanStatus } from '@/types/draftRevision'
 import type { DraftRevisionApplyResponse, DraftRevisionApplyStatus } from '@/types/draftRevisionApply'
 import type { PublishCard, PublishPackageResponse, PublishPackageStatus } from '@/types/publishPackage'
+import type { ManualPublishBackfillResponse } from '@/types/manualPublishBackfill'
 
 interface ExampleInput {
   label: string
@@ -1473,6 +1557,8 @@ const draftRevisionApplyLoading = ref(false)
 const draftRevisionApplyResult = ref<DraftRevisionApplyResponse | null>(null)
 const publishPackageLoading = ref(false)
 const publishPackageResult = ref<PublishPackageResponse | null>(null)
+const manualPublishLoading = ref(false)
+const manualPublishResult = ref<ManualPublishBackfillResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1515,6 +1601,18 @@ const draftRevisionApplyForm = reactive({
 const publishPackageForm = reactive({
   style: 'clean_knowledge_card',
   card_count: 5
+})
+const manualPublishForm = reactive({
+  note_url: '',
+  published_at: '',
+  title: '',
+  like_count: 0,
+  collect_count: 0,
+  comment_count: 0,
+  share_count: 0,
+  follower_gain: 0,
+  lead_count: 0,
+  remark: ''
 })
 const draftRevisionQuickFeedback = ['标题太 AI', '正文太长', '表达太营销', 'CTA 太硬', '不符合账号人设', '证据不足']
 
@@ -1943,6 +2041,7 @@ const runDraftContextPreview = async () => {
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
+    manualPublishResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -1979,6 +2078,7 @@ const confirmDraftGeneration = async () => {
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
+    manualPublishResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -2010,6 +2110,7 @@ const confirmDraftReview = async () => {
     draftRevisionPlanResult.value = null
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
+    manualPublishResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
@@ -2048,6 +2149,7 @@ const generateDraftRevisionPlan = async () => {
     })
     draftRevisionApplyResult.value = null
     publishPackageResult.value = null
+    manualPublishResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
@@ -2081,6 +2183,7 @@ const applyDraftRevision = async () => {
       form.current_target_id = String(draftRevisionApplyResult.value.revised_draft_id)
     }
     publishPackageResult.value = null
+    manualPublishResult.value = null
     await refreshConversationData()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '应用修改计划失败'
@@ -2109,10 +2212,48 @@ const generatePublishPackage = async () => {
       style: publishPackageForm.style,
       card_count: publishPackageForm.card_count
     })
+    manualPublishResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Failed to create publish package'
   } finally {
     publishPackageLoading.value = false
+  }
+}
+
+const saveManualPublishBackfill = async () => {
+  if (!form.account_id) {
+    errorMessage.value = 'Select an account first'
+    return
+  }
+  const packageResult = publishPackageResult.value
+  const packageId = packageResult?.package_id
+  if (!packageId) {
+    errorMessage.value = 'Create a publish package before recording manual publish metrics'
+    return
+  }
+  manualPublishLoading.value = true
+  errorMessage.value = ''
+  try {
+    manualPublishResult.value = await recordManualPublish(packageId, {
+      account_id: form.account_id,
+      confirmed: true,
+      platform: 'xhs',
+      note_url: manualPublishForm.note_url.trim(),
+      published_at: manualPublishForm.published_at || null,
+      title: manualPublishForm.title.trim() || packageResult.title || null,
+      like_count: manualPublishForm.like_count,
+      collect_count: manualPublishForm.collect_count,
+      comment_count: manualPublishForm.comment_count,
+      share_count: manualPublishForm.share_count,
+      follower_gain: manualPublishForm.follower_gain,
+      lead_count: manualPublishForm.lead_count,
+      remark: manualPublishForm.remark.trim() || null,
+      snapshot_window: 'manual'
+    })
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to save manual publish backfill'
+  } finally {
+    manualPublishLoading.value = false
   }
 }
 
@@ -2570,6 +2711,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #fed7aa;
   border-radius: 8px;
   background: #fffaf5;
+}
+
+.manual-publish-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f7fef9;
 }
 
 .publish-package-result {
