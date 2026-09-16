@@ -638,6 +638,101 @@
                       <p v-for="item in draftReviewResult.must_fix_before_publish" :key="item">{{ item }}</p>
                     </div>
                   </div>
+                  <section v-if="draftReviewResult?.review_report_id" class="draft-revision-card">
+                    <div class="toolbar">
+                      <strong>草稿反馈与修改计划</strong>
+                      <el-tag
+                        v-if="draftRevisionPlanResult"
+                        :type="draftRevisionStatusType(draftRevisionPlanResult.status)"
+                        effect="plain"
+                      >
+                        {{ draftRevisionPlanResult.status }}
+                      </el-tag>
+                      <el-tag v-else type="info" effect="plain">Revision Planning V0</el-tag>
+                    </div>
+                    <el-descriptions :column="1" border size="small">
+                      <el-descriptions-item label="draft_id">{{ draftGenerationResult.draft_id }}</el-descriptions-item>
+                      <el-descriptions-item label="review_report_id">{{ draftReviewResult.review_report_id }}</el-descriptions-item>
+                      <el-descriptions-item label="review_summary">{{ draftReviewResult.summary || '-' }}</el-descriptions-item>
+                    </el-descriptions>
+                    <el-input
+                      v-model="draftRevisionForm.feedback_text"
+                      type="textarea"
+                      :rows="3"
+                      resize="none"
+                      maxlength="2000"
+                      show-word-limit
+                      placeholder="例如：标题太 AI，正文太长，CTA 太硬，保留第二段"
+                    />
+                    <div class="tag-row">
+                      <el-button
+                        v-for="item in draftRevisionQuickFeedback"
+                        :key="item"
+                        size="small"
+                        plain
+                        @click="appendDraftRevisionFeedback(item)"
+                      >
+                        {{ item }}
+                      </el-button>
+                    </div>
+                    <el-alert
+                      type="warning"
+                      title="本步骤会调用模型，但不会修改草稿。"
+                      show-icon
+                      :closable="false"
+                    />
+                    <el-alert
+                      type="info"
+                      title="本步骤只生成修改计划，不会改动原草稿，不会发布到小红书。"
+                      show-icon
+                      :closable="false"
+                    />
+                    <el-button
+                      size="small"
+                      type="primary"
+                      :loading="draftRevisionLoading"
+                      :disabled="draftReviewResult.status !== 'REVIEWED'"
+                      @click="generateDraftRevisionPlan"
+                    >
+                      生成修改计划
+                    </el-button>
+                    <div v-if="draftRevisionPlanResult" class="mini-card-list">
+                      <el-alert
+                        v-if="draftRevisionPlanResult.status === 'PROVIDER_NOT_CONFIGURED'"
+                        type="warning"
+                        :title="draftRevisionPlanResult.error_message || 'Provider 未配置，无法生成真实修改计划。'"
+                        show-icon
+                        :closable="false"
+                      />
+                      <p class="result-summary">
+                        {{ draftRevisionPlanResult.summary || draftRevisionPlanResult.error_message || '-' }}
+                      </p>
+                      <div class="slot-meta">
+                        <span>plan {{ draftRevisionPlanResult.plan_id || '-' }}</span>
+                        <span>ready {{ draftRevisionPlanResult.ready_for_revision }}</span>
+                      </div>
+                      <div v-if="draftRevisionPlanResult.operations.length" class="mini-card-list">
+                        <div
+                          v-for="operation in draftRevisionPlanResult.operations"
+                          :key="`${operation.order}-${operation.target}-${operation.action}`"
+                          class="mini-card"
+                        >
+                          <strong>{{ operation.order }}. {{ operation.target }} / {{ operation.action }} / {{ operation.priority }}</strong>
+                          <p>{{ operation.reason }}</p>
+                          <p>{{ operation.instruction }}</p>
+                        </div>
+                      </div>
+                      <div v-if="draftRevisionPlanResult.preserve.length" class="slot-meta">
+                        <span v-for="item in draftRevisionPlanResult.preserve" :key="item">保留：{{ item }}</span>
+                      </div>
+                      <div v-if="draftRevisionPlanResult.must_not_change.length" class="slot-meta">
+                        <span v-for="item in draftRevisionPlanResult.must_not_change" :key="item">不改：{{ item }}</span>
+                      </div>
+                      <div v-if="draftRevisionPlanResult.risk_fixes.length" class="slot-meta">
+                        <span v-for="item in draftRevisionPlanResult.risk_fixes" :key="item">风险修复：{{ item }}</span>
+                      </div>
+                    </div>
+                  </section>
                 </section>
               </section>
             </div>
@@ -1069,6 +1164,7 @@ import { createOperationExperiment, previewOperationExperiment } from '@/api/ope
 import { previewDraftContext } from '@/api/draftContextPreview'
 import { generateDraft } from '@/api/draftGeneration'
 import { reviewDraft } from '@/api/draftReview'
+import { createDraftRevisionPlan } from '@/api/draftRevision'
 import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
@@ -1089,6 +1185,7 @@ import type { OperationExperimentResponse } from '@/types/operationExperiment'
 import type { DraftContextPreviewResponse, DraftContextPreviewStatus } from '@/types/draftContextPreview'
 import type { DraftGenerationResponse, DraftGenerationStatus } from '@/types/draftGeneration'
 import type { DraftReviewResponse, DraftReviewStatus } from '@/types/draftReview'
+import type { DraftRevisionPlanResponse, DraftRevisionPlanStatus } from '@/types/draftRevision'
 
 interface ExampleInput {
   label: string
@@ -1153,6 +1250,8 @@ const draftGenerationLoading = ref(false)
 const draftGenerationResult = ref<DraftGenerationResponse | null>(null)
 const draftReviewLoading = ref(false)
 const draftReviewResult = ref<DraftReviewResponse | null>(null)
+const draftRevisionLoading = ref(false)
+const draftRevisionPlanResult = ref<DraftRevisionPlanResponse | null>(null)
 const accountSetupForm = reactive({
   account_name: '',
   content_domain: '',
@@ -1186,6 +1285,10 @@ const draftGenerationForm = reactive({
   tone: 'natural',
   model_profile: 'default'
 })
+const draftRevisionForm = reactive({
+  feedback_text: ''
+})
+const draftRevisionQuickFeedback = ['标题太 AI', '正文太长', '表达太营销', 'CTA 太硬', '不符合账号人设', '证据不足']
 
 const routerIntent = computed(() => response.value?.router_result?.intent || '-')
 const planSteps = computed(() => response.value?.plan?.steps || [])
@@ -1605,6 +1708,7 @@ const runDraftContextPreview = async () => {
     })
     draftGenerationResult.value = null
     draftReviewResult.value = null
+    draftRevisionPlanResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预览草稿上下文失败'
   } finally {
@@ -1638,6 +1742,7 @@ const confirmDraftGeneration = async () => {
       model_profile: draftGenerationForm.model_profile
     })
     draftReviewResult.value = null
+    draftRevisionPlanResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '生成草稿失败'
   } finally {
@@ -1666,10 +1771,48 @@ const confirmDraftReview = async () => {
       check_risk: true,
       check_evidence_consistency: true
     })
+    draftRevisionPlanResult.value = null
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '审核草稿失败'
   } finally {
     draftReviewLoading.value = false
+  }
+}
+
+const appendDraftRevisionFeedback = (text: string) => {
+  const current = draftRevisionForm.feedback_text.trim()
+  draftRevisionForm.feedback_text = current ? `${current}，${text}` : text
+}
+
+const generateDraftRevisionPlan = async () => {
+  if (!form.account_id) {
+    errorMessage.value = '请先创建或选择账号画像'
+    return
+  }
+  const draftId = draftGenerationResult.value?.draft_id
+  if (!draftId || !draftReviewResult.value?.review_report_id) {
+    errorMessage.value = '请先完成草稿审核'
+    return
+  }
+  if (!draftRevisionForm.feedback_text.trim()) {
+    errorMessage.value = '请先填写对草稿的反馈'
+    return
+  }
+  draftRevisionLoading.value = true
+  errorMessage.value = ''
+  try {
+    draftRevisionPlanResult.value = await createDraftRevisionPlan(draftId, {
+      account_id: form.account_id,
+      confirmed: true,
+      review_report_id: draftReviewResult.value.review_report_id,
+      conversation_id: form.conversation_id,
+      feedback_text: draftRevisionForm.feedback_text.trim()
+    })
+    await refreshConversationData()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '生成修改计划失败'
+  } finally {
+    draftRevisionLoading.value = false
   }
 }
 
@@ -1781,6 +1924,13 @@ const draftGenerationStatusType = (status: DraftGenerationStatus) => {
 const draftReviewStatusType = (status: DraftReviewStatus) => {
   if (status === 'REVIEWED') return 'success'
   if (status === 'WAITING_CONFIRMATION' || status === 'PROVIDER_NOT_CONFIGURED' || status === 'BLOCKED') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const draftRevisionStatusType = (status: DraftRevisionPlanStatus) => {
+  if (status === 'READY') return 'success'
+  if (status === 'WAITING_CONFIRMATION' || status === 'PROVIDER_NOT_CONFIGURED') return 'warning'
   if (status === 'FAILED') return 'danger'
   return 'info'
 }
@@ -1981,6 +2131,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #fecaca;
   border-radius: 8px;
   background: #fffafa;
+}
+
+.draft-revision-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  background: #fbfaff;
 }
 
 .inline-controls {

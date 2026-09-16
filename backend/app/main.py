@@ -35,6 +35,7 @@ from app.api.operation_experiment import router as operation_experiment_router
 from app.api.draft_context_preview import router as draft_context_preview_router
 from app.api.draft_generation import router as draft_generation_router
 from app.api.draft_review import router as draft_review_router
+from app.api.draft_revision_plan import router as draft_revision_plan_router
 
 def create_app():
     """创建 FastAPI 应用实例。"""
@@ -74,6 +75,7 @@ def create_app():
     app.include_router(draft_context_preview_router)
     app.include_router(draft_generation_router)
     app.include_router(draft_review_router)
+    app.include_router(draft_revision_plan_router)
     return app
 
 app=create_app()

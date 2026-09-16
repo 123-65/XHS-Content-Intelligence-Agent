@@ -22,6 +22,7 @@ from app.models.context_slot_log import ContextSlotLog
 from app.models.content_opportunity import ContentOpportunity
 from app.models.crawl_task import CrawlTask
 from app.models.draft_generation_context import DraftGenerationContext
+from app.models.draft_revision_plan import DraftRevisionPlan
 from app.models.experiment_metric_target import ExperimentMetricTarget
 from app.models.experiment_variable import ExperimentVariable
 from app.models.eval_case import EvalCase
@@ -72,6 +73,7 @@ __all__ = [
     "PrivateConversionSnapshot",
     "NoteCommentSnapshot",
     "DraftGenerationContext",
+    "DraftRevisionPlan",
     "PromptTemplate",
     "PromptRunLog",
     "ReviewReport",
