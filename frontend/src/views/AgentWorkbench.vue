@@ -165,6 +165,92 @@
           />
         </section>
 
+        <section class="xhs-url-collect-box">
+          <div class="toolbar">
+            <strong>XHS URL Collect</strong>
+            <el-tag v-if="latestXhsUrlCollectRun" :type="xhsUrlCollectRunStatusType(latestXhsUrlCollectRun.status)" effect="plain">
+              {{ latestXhsUrlCollectRun.status }}
+            </el-tag>
+            <el-tag v-else type="info" effect="plain">public URL only</el-tag>
+          </div>
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="account_id">{{ form.account_id || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="boundary">no cookies, no captcha bypass, no login, no LLM backfill</el-descriptions-item>
+          </el-descriptions>
+          <el-alert
+            type="warning"
+            title="The system will try to read public page content only. Failed collection will stay failed and will not be replaced with fake data."
+            show-icon
+            :closable="false"
+          />
+          <div class="form-grid single">
+            <label>
+              <span>xhs note urls</span>
+              <el-input
+                v-model="xhsUrlCollectForm.urlsText"
+                type="textarea"
+                :rows="4"
+                resize="none"
+                placeholder="https://www.xiaohongshu.com/explore/..."
+              />
+            </label>
+          </div>
+          <div class="form-grid">
+            <label>
+              <span>collect comments</span>
+              <el-checkbox v-model="xhsUrlCollectForm.collect_comments">collect top comments</el-checkbox>
+            </label>
+            <label>
+              <span>max_comments</span>
+              <el-input-number v-model="xhsUrlCollectForm.max_comments" :min="0" :max="100" controls-position="right" />
+            </label>
+          </div>
+          <div class="action-row compact-actions">
+            <el-button size="small" type="primary" :loading="xhsUrlCollectLoading" @click="runXhsUrlCollect">
+              Start URL collect
+            </el-button>
+            <el-button size="small" :loading="xhsUrlCollectLoading" @click="loadXhsUrlCollectRuns">
+              Recent URL collect runs
+            </el-button>
+            <el-button
+              size="small"
+              :disabled="!latestXhsUrlCollectRun?.success_count"
+              :loading="evidenceLoading"
+              @click="runEvidenceRefresh"
+            >
+              Refresh evidence analysis
+            </el-button>
+          </div>
+          <div v-if="latestXhsUrlCollectRun" class="mini-card-list">
+            <div class="mini-card">
+              <strong>Run #{{ latestXhsUrlCollectRun.run_id || '-' }}</strong>
+              <div class="slot-meta">
+                <span>total {{ latestXhsUrlCollectRun.total }}</span>
+                <span>success {{ latestXhsUrlCollectRun.success_count }}</span>
+                <span>failed {{ latestXhsUrlCollectRun.failed_count }}</span>
+                <span>{{ latestXhsUrlCollectRun.error_code || 'NO_ERROR' }}</span>
+              </div>
+              <p v-if="latestXhsUrlCollectRun.error_message">{{ latestXhsUrlCollectRun.error_message }}</p>
+            </div>
+            <div v-for="item in latestXhsUrlCollectRun.results" :key="item.url" class="mini-card">
+              <div class="toolbar">
+                <strong>{{ item.title || item.url }}</strong>
+                <el-tag :type="xhsUrlCollectItemStatusType(item.status)" effect="plain">{{ item.status }}</el-tag>
+              </div>
+              <div class="slot-meta">
+                <span>note {{ item.note_id || '-' }}</span>
+                <span>author {{ item.author_name || '-' }}</span>
+                <span>likes {{ item.like_count ?? '-' }}</span>
+                <span>collects {{ item.collect_count ?? '-' }}</span>
+                <span>comments {{ item.comment_count ?? '-' }}</span>
+                <span>saved comments {{ item.comment_count_saved }}</span>
+              </div>
+              <p v-if="item.error_message">{{ item.error_code || item.status }} / {{ item.error_message }}</p>
+              <p v-if="item.warnings.length">{{ item.warnings.join(' / ') }}</p>
+            </div>
+          </div>
+        </section>
+
         <section class="data-refresh-box">
           <div class="toolbar">
             <strong>数据刷新</strong>
@@ -1639,6 +1725,7 @@ import {
 import { createAccountProfile, getAccountProfiles, type AccountProfileResponse } from '@/api/account'
 import { getDataSourceConfigByAccount, upsertDataSourceConfig } from '@/api/dataSourceConfig'
 import { createDataRefreshRun, listDataRefreshRuns } from '@/api/dataRefreshRun'
+import { collectXhsUrls, listXhsUrlCollectRuns } from '@/api/xhsUrlCollect'
 import { createEvidenceRefreshRun, listEvidenceRefreshRuns } from '@/api/evidenceRefreshRun'
 import { createOperationRun, listOperationRuns } from '@/api/operationRun'
 import { createOperationExperiment, previewOperationExperiment } from '@/api/operationExperiment'
@@ -1665,6 +1752,7 @@ import type {
 } from '@/types/agentChat'
 import type { DataSourceConfigResponse } from '@/types/dataSourceConfig'
 import type { DataRefreshRunResponse, RefreshRunStatus } from '@/types/dataRefreshRun'
+import type { XhsUrlCollectResponse, XhsUrlCollectRunStatus, XhsUrlCollectItemStatus } from '@/types/xhsUrlCollect'
 import type { EvidenceRefreshRunResponse, EvidenceRefreshRunStatus } from '@/types/evidenceRefreshRun'
 import type { OperationRecommendation, OperationRunResponse, OperationRunStatus } from '@/types/operationRun'
 import type { OperationExperimentResponse } from '@/types/operationExperiment'
@@ -1731,6 +1819,9 @@ const accountLoading = ref(false)
 const accounts = ref<AccountProfileResponse[]>([])
 const dataSourceLoading = ref(false)
 const dataSourceConfig = ref<DataSourceConfigResponse | null>(null)
+const xhsUrlCollectLoading = ref(false)
+const latestXhsUrlCollectRun = ref<XhsUrlCollectResponse | null>(null)
+const xhsUrlCollectRuns = ref<XhsUrlCollectResponse[]>([])
 const refreshLoading = ref(false)
 const latestRefreshRun = ref<DataRefreshRunResponse | null>(null)
 const refreshRuns = ref<DataRefreshRunResponse[]>([])
@@ -1774,6 +1865,11 @@ const dataSourceForm = reactive({
   keywordsText: '',
   competitorAccountsText: '',
   noteUrlsText: ''
+})
+const xhsUrlCollectForm = reactive({
+  urlsText: '',
+  collect_comments: true,
+  max_comments: 20
 })
 const evidenceRefreshForm = reactive({
   keyword: '',
@@ -2067,6 +2163,47 @@ const saveDataSourceConfig = async () => {
     errorMessage.value = error instanceof Error ? error.message : '保存数据源配置失败'
   } finally {
     dataSourceLoading.value = false
+  }
+}
+
+const runXhsUrlCollect = async () => {
+  if (!form.account_id) {
+    errorMessage.value = 'Select an account first'
+    return
+  }
+  const urls = splitSourceLines(xhsUrlCollectForm.urlsText)
+  if (!urls.length) {
+    errorMessage.value = 'Paste at least one XHS note URL'
+    return
+  }
+  xhsUrlCollectLoading.value = true
+  errorMessage.value = ''
+  try {
+    latestXhsUrlCollectRun.value = await collectXhsUrls({
+      account_id: form.account_id,
+      confirmed: true,
+      urls,
+      collect_comments: xhsUrlCollectForm.collect_comments,
+      max_comments: xhsUrlCollectForm.max_comments
+    })
+    await loadXhsUrlCollectRuns()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to collect XHS URLs'
+  } finally {
+    xhsUrlCollectLoading.value = false
+  }
+}
+
+const loadXhsUrlCollectRuns = async () => {
+  if (!form.account_id) return
+  xhsUrlCollectLoading.value = true
+  try {
+    xhsUrlCollectRuns.value = await listXhsUrlCollectRuns({ account_id: form.account_id })
+    latestXhsUrlCollectRun.value = xhsUrlCollectRuns.value[0] || latestXhsUrlCollectRun.value
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to load XHS URL collect runs'
+  } finally {
+    xhsUrlCollectLoading.value = false
   }
 }
 
@@ -2744,6 +2881,21 @@ const refreshStatusType = (status: RefreshRunStatus) => {
   return 'info'
 }
 
+const xhsUrlCollectRunStatusType = (status: XhsUrlCollectRunStatus) => {
+  if (status === 'COMPLETED') return 'success'
+  if (status === 'PARTIAL_SUCCESS' || status === 'WAITING_CONFIRMATION') return 'warning'
+  if (status === 'FAILED') return 'danger'
+  return 'info'
+}
+
+const xhsUrlCollectItemStatusType = (status: XhsUrlCollectItemStatus) => {
+  if (status === 'SUCCESS') return 'success'
+  if (status === 'PARTIAL_SUCCESS') return 'warning'
+  if (status === 'LOGIN_REQUIRED' || status === 'CAPTCHA_REQUIRED' || status === 'RATE_LIMITED') return 'warning'
+  if (status === 'COLLECT_FAILED' || status === 'UNSUPPORTED_URL' || status === 'PARSE_FAILED') return 'danger'
+  return 'info'
+}
+
 const evidenceStatusType = (status: EvidenceRefreshRunStatus) => {
   if (status === 'SUCCESS') return 'success'
   if (status === 'PARTIAL' || status === 'DATA_INSUFFICIENT') return 'warning'
@@ -2934,6 +3086,16 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #fde68a;
   border-radius: 8px;
   background: #fffdf4;
+}
+
+.xhs-url-collect-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  background: #f6fffd;
 }
 
 .evidence-refresh-box {
