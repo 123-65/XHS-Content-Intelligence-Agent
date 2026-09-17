@@ -134,7 +134,7 @@ def collect_xhs_notes_handler(step: PlanStep, context: dict[str, Any]) -> dict[s
         _account_id(step, context),
         _string_list(params.get("note_urls")),
         collect_comments=bool(params.get("collect_comments", True)),
-        max_comments=_int_or_default(params.get("max_comments"), 20),
+        max_comments=_int_or_default(params.get("max_comments"), 10),
         enable_ocr=bool(params.get("enable_ocr", True)),
     )
 

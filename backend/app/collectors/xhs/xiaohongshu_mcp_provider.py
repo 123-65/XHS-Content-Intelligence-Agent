@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 
 from app.collectors.xhs.base import XhsCollectionResult, XhsCollectorProvider
-from app.collectors.xhs.normalizer import normalize_account_payload, normalize_note_payload
+from app.collectors.xhs.normalizer import normalize_account_payload, normalize_note_payload, sanitize_xhs_payload
 
 
 class McpProviderError(RuntimeError):
@@ -74,11 +74,30 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
         }
         if collect_comments and max_comments > 10:
             arguments["limit"] = max_comments
+        partial_comments = False
+        retry_warning: str | None = None
         try:
             result, raw_text = self._call_tool("get_feed_detail", arguments)
             payload = self._tool_payload(result)
         except McpProviderError as exc:
-            return self._failure(self._error_status(exc.code), canonical_url, str(exc), error_code=exc.code, raw_text=exc.raw_text)
+            if exc.code != "PROVIDER_TIMEOUT":
+                return self._failure(self._error_status(exc.code), canonical_url, str(exc), error_code=exc.code, raw_text=exc.raw_text)
+            retry_arguments = arguments
+            if collect_comments and max_comments > 10:
+                retry_arguments = {"feed_id": feed_id, "xsec_token": xsec_token, "load_all_comments": False}
+                partial_comments = True
+            try:
+                result, raw_text = self._call_tool("get_feed_detail", retry_arguments)
+                payload = self._tool_payload(result)
+                retry_warning = "PROVIDER_TIMEOUT_RETRIED"
+            except McpProviderError as retry_exc:
+                return self._failure(
+                    self._error_status(retry_exc.code),
+                    canonical_url,
+                    str(retry_exc),
+                    error_code=retry_exc.code,
+                    raw_text=retry_exc.raw_text,
+                )
 
         note = normalize_note_payload(
             payload,
@@ -86,7 +105,15 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
             provider_name=self.provider_name,
             source_type=self.source_type,
         )
-        status = "SUCCESS" if note.title or note.content else "PARTIAL_SUCCESS"
+        if partial_comments:
+            note.warnings.append("COMMENTS_PARTIAL_AFTER_TIMEOUT")
+        comments_partial = collect_comments and note.comment_count is not None and note.comment_count > len(note.comments)
+        if comments_partial:
+            note.warnings.append("COMMENTS_PARTIAL_FROM_PROVIDER")
+        if retry_warning:
+            note.warnings.append(retry_warning)
+        note.warnings = list(dict.fromkeys(note.warnings))
+        status = "SUCCESS" if (note.title or note.content) and not partial_comments and not comments_partial else "PARTIAL_SUCCESS"
         note.status = status
         return XhsCollectionResult(
             status=status,
@@ -95,6 +122,7 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
             parsed_note=note,
             parsed_result=note,
             raw_text=raw_text,
+            warnings=note.warnings,
             is_mock=False,
         )
 
@@ -114,6 +142,7 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
                 error_code="XSEC_TOKEN_REQUIRED",
             )
         user_id, xsec_token, canonical_url = target
+        retry_warning: str | None = None
         try:
             result, raw_text = self._call_tool(
                 "user_profile",
@@ -121,7 +150,23 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
             )
             payload = self._tool_payload(result)
         except McpProviderError as exc:
-            return self._failure(self._error_status(exc.code), canonical_url, str(exc), error_code=exc.code, raw_text=exc.raw_text)
+            if exc.code != "PROVIDER_TIMEOUT":
+                return self._failure(self._error_status(exc.code), canonical_url, str(exc), error_code=exc.code, raw_text=exc.raw_text)
+            try:
+                result, raw_text = self._call_tool(
+                    "user_profile",
+                    {"user_id": user_id, "xsec_token": xsec_token, "tab": "note"},
+                )
+                payload = self._tool_payload(result)
+                retry_warning = "PROVIDER_TIMEOUT_RETRIED"
+            except McpProviderError as retry_exc:
+                return self._failure(
+                    self._error_status(retry_exc.code),
+                    canonical_url,
+                    str(retry_exc),
+                    error_code=retry_exc.code,
+                    raw_text=retry_exc.raw_text,
+                )
 
         account = normalize_account_payload(
             payload,
@@ -130,6 +175,8 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
             source_type=self.source_type,
         )
         account.recent_notes = account.recent_notes[:recent_note_limit]
+        if retry_warning:
+            account.warnings.append(retry_warning)
         status = "SUCCESS" if account.nickname else "PARTIAL_SUCCESS"
         account.status = status
         return XhsCollectionResult(
@@ -138,6 +185,7 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
             source_url=canonical_url,
             parsed_account=account,
             raw_text=raw_text,
+            warnings=account.warnings,
             is_mock=False,
         )
 
@@ -184,7 +232,7 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
 
     def _call_tool(self, name: str, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
         result = self._rpc("tools/call", {"name": name, "arguments": arguments})
-        raw_text = json.dumps(result, ensure_ascii=False)[:20000]
+        raw_text = json.dumps(sanitize_xhs_payload(result), ensure_ascii=False)[:20000]
         if result.get("isError") is True:
             message = self._content_text(result) or f"MCP tool {name} failed."
             raise McpProviderError(self._tool_error_code(message), message, raw_text)
@@ -234,6 +282,8 @@ class XiaohongshuMcpProvider(XhsCollectorProvider):
 
     def _tool_error_code(self, message: str) -> str:
         lowered = message.lower()
+        if "deadline exceeded" in lowered or "timed out" in lowered or "timeout" in lowered:
+            return "PROVIDER_TIMEOUT"
         if "未登录" in message or "登录" in message or "cookie" in lowered or "session" in lowered:
             return "LOGIN_REQUIRED"
         if "captcha" in lowered or "验证" in message or "风控" in message:

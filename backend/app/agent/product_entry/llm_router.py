@@ -175,7 +175,7 @@ class LLMUserInputRouter:
                 "note_urls": note_urls,
                 "competitor_account_ids_or_urls": account_values,
                 "collect_comments": True,
-                "max_comments": 20,
+                "max_comments": 10,
                 "enable_ocr": True,
                 "recent_note_limit": 10,
                 "limit": 20,

@@ -67,6 +67,6 @@ def crawl_note(
     result = XhsNoteSnapshotResponse.model_validate(snapshot).model_dump(mode="json")
 
     if snapshot.status == "FAILED":
-        return JSONResponse(status_code=400, content=fail("采集失败", code=400, data=result).model_dump())
+        return JSONResponse(status_code=400, content=fail(code=400, message="采集失败", data=result).model_dump())
 
     return success(result)

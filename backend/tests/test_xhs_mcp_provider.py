@@ -17,28 +17,33 @@ def test_collect_note_uses_real_mcp_tool_contract_and_normalizes_payload() -> No
         captured.update(json.loads(request.content))
         return _mcp_response(
             {
-                "note": {
-                    "noteId": "note-1",
-                    "title": "Real title",
-                    "desc": "Real content",
-                    "user": {"userId": "author-1", "nickname": "Real author"},
-                    "interactInfo": {
-                        "likedCount": "1.2万",
-                        "collectedCount": "345",
-                        "commentCount": "2",
-                        "shareCount": "7",
+                "feed_id": "note-1",
+                "data": {
+                    "note": {
+                        "noteId": "note-1",
+                        "title": "Real title",
+                        "desc": "Real content",
+                        "user": {"userId": "author-1", "nickname": "Real author"},
+                        "interactInfo": {
+                            "likedCount": "1.2万",
+                            "collectedCount": "345",
+                            "commentCount": "1",
+                            "sharedCount": "7",
+                        },
+                        "imageList": [{"urlDefault": "https://img.example/1.jpg"}],
+                        "tagList": [{"name": "Agent"}],
                     },
-                    "imageList": [{"urlDefault": "https://img.example/1.jpg"}],
-                    "tagList": [{"name": "Agent"}],
+                    "comments": {
+                        "list": [
+                            {
+                                "id": "comment-1",
+                                "content": "How was this built?",
+                                "likeCount": "8",
+                                "userInfo": {"userId": "reader-1", "nickname": "Reader"},
+                            }
+                        ]
+                    },
                 },
-                "comments": [
-                    {
-                        "id": "comment-1",
-                        "content": "How was this built?",
-                        "likeCount": "8",
-                        "userInfo": {"userId": "reader-1", "nickname": "Reader"},
-                    }
-                ],
             }
         )
 
@@ -67,9 +72,10 @@ def test_collect_note_uses_real_mcp_tool_contract_and_normalizes_payload() -> No
     assert result.parsed_note.title == "Real title"
     assert result.parsed_note.author_id == "author-1"
     assert result.parsed_note.like_count == 12000
+    assert result.parsed_note.share_count == 7
     assert result.parsed_note.image_urls == ["https://img.example/1.jpg"]
     assert result.parsed_note.comments[0].comment_id == "comment-1"
-    assert result.parsed_note.raw_payload["note"]["noteId"] == "note-1"
+    assert result.parsed_note.raw_payload["data"]["note"]["noteId"] == "note-1"
     assert "secret-token" not in result.source_url
 
 
@@ -80,11 +86,11 @@ def test_collect_account_uses_user_profile_and_normalizes_real_shape() -> None:
         captured.update(json.loads(request.content))
         return _mcp_response(
             {
-                "basicInfo": {
-                    "userId": "user-1",
+                "userBasicInfo": {
                     "nickname": "Peer account",
                     "desc": "Practical AI notes",
                     "images": "https://img.example/avatar.jpg",
+                    "redId": "display-id",
                 },
                 "interactions": [
                     {"type": "follows", "count": "18"},
@@ -94,6 +100,8 @@ def test_collect_account_uses_user_profile_and_normalizes_real_shape() -> None:
                 "feeds": [
                     {
                         "id": "recent-1",
+                        "xsecToken": "must-not-be-persisted",
+                        "cookie": "must-not-be-persisted",
                         "noteCard": {
                             "displayTitle": "Recent note",
                             "user": {"userId": "user-1", "nickname": "Peer account"},
@@ -117,12 +125,92 @@ def test_collect_account_uses_user_profile_and_normalizes_real_shape() -> None:
     assert result.status == "SUCCESS"
     assert result.is_mock is False
     assert result.parsed_account is not None
+    assert result.parsed_account.account_id == "user-1"
     assert result.parsed_account.nickname == "Peer account"
     assert result.parsed_account.follower_count == 24000
     assert result.parsed_account.following_count == 18
     assert result.parsed_account.liked_count == 100000
     assert result.parsed_account.recent_notes[0].note_id == "recent-1"
     assert result.parsed_account.recent_notes[0].title == "Recent note"
+    serialized_payload = json.dumps(result.parsed_account.raw_payload)
+    assert "must-not-be-persisted" not in serialized_payload
+    assert "xsecToken" not in serialized_payload
+    assert "cookie" not in serialized_payload
+    assert "profile-token" not in (result.raw_text or "")
+
+
+def test_collect_note_retries_with_partial_comments_after_full_comment_timeout() -> None:
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if payload["params"]["arguments"]["load_all_comments"]:
+            raise httpx.ReadTimeout("all comments timed out", request=request)
+        return _mcp_response({"data": {"note": {"noteId": "note-1", "title": "Real title"}, "comments": {"list": []}}})
+
+    provider = XiaohongshuMcpProvider(base_url="http://collector:18060", transport=httpx.MockTransport(handler))
+    result = provider.collect_note(
+        "https://www.xiaohongshu.com/explore/note-1?xsec_token=secret-token",
+        collect_comments=True,
+        max_comments=20,
+    )
+
+    assert result.status == "PARTIAL_SUCCESS"
+    assert result.parsed_note is not None
+    assert result.parsed_note.title == "Real title"
+    assert result.parsed_note.warnings == ["COMMENTS_PARTIAL_AFTER_TIMEOUT", "PROVIDER_TIMEOUT_RETRIED"]
+    assert [item["params"]["arguments"]["load_all_comments"] for item in requests] == [True, False]
+
+
+def test_collect_note_marks_provider_comment_subset_as_partial() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _mcp_response(
+            {
+                "data": {
+                    "note": {
+                        "noteId": "note-1",
+                        "title": "Real title",
+                        "interactInfo": {"commentCount": "12"},
+                    },
+                    "comments": {"list": [{"id": "comment-1", "content": "Real comment"}]},
+                }
+            }
+        )
+
+    provider = XiaohongshuMcpProvider(base_url="http://collector:18060", transport=httpx.MockTransport(handler))
+    result = provider.collect_note(
+        "https://www.xiaohongshu.com/explore/note-1?xsec_token=secret-token",
+        collect_comments=True,
+        max_comments=10,
+    )
+
+    assert result.status == "PARTIAL_SUCCESS"
+    assert result.warnings == ["COMMENTS_PARTIAL_FROM_PROVIDER"]
+    assert result.parsed_note is not None
+    assert len(result.parsed_note.comments) == 1
+
+
+def test_collect_note_retries_bounded_request_once_after_timeout() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ReadTimeout("bounded request timed out", request=request)
+        return _mcp_response({"data": {"note": {"noteId": "note-1", "title": "Real title"}, "comments": {"list": []}}})
+
+    provider = XiaohongshuMcpProvider(base_url="http://collector:18060", transport=httpx.MockTransport(handler))
+    result = provider.collect_note(
+        "https://www.xiaohongshu.com/explore/note-1?xsec_token=secret-token",
+        collect_comments=True,
+        max_comments=10,
+    )
+
+    assert calls == 2
+    assert result.status == "SUCCESS"
+    assert result.warnings == ["PROVIDER_TIMEOUT_RETRIED"]
 
 
 def test_missing_xsec_token_is_a_real_failure_without_mock_fallback() -> None:

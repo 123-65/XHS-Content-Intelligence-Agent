@@ -1,12 +1,47 @@
 import re
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from app.collectors.xhs.base import XhsCollectedAccount, XhsCollectedComment, XhsCollectedNote
 
 
+_SENSITIVE_KEY_PARTS = (
+    "xsectoken",
+    "accesstoken",
+    "refreshtoken",
+    "authorization",
+    "cookie",
+    "session",
+)
+_SENSITIVE_QUERY_RE = re.compile(
+    r"(?i)((?:xsec[_-]?token|access[_-]?token|refresh[_-]?token|authorization|session)[=:])([^&\s\"'<>]+)"
+)
+
+
+def sanitize_xhs_payload(value: Any) -> Any:
+    """Remove authentication material before provider payloads can be persisted or logged."""
+    if isinstance(value, dict):
+        sanitized = {}
+        for key, item in value.items():
+            normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
+            if any(part in normalized_key for part in _SENSITIVE_KEY_PARTS):
+                continue
+            sanitized[key] = sanitize_xhs_payload(item)
+        return sanitized
+    if isinstance(value, list):
+        return [sanitize_xhs_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_xhs_payload(item) for item in value]
+    if isinstance(value, str):
+        return _SENSITIVE_QUERY_RE.sub(r"\1***", value)
+    return value
+
+
 def normalize_note_payload(payload: dict[str, Any], *, source_url: str, provider_name: str, source_type: str) -> XhsCollectedNote:
-    data = _unwrap(payload, "note", "data", "feed")
+    payload = sanitize_xhs_payload(payload)
+    container = _unwrap(payload, "data", "feed")
+    data = _unwrap(container, "note")
     note_card = _mapping(_first(data, "note_card", "noteCard"))
     if note_card:
         data = {**data, **note_card}
@@ -14,6 +49,7 @@ def normalize_note_payload(payload: dict[str, Any], *, source_url: str, provider
     interact = _mapping(_first(data, "interact_info", "interactInfo", "note_interact_info", "noteInteractInfo"))
     comment_items = _list(
         _first(payload, "comments", "comment_list", "commentList")
+        or _first(container, "comments", "comment_list", "commentList")
         or _first(data, "comments", "comment_list", "commentList", "top_comments")
     )
     comments = [
@@ -45,7 +81,7 @@ def normalize_note_payload(payload: dict[str, Any], *, source_url: str, provider
         like_count=_int(_first(interact, "liked_count", "likedCount", "like_count", "likes") or _first(data, "like_count", "liked_count")),
         collect_count=_int(_first(interact, "collected_count", "collectedCount", "collect_count", "collects") or _first(data, "collect_count", "collected_count")),
         comment_count=_int(_first(interact, "comment_count", "commentCount", "comments_count") or _first(data, "comment_count", "comments_count")),
-        share_count=_int(_first(interact, "share_count", "shareCount", "shares") or _first(data, "share_count", "shares")),
+        share_count=_int(_first(interact, "share_count", "shareCount", "sharedCount", "shares") or _first(data, "share_count", "shares")),
         cover_url=_cover_url(data, image_urls),
         image_urls=image_urls,
         image_ocr_texts=_string_list(_first(data, "image_ocr_texts", "ocr_texts")),
@@ -59,11 +95,17 @@ def normalize_note_payload(payload: dict[str, Any], *, source_url: str, provider
 
 
 def normalize_account_payload(payload: dict[str, Any], *, source_url: str, provider_name: str, source_type: str) -> XhsCollectedAccount:
+    payload = sanitize_xhs_payload(payload)
     data = _unwrap(payload, "account", "data", "profile")
-    basic = _mapping(_first(data, "basic_info", "basicInfo", "user", "user_info", "userInfo")) or data
+    basic = _mapping(_first(data, "basic_info", "basicInfo", "userBasicInfo", "user", "user_info", "userInfo")) or data
     counts = _interaction_counts(_first(data, "interactions", "interaction_info", "interactionInfo"))
-    account_id = _text(_first(basic, "user_id", "userId", "account_id", "red_id", "redId", "id"))
     recent_items = _list(_first(data, "feeds", "notes", "recent_notes", "recentNotes", "items"))
+    account_id = (
+        _text(_first(basic, "user_id", "userId", "account_id", "id"))
+        or _recent_note_author_id(recent_items)
+        or _profile_id(source_url)
+        or _text(_first(basic, "red_id", "redId"))
+    )
     recent_notes = [
         _normalize_recent_note(item, provider_name=provider_name, source_type=source_type)
         for item in recent_items
@@ -132,7 +174,29 @@ def _mapping(value: Any) -> dict[str, Any]:
 
 
 def _list(value: Any) -> list[Any]:
+    if isinstance(value, dict):
+        nested = _first(value, "list", "items", "comments")
+        return nested if isinstance(nested, list) else []
     return value if isinstance(value, list) else []
+
+
+def _recent_note_author_id(items: list[Any]) -> str | None:
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        note_card = _mapping(_first(item, "note_card", "noteCard")) or item
+        user = _mapping(_first(note_card, "user", "user_info", "userInfo", "author"))
+        if user_id := _text(_first(user, "user_id", "userId", "id")):
+            return user_id
+    return None
+
+
+def _profile_id(source_url: str) -> str | None:
+    parts = [part for part in urlparse(source_url).path.split("/") if part]
+    if "profile" not in parts:
+        return None
+    index = parts.index("profile")
+    return parts[index + 1] if index + 1 < len(parts) else None
 
 
 def _text(value: Any) -> str | None:

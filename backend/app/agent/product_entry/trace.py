@@ -88,9 +88,15 @@ class AgentEntryTrace(_TraceSchema):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-_SECRET_KEY_RE = re.compile(r"(api[_-]?key|access[_-]?token|refresh[_-]?token|authorization|password|secret)", re.IGNORECASE)
+_SECRET_KEY_RE = re.compile(
+    r"(api[_-]?key|xsec[_-]?token|access[_-]?token|refresh[_-]?token|authorization|cookie|session|password|secret)",
+    re.IGNORECASE,
+)
 _OPENAI_KEY_RE = re.compile(r"sk-[A-Za-z0-9_\-]{8,}")
 _BEARER_RE = re.compile(r"Bearer\s+[A-Za-z0-9._\-]+", re.IGNORECASE)
+_QUERY_SECRET_RE = re.compile(
+    r"(?i)((?:xsec[_-]?token|access[_-]?token|refresh[_-]?token|authorization|session)[=:])([^&\s\"'<>]+)"
+)
 
 
 def mask_sensitive_text(text: str | None) -> str | None:
@@ -98,7 +104,8 @@ def mask_sensitive_text(text: str | None) -> str | None:
     if text is None:
         return None
     masked = _OPENAI_KEY_RE.sub("sk-***", text)
-    return _BEARER_RE.sub("Bearer ***", masked)
+    masked = _BEARER_RE.sub("Bearer ***", masked)
+    return _QUERY_SECRET_RE.sub(r"\1***", masked)
 
 
 def summarize_payload(payload: dict[str, Any] | None, max_chars: int = 800) -> dict[str, Any]:

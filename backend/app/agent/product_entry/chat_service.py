@@ -267,7 +267,7 @@ def _workflow_timeline(execution_result: PlanExecutionResult, plan: Plan | None 
         {
             "step_order": step.step_order,
             "action": step.action.value,
-            "status": step.status.value,
+            "status": step.output.get("status") if step.output.get("status") in {"PARTIAL_SUCCESS", "FAILED"} else step.status.value,
             "started_at": step.started_at.isoformat() if step.started_at else None,
             "finished_at": step.finished_at.isoformat() if step.finished_at else None,
             "duration_ms": _duration_ms(step.started_at, step.finished_at),
@@ -301,7 +301,11 @@ def _timeline_input_summary(step: PlanStep | None) -> str | None:
 def _timeline_output_summary(action: Action, output: dict, message: str | None) -> str | None:
     counts = output.get("data_count") or {}
     if action == Action.COLLECT_XHS_NOTES:
-        return f"保存 {counts.get('notes_saved', 0)} 篇笔记 / {counts.get('comments_saved', 0)} 条评论 / {counts.get('images', 0)} 个图片 URL"
+        return (
+            f"保存 {counts.get('notes_saved', 0)} 篇笔记 / "
+            f"收到 {counts.get('comments_received', 0)} 条评论 / "
+            f"保存 {counts.get('comments_saved', 0)} 条评论 / {counts.get('images', 0)} 个图片 URL"
+        )
     if action == Action.COLLECT_XHS_ACCOUNTS:
         return f"保存 {counts.get('accounts_saved', 0)} 个账号 / {counts.get('recent_notes_saved', 0)} 篇近期笔记"
     if action == Action.ANALYZE_COMPETITOR_DATA:

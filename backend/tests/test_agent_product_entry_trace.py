@@ -237,6 +237,14 @@ def test_mask_sensitive_text_masks_bearer_token():
     assert masked == "Authorization: Bearer ***"
 
 
+def test_mask_sensitive_text_masks_xhs_query_token():
+    masked = mask_sensitive_text(
+        "https://www.xiaohongshu.com/explore/note-1?xsec_token=private-value&xsec_source=pc_feed"
+    )
+
+    assert masked == "https://www.xiaohongshu.com/explore/note-1?xsec_token=***&xsec_source=pc_feed"
+
+
 def test_summarize_payload_limits_long_text():
     """测试 summarize_payload 能限制超长文本。"""
     payload = summarize_payload({"text": "a" * 100}, max_chars=10)

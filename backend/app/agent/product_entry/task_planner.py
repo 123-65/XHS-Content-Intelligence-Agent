@@ -157,7 +157,7 @@ class LLMTaskPlanner:
                         "account_id": account_id,
                         "note_urls": note_urls,
                         "collect_comments": params.get("collect_comments", True),
-                        "max_comments": params.get("max_comments", 20),
+                        "max_comments": params.get("max_comments", 10),
                         "enable_ocr": params.get("enable_ocr", True),
                     },
                     expected_output="真实笔记、评论、图片和 OCR 结果入库摘要",

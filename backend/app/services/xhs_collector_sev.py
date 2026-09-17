@@ -64,7 +64,7 @@ class XhsCollectorService:
             if provider_result.status not in SUCCESS_STATUSES or not provider_result.parsed_note:
                 outcomes.append(
                     XhsCollectItemOutcome(
-                        input_value=url,
+                        input_value=provider_result.source_url,
                         status=provider_result.status,
                         error_code=provider_result.error_code or provider_result.status,
                         error_message=provider_result.error_message,
@@ -85,7 +85,7 @@ class XhsCollectorService:
             self.db.commit()
             outcomes.append(
                 XhsCollectItemOutcome(
-                    input_value=url,
+                    input_value=provider_result.source_url,
                     status=provider_result.status,
                     warnings=warnings,
                     ids={
@@ -95,6 +95,7 @@ class XhsCollectorService:
                     },
                     data_count={
                         "notes_saved": 1,
+                        "comments_received": len(note.comments),
                         "comments_saved": len(imported["comments"]),
                         "images": len(note.image_urls),
                     },
@@ -119,7 +120,7 @@ class XhsCollectorService:
             if provider_result.status not in SUCCESS_STATUSES or not provider_result.parsed_account:
                 outcomes.append(
                     XhsCollectItemOutcome(
-                        input_value=account_input,
+                        input_value=provider_result.source_url,
                         status=provider_result.status,
                         error_code=provider_result.error_code or provider_result.status,
                         error_message=provider_result.error_message,
@@ -137,10 +138,10 @@ class XhsCollectorService:
             account = imported["competitor_account"]
             note_results = imported["recent_note_results"]
             outcomes.append(
-                XhsCollectItemOutcome(
-                    input_value=account_input,
-                    status=provider_result.status,
-                    warnings=[*provider_result.warnings, *collected.warnings],
+                    XhsCollectItemOutcome(
+                        input_value=provider_result.source_url,
+                        status=provider_result.status,
+                        warnings=list(dict.fromkeys([*provider_result.warnings, *collected.warnings])),
                     ids={"competitor_account_id": account.id},
                     data_count={"accounts_saved": 1, "recent_notes_saved": len(note_results)},
                     nickname=account.nickname,
@@ -178,6 +179,7 @@ class XhsCollectorService:
     def _summary(self, action: str, outcomes: list[XhsCollectItemOutcome]) -> dict[str, Any]:
         success_count = sum(1 for item in outcomes if item.status in SUCCESS_STATUSES)
         failed_count = len(outcomes) - success_count
+        partial_count = sum(1 for item in outcomes if item.status == "PARTIAL_SUCCESS")
         warnings = list(dict.fromkeys(warning for item in outcomes for warning in item.warnings))
         errors = [
             {"input": item.input_value, "error_code": item.error_code, "error_message": item.error_message}
@@ -186,7 +188,7 @@ class XhsCollectorService:
         ]
         return {
             "action": action,
-            "status": "SUCCESS" if failed_count == 0 else "PARTIAL_SUCCESS" if success_count else "FAILED",
+            "status": "SUCCESS" if failed_count == 0 and partial_count == 0 else "PARTIAL_SUCCESS" if success_count else "FAILED",
             "provider_name": self.provider_name,
             "provider": self.source_type,
             "source_type": self.source_type,

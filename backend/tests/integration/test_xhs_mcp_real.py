@@ -14,9 +14,9 @@ pytestmark = pytest.mark.skipif(
 
 def test_real_xhs_mcp_contract() -> None:
     note_url = os.environ.get("XHS_TEST_NOTE_URL")
-    account_id_or_url = os.environ.get("XHS_TEST_ACCOUNT_ID")
+    account_id_or_url = os.environ.get("XHS_TEST_ACCOUNT_URL") or os.environ.get("XHS_TEST_ACCOUNT_ID")
     assert note_url, "XHS_TEST_NOTE_URL is required"
-    assert account_id_or_url, "XHS_TEST_ACCOUNT_ID is required (a profile URL with xsec_token is recommended)"
+    assert account_id_or_url, "XHS_TEST_ACCOUNT_URL is required"
 
     provider = XiaohongshuMcpProvider()
     login = provider.check_login_status()
@@ -28,7 +28,7 @@ def test_real_xhs_mcp_contract() -> None:
     tool_names = {item.get("name") for item in provider.list_tools()}
     assert {"check_login_status", "get_feed_detail", "user_profile"}.issubset(tool_names)
 
-    note_result = provider.collect_note(note_url, collect_comments=True, max_comments=20)
+    note_result = provider.collect_note(note_url, collect_comments=True, max_comments=10)
     assert note_result.status in SUCCESS_STATUSES
     assert note_result.provider_name == "xiaohongshu_mcp"
     assert note_result.is_mock is False
