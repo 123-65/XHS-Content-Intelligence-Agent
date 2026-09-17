@@ -17,17 +17,6 @@
         text-color="#cbd5e1"
         active-text-color="#ffffff"
       >
-        <el-menu-item index="/dashboard"><Monitor :size="18" /><span>仪表盘</span></el-menu-item>
-        <el-menu-item index="/account"><Settings :size="18" /><span>账号配置</span></el-menu-item>
-        <el-menu-item index="/competitor/collect"><Search :size="18" /><span>竞品采集</span></el-menu-item>
-        <el-menu-item index="/notes"><Library :size="18" /><span>笔记库</span></el-menu-item>
-        <el-menu-item index="/competitor/analysis"><ChartColumn :size="18" /><span>竞品分析</span></el-menu-item>
-        <el-menu-item index="/experiments"><FlaskConical :size="18" /><span>内容实验</span></el-menu-item>
-        <el-menu-item index="/drafts"><PenLine :size="18" /><span>内容生成</span></el-menu-item>
-        <el-menu-item index="/publish"><UploadCloud :size="18" /><span>发布辅助</span></el-menu-item>
-        <el-menu-item index="/metrics"><LineChart :size="18" /><span>效果复盘</span></el-menu-item>
-        <el-menu-item index="/strategy"><BrainCircuit :size="18" /><span>策略记忆</span></el-menu-item>
-        <el-menu-item index="/workflow-logs"><TerminalSquare :size="18" /><span>运行日志</span></el-menu-item>
         <el-menu-item index="/agent/workbench"><Bot :size="18" /><span>Agent 工作台</span></el-menu-item>
         <el-menu-item index="/developer/agent-trace"><Bug :size="18" /><span>Trace 控制台</span></el-menu-item>
       </el-menu>
@@ -39,10 +28,10 @@
           <el-button :icon="PanelLeft" circle @click="app.toggleSidebar()" />
           <div>
             <strong>XHS Growth Intelligence Agent</strong>
-            <span>当前账号：{{ account.profile.name }} · 当前目标：{{ account.profile.primaryGoal }}线索</span>
+            <span>真实数据采集、分析与运营工作流</span>
           </div>
         </div>
-        <el-tag type="success" effect="light">Demo Mock Mode</el-tag>
+        <el-tag type="success" effect="light">Real Data</el-tag>
       </el-header>
       <el-main class="main">
         <router-view />
@@ -52,28 +41,11 @@
 </template>
 
 <script setup lang="ts">
-import {
-  BrainCircuit,
-  Bot,
-  Bug,
-  ChartColumn,
-  FlaskConical,
-  Library,
-  LineChart,
-  Monitor,
-  PanelLeft,
-  PenLine,
-  Search,
-  Settings,
-  TerminalSquare,
-  UploadCloud
-} from 'lucide-vue-next'
+import { Bot, Bug, PanelLeft } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
-import { useAccountStore } from '@/stores/account'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
-const account = useAccountStore()
 const app = useAppStore()
 </script>
 
