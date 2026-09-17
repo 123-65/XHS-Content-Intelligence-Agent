@@ -12,3 +12,9 @@ frontend/dist/
 idea_to_post_todos.zip
 
 .pytest_tmp/
+
+# Local xiaohongshu-mcp binaries and login state
+tools/xiaohongshu-mcp/*.exe
+tools/xiaohongshu-mcp/data/
+tools/xiaohongshu-mcp/session/
+tools/xiaohongshu-mcp/cookies*

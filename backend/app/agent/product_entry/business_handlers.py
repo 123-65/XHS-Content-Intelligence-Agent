@@ -154,7 +154,8 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
     """Agent Tool: reuse existing competitor report service without adding new semantic rules."""
     params = _params(step)
     account_id = _account_id(step, context)
-    report = CompetitorReportService(_db_session(context)).create_report(
+    db = _db_session(context)
+    report = CompetitorReportService(db).create_report(
         CompetitorReportCreate(
             account_id=account_id,
             name="Agent Competitor Analysis",
@@ -162,6 +163,28 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
             limit=_int_or_default(params.get("limit"), 20),
         )
     )
+    comment_ids = [
+        row[0]
+        for row in db.query(CompetitorComment.id)
+        .filter(
+            CompetitorComment.account_id == account_id,
+            CompetitorComment.competitor_note_id.in_(report.competitor_note_ids),
+            CompetitorComment.is_mock.is_(False),
+        )
+        .all()
+    ]
+    evidence = {
+        "competitor_account_ids": report.competitor_account_ids,
+        "competitor_note_ids": report.competitor_note_ids,
+        "note_snapshot_ids": report.note_snapshot_ids,
+        "comment_ids": comment_ids,
+    }
+    metadata = {
+        "analysis_engine": "SEMANTIC_RULE_BASELINE",
+        "data_source": "REAL",
+        "provider": "XHS_MCP",
+        "evidence": evidence,
+    }
     return {
         "report_id": report.id,
         "account_id": account_id,
@@ -172,11 +195,13 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
         "content_pillars": report.content_pillars,
         "comment_demands": report.comment_demands,
         "opportunity_count": len(report.content_insights or []),
-        "evidence": {
-            "competitor_account_ids": report.competitor_account_ids,
-            "competitor_note_ids": report.competitor_note_ids,
-            "note_snapshot_ids": report.note_snapshot_ids,
-        },
+        "provider": "XHS_MCP",
+        "data_source": "REAL",
+        "data_count": {"notes_analyzed": report.note_count, "comments_analyzed": report.comment_count},
+        "evidence": evidence,
+        "evidence_ids": {**evidence, "report_id": report.id},
+        "metadata": metadata,
+        "analysis_engine": "SEMANTIC_RULE_BASELINE",
         "semantic_rule_baseline": "SEMANTIC_RULE_BASELINE",
     }
 

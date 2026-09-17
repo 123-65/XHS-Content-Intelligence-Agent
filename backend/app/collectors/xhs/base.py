@@ -107,6 +107,7 @@ class XhsCollectProviderResult(BaseModel):
     status: XhsCollectStatus
     provider_name: str
     source_url: str
+    is_mock: bool = False
     error_code: str | None = None
     error_message: str | None = None
     raw_html: str | None = None

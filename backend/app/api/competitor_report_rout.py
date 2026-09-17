@@ -17,7 +17,10 @@ router = APIRouter(prefix="/api/competitor/reports", tags=["竞品分析 V2"])
 
 def _service_error(exc: ValueError, status_code: int) -> JSONResponse:
     """返回业务错误响应。"""
-    return JSONResponse(status_code=status_code, content=fail(code=status_code, message=str(exc)).model_dump())
+    return JSONResponse(
+        status_code=status_code,
+        content=fail(code=status_code, message=str(exc), data=getattr(exc, "payload", None)).model_dump(),
+    )
 
 
 @router.post("")

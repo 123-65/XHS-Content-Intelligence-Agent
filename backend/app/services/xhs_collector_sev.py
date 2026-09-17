@@ -178,22 +178,29 @@ class XhsCollectorService:
     def _summary(self, action: str, outcomes: list[XhsCollectItemOutcome]) -> dict[str, Any]:
         success_count = sum(1 for item in outcomes if item.status in SUCCESS_STATUSES)
         failed_count = len(outcomes) - success_count
+        warnings = list(dict.fromkeys(warning for item in outcomes for warning in item.warnings))
+        errors = [
+            {"input": item.input_value, "error_code": item.error_code, "error_message": item.error_message}
+            for item in outcomes
+            if item.error_code or item.error_message
+        ]
         return {
             "action": action,
             "status": "SUCCESS" if failed_count == 0 else "PARTIAL_SUCCESS" if success_count else "FAILED",
             "provider_name": self.provider_name,
+            "provider": self.source_type,
             "source_type": self.source_type,
+            "data_source": "REAL",
             "total": len(outcomes),
             "success_count": success_count,
             "failed_count": failed_count,
             "items": [item.__dict__ for item in outcomes],
             "data_count": self._data_count(outcomes),
             "evidence_ids": self._evidence_ids(outcomes),
-            "errors": [
-                {"input": item.input_value, "error_code": item.error_code, "error_message": item.error_message}
-                for item in outcomes
-                if item.error_code or item.error_message
-            ],
+            "warnings": warnings,
+            "errors": errors,
+            "error_code": errors[0]["error_code"] if errors else None,
+            "error_message": errors[0]["error_message"] if errors else None,
         }
 
     def _data_count(self, outcomes: list[XhsCollectItemOutcome]) -> dict[str, int]:

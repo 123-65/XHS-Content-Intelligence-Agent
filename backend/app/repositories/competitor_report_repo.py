@@ -25,7 +25,14 @@ class CompetitorReportRepository:
 
     def list_competitor_accounts(self, account_id: int) -> list[CompetitorAccount]:
         """查询账号下的同行账号快照。"""
-        stmt = select(CompetitorAccount).where(CompetitorAccount.account_id == account_id).order_by(CompetitorAccount.id.desc())
+        stmt = (
+            select(CompetitorAccount)
+            .where(
+                CompetitorAccount.account_id == account_id,
+                CompetitorAccount.is_mock.is_(False),
+            )
+            .order_by(CompetitorAccount.id.desc())
+        )
         return list(self.db.execute(stmt).scalars().all())
 
     def list_competitor_notes(self, account_id: int, keyword: str | None, limit: int) -> list[CompetitorNote]:
@@ -78,7 +85,10 @@ class CompetitorReportRepository:
 
     def list_comments_for_notes(self, account_id: int, note_ids: list[int]) -> list[CompetitorComment]:
         """查询竞品笔记下的评论样本。"""
-        stmt = select(CompetitorComment).where(CompetitorComment.account_id == account_id)
+        stmt = select(CompetitorComment).where(
+            CompetitorComment.account_id == account_id,
+            CompetitorComment.is_mock.is_(False),
+        )
         if note_ids:
             stmt = stmt.where(CompetitorComment.competitor_note_id.in_(note_ids))
         return list(self.db.execute(stmt).scalars().all())
