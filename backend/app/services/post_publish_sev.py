@@ -67,17 +67,10 @@ class PostPublishService:
         return [PublicMetricSnapshotResponse.model_validate(item) for item in self.repo.list_public_metrics(published_note_id)]
 
     def collect_public_metrics(self, published_note_id: int, data: CollectMetricsRequest) -> PublicMetricSnapshotResponse:
-        """使用手动数据或确定性 Mock 数据回采公开指标。"""
+        """保存人工核对后的真实公开指标。"""
         self._ensure_published_note(published_note_id)
-        metrics = self._mock_metrics(data.snapshot_window.value) if data.use_mock else data.metrics
-        if metrics is None:
-            raise ValueError("metrics is required when use_mock is false")
-        snapshot_data = metrics.model_dump()
+        snapshot_data = data.metrics.model_dump()
         snapshot_data["published_note_id"] = published_note_id
-        if data.use_mock:
-            snapshot_data["source_type"] = "MOCK"
-            snapshot_data["raw_snapshot"] = {"provider": "MockPublicMetricProvider", "snapshot_window": data.snapshot_window.value}
-            snapshot_data["confidence"] = Decimal("0.8000")
         snapshot = self.repo.create_public_metric_snapshot(snapshot_data)
         return PublicMetricSnapshotResponse.model_validate(snapshot)
 
@@ -185,20 +178,6 @@ class PostPublishService:
         generated_id = None if plan.plan_type == OptimizationPlanType.PAUSE.value else self._create_next_experiment(plan)
         applied = self.repo.update_plan_applied(plan, generated_id)
         return ContentOptimizationPlanResponse.model_validate(applied)
-
-    def _mock_metrics(self, snapshot_window: str) -> PublicMetricSnapshotCreate:
-        """按指标窗口生成确定性的 Mock 公开指标。"""
-        multiplier = {"24h": 1, "48h": 2, "72h": 3, "7d": 5}[snapshot_window]
-        return PublicMetricSnapshotCreate(
-            snapshot_window=snapshot_window,
-            view_count=500 * multiplier,
-            like_count=45 * multiplier,
-            collect_count=35 * multiplier,
-            comment_count=8 * multiplier,
-            share_count=3 * multiplier,
-            follow_count=4 * multiplier,
-            profile_visit_count=18 * multiplier,
-        )
 
     def _public_summary(self, metrics) -> dict:
         """基于最新快照汇总公开指标。"""

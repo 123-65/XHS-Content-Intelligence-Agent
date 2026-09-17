@@ -17,11 +17,9 @@ class LLMClient:
     """统一 LLM 客户端。业务代码只允许调用此类。"""
 
     def __init__(self, provider_name: str | None = None):
-        """初始化并选择 LLM Provider；Mock 只能显式指定，真实 Provider 不可用时不自动兜底。"""
+        """初始化真实 LLM Provider；不提供 Mock 或隐式降级。"""
         self.requested_provider = configured_provider_name(provider_name)
         self.provider_impl = build_llm_provider(self.requested_provider)
-        if self.provider_impl.is_mock and self.requested_provider != "mock":
-            raise LLMError(f"{ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value}: mock provider cannot be used as implicit fallback")
         if not self.provider_impl.available():
             raise LLMError(f"{ProviderErrorCode.LLM_CONFIG_MISSING.value}: provider {self.requested_provider} is not configured")
         self.model = self.provider_impl.model

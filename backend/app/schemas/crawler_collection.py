@@ -7,7 +7,7 @@ from app.schemas.provider_status import ProviderSourceType
 
 
 CrawlTaskStatus = Literal["PENDING", "RUNNING", "SUCCESS", "FAILED"]
-CrawlerProviderName = Literal["readonly_xhs", "mcp_xhs", "manual_snapshot", "seed_sample", "manual"]
+CrawlerProviderName = Literal["readonly_xhs", "mcp_xhs", "manual_snapshot"]
 
 
 class CrawlTaskCreate(BaseModel):

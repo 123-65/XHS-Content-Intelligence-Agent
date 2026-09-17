@@ -2,7 +2,6 @@ import pytest
 
 from app.llm.client import LLMClient
 from app.llm.errors import LLMError, LLMResponseError
-from app.llm.providers.mock_provider import MockLLMProvider
 from app.llm.router import configured_provider_name, llm_health
 from app.schemas.llm import LLMResult, LLMStructuredResult, LLMUsage
 from app.schemas.llm_test import LLMTestAnalysisResult
@@ -55,6 +54,13 @@ class FakeFailingProvider(FakeRealProvider):
         raise LLMResponseError("upstream timeout")
 
 
+class FakeUnavailableProvider(FakeRealProvider):
+    is_mock = True
+
+    def available(self) -> bool:
+        return False
+
+
 def test_default_provider_name_is_not_mock(monkeypatch):
     """测试未配置默认 Provider 时不会回到 mock。"""
     monkeypatch.setattr("app.llm.router.settings.llm_provider", "")
@@ -67,8 +73,8 @@ def test_default_provider_name_is_not_mock(monkeypatch):
 def test_no_api_key_does_not_fall_back_to_mock(monkeypatch):
     """测试无真实配置时不会隐式回退 Mock。"""
     monkeypatch.setattr("app.llm.client.configured_provider_name", lambda provider_name=None: "qwen")
-    monkeypatch.setattr("app.llm.client.build_llm_provider", lambda provider_name=None: MockLLMProvider())
-    with pytest.raises(LLMError, match="implicit fallback"):
+    monkeypatch.setattr("app.llm.client.build_llm_provider", lambda provider_name=None: FakeUnavailableProvider())
+    with pytest.raises(LLMError, match=ProviderErrorCode.LLM_CONFIG_MISSING.value):
         LLMClient()
 
 
@@ -162,15 +168,7 @@ def test_llm_provider_error_code_enums_keep_expected_values():
     assert ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value == "LLM_PROVIDER_UNAVAILABLE"
 
 
-def test_explicit_mock_provider_is_allowed():
-    """测试显式指定 mock provider 时允许使用 MockLLM。"""
-    client = LLMClient(provider_name="mock")
-    result = client.generate_text("test prompt", prompt_key="unit_test", prompt_version="v1")
-
-    assert result.provider == "mock"
-    assert result.is_mock is True
-    assert result.fallback_used is False
-    assert result.fallback_from is None
-    assert result.prompt_key == "unit_test"
-    assert result.prompt_version == "v1"
-    assert result.latency_ms >= 0
+def test_explicit_mock_provider_is_rejected():
+    """正式统一客户端不允许显式启用 Mock Provider。"""
+    with pytest.raises(LLMError, match=ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value):
+        LLMClient(provider_name="mock")

@@ -6,7 +6,6 @@ from app.crawler.xhs_url import parse_xhs_note_url
 from app.models.xhs_note import XhsNoteSnapshot
 from app.repositories.xhs_note_repo import XhsNoteSnapshotRepository
 from app.schemas.xhs_note import XhsNoteSnapshotCreate, XhsNoteUrlParseResult
-from app.crawler.factory import get_xhs_crawler_provider
 
 
 class XhsNoteSnapshotService:
@@ -50,22 +49,6 @@ class XhsNoteSnapshotService:
         if not snapshot:
             raise ValueError("笔记快照不存在")
         return snapshot
-
-    def crawl_and_create_snapshot(
-        self,
-        note_url: str,
-        source_type: str = "MANUAL_LINK",
-        keyword: str | None = None,
-    ) -> XhsNoteSnapshot:
-        """采集单篇公开笔记并创建快照。"""
-        provider = get_xhs_crawler_provider()
-        crawl_result = provider.crawl_note(note_url=note_url, source_type=source_type, keyword=keyword)
-
-        data = XhsNoteSnapshotCreate(**crawl_result.model_dump())
-        if crawl_result.status == "FAILED":
-            return self.repo.create(data, raw_hash=None)
-
-        return self.create_snapshot(data)
 
 #==========================================内部函数=================================================
     def _build_merged_text(self, data: XhsNoteSnapshotCreate) -> str:

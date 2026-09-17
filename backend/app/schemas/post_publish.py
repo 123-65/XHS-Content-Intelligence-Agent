@@ -55,11 +55,10 @@ class PublicMetricSnapshotCreate(BaseModel):
 
 
 class CollectMetricsRequest(BaseModel):
-    """手动或 Mock 回采公开指标的请求体。"""
+    """人工回填真实公开指标的请求体。"""
 
     snapshot_window: MetricSnapshotWindow
-    metrics: PublicMetricSnapshotCreate | None = None
-    use_mock: bool = False
+    metrics: PublicMetricSnapshotCreate
 
 
 class PublicMetricSnapshotResponse(BaseModel):

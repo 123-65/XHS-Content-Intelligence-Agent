@@ -133,11 +133,24 @@ def test_post_publish_feedback_loop_success_path():
 
     collect_response = client.post(
         f"/api/published-notes/{published_note_id}/collect-metrics",
-        json={"snapshot_window": "24h", "use_mock": True},
+        json={
+            "snapshot_window": "24h",
+            "metrics": {
+                "snapshot_window": "24h",
+                "view_count": 500,
+                "like_count": 45,
+                "collect_count": 35,
+                "comment_count": 8,
+                "share_count": 3,
+                "follow_count": 4,
+                "profile_visit_count": 18,
+                "source_type": "MANUAL",
+            },
+        },
     )
     assert collect_response.status_code == 200
     metrics = collect_response.json()["data"]
-    assert metrics["source_type"] == "MOCK"
+    assert metrics["source_type"] == "MANUAL"
     assert metrics["collect_count"] == 35
 
     list_response = client.get(f"/api/published-notes/{published_note_id}/public-metrics")

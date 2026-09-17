@@ -7,9 +7,9 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from pydantic import ValidationError
 
-from app.llm.mock_client import MockLLMClient
 from app.schemas.content_draft_v2 import DraftGenerateV2Result
 from app.schemas.eval import EvalCaseResult
+from evals.fakes import FakeEvalLLMClient
 from evals.runners.assertions import validate_min_json_schema
 from evals.runners.core import build_arg_parser, print_report, run_eval
 
@@ -40,9 +40,9 @@ def evaluate_case(case: dict) -> EvalCaseResult:
 
 
 def _resolve_output(input_payload: dict, schema_model):
-    """Resolve case output from static payload or MockLLMClient."""
+    """Resolve case output from static payload or the eval-only fake client."""
     if input_payload.get("use_mock_llm"):
-        return MockLLMClient().generate_structured("schema eval", schema_model).data.model_dump()
+        return FakeEvalLLMClient().generate_structured("schema eval", schema_model).data.model_dump()
     return input_payload.get("output", {})
 
 

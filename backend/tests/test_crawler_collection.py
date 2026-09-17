@@ -7,7 +7,6 @@ from app.crawler.providers.factory import PROVIDER_ORDER, get_collection_provide
 from app.crawler.providers.manual_snapshot_provider import ManualSnapshotProvider
 from app.crawler.providers.mcp_xhs_provider import MCPXhsProvider
 from app.crawler.providers.readonly_xhs_provider import ReadOnlyXhsProvider
-from app.crawler.providers.seed_sample import SeedSampleProvider
 from app.main import app
 from app.schemas.provider_status import ProviderSourceType
 from app.services.provider_health_sev import ProviderHealthService
@@ -42,77 +41,13 @@ def create_test_account(name: str = "采集测试账号") -> int:
     return response.json()["data"]["id"]
 
 
-def test_seed_sample_crawl_task_flow():
-    """测试 SeedSampleProvider 采集任务完整流程。"""
-    account_id = create_test_account()
-    create_response = client.post(
-        "/api/crawler/tasks",
-        json={
-            "account_id": account_id,
-            "task_type": "COMPETITOR_SEED",
-            "provider_name": "seed_sample",
-            "keyword": "AI Agent",
-        },
-    )
-    assert create_response.status_code == 200
-    task_id = create_response.json()["data"]["id"]
-
-    run_response = client.post(f"/api/crawler/tasks/{task_id}/run")
-    assert run_response.status_code == 200
-    task = run_response.json()["data"]
-    assert task["status"] == "SUCCESS"
-    assert task["result_count"] == 7
-    assert task["success_count"] == 7
-    assert task["failed_count"] == 0
-    assert task["confidence"] > 0
-
-    detail_response = client.get(f"/api/crawler/tasks/{task_id}")
-    assert detail_response.status_code == 200
-    assert detail_response.json()["data"]["id"] == task_id
-
-    accounts_response = client.get(f"/api/competitor/accounts?account_id={account_id}")
-    assert accounts_response.status_code == 200
-    accounts = accounts_response.json()["data"]
-    assert len(accounts) == 1
-    assert accounts[0]["source_type"] == "SEED_SAMPLE"
-    assert accounts[0]["raw_snapshot"]["provider"] == "seed_sample"
-
-    notes_response = client.get(f"/api/competitor/notes?account_id={account_id}")
-    assert notes_response.status_code == 200
-    notes = notes_response.json()["data"]
-    assert len(notes) == 3
-    assert all(note["account_id"] == account_id for note in notes)
-    assert all(note["source_type"] == "SEED_SAMPLE" for note in notes)
-    assert any("AI Agent" in (note["title"] or "") for note in notes)
-
-
-def test_provider_factory_keeps_seed_sample_out_of_default_chain():
-    """生产默认链路不自动使用 SeedSampleProvider。"""
+def test_provider_factory_contains_only_real_providers():
+    """生产 Provider 注册表只包含真实来源。"""
     provider_names = [provider.name for provider in get_provider_chain()]
 
     assert list(PROVIDER_ORDER) == ["mcp_xhs", "readonly_xhs", "manual_snapshot"]
     assert provider_names == ["mcp_xhs", "readonly_xhs", "manual_snapshot"]
-    assert "seed_sample" not in provider_names
     assert get_collection_provider().name == "mcp_xhs"
-
-
-def test_seed_sample_provider_requires_explicit_selection():
-    """seed_sample 仅保留给 demo/test 显式指定。"""
-    provider_names = [provider.name for provider in get_provider_chain("seed_sample")]
-
-    assert provider_names == ["seed_sample"]
-    assert get_collection_provider("seed_sample").name == "seed_sample"
-
-
-def test_seed_sample_provider_keeps_explicit_mock_source_type():
-    """SeedSampleProvider 显式标记为测试样本数据。"""
-    task = SimpleNamespace(id=1, account_id=1, keyword="AI Agent", input_payload={})
-
-    result = SeedSampleProvider().collect(task)
-
-    assert result.provider_name == "seed_sample"
-    assert result.source_type == ProviderSourceType.SEED_SAMPLE.value
-    assert result.is_mock is True
 
 
 def test_provider_health_does_not_recommend_seed_sample_fallback(monkeypatch):
@@ -123,8 +58,7 @@ def test_provider_health_does_not_recommend_seed_sample_fallback(monkeypatch):
     crawler_health = ProviderHealthService().health()["crawler"]
 
     assert crawler_health["fallback_provider"] == "manual_snapshot"
-    assert "seed_sample" not in crawler_health["provider_order"]
-    assert "seed_sample" not in crawler_health["suggestion"]
+    assert set(crawler_health["provider_order"]) == {"mcp_xhs", "readonly_xhs", "manual_snapshot"}
     assert ProviderErrorCode.MCP_NOT_CONFIGURED.value in crawler_health["status_codes"]
 
 
@@ -214,7 +148,7 @@ def test_manual_provider_crawl_task_flow():
         json={
             "account_id": account_id,
             "task_type": "COMPETITOR_MANUAL",
-            "provider_name": "manual",
+            "provider_name": "manual_snapshot",
             "input_payload": {
                 "accounts": [
                     {

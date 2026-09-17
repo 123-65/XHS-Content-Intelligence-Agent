@@ -1,5 +1,5 @@
 from app.core.config import settings
-from app.crawler.providers.factory import DEMO_PROVIDER_NAMES, PROVIDERS, PROVIDER_ORDER
+from app.crawler.providers.factory import PROVIDERS, PROVIDER_ORDER
 from app.llm.router import llm_health
 from app.schemas.provider_status import ProviderErrorCode
 
@@ -23,18 +23,15 @@ class ProviderHealthService:
         """返回 Crawler Provider 健康状态。"""
         active = settings.xhs_crawler_provider if settings.xhs_crawler_provider in PROVIDERS else PROVIDER_ORDER[0]
         provider = PROVIDERS[active]
-        is_demo_provider = active in DEMO_PROVIDER_NAMES
         status_codes = []
         if active == "mcp_xhs":
             status_codes.append(ProviderErrorCode.MCP_NOT_CONFIGURED.value)
-        if is_demo_provider:
-            status_codes.append(ProviderErrorCode.MANUAL_SNAPSHOT_REQUIRED.value)
         return {
             "active_provider": provider.name,
-            "available": not is_demo_provider,
+            "available": True,
             "fallback_provider": "manual_snapshot",
             "provider_order": list(PROVIDER_ORDER),
-            "is_mock": is_demo_provider,
+            "is_mock": False,
             "status_codes": status_codes,
             "suggestion": "请配置 MCP 数据源，或手动录入真实公开笔记样本。",
             "guardrails": [
@@ -52,10 +49,10 @@ class ProviderHealthService:
 
     def _embedding(self) -> dict:
         """返回 Embedding Provider 健康状态。"""
-        is_mock = not settings.embedding_api_key or settings.embedding_provider == "mock"
+        available = bool(settings.embedding_api_key and settings.embedding_provider != "disabled")
         return {
-            "active_provider": settings.embedding_provider if not is_mock else "mock",
+            "active_provider": settings.embedding_provider if available else None,
             "model": settings.embedding_model,
-            "available": True,
-            "is_mock": is_mock,
+            "available": available,
+            "is_mock": False,
         }

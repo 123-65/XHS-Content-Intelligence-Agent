@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     xhs_crawler_provider: str = "readonly_xhs"
     crawler_headless: bool = False
     crawler_timeout_ms: int = 15000
-    embedding_provider: str = "mock"
+    embedding_provider: str = "disabled"
     embedding_api_key: str | None = None
     embedding_model: str = "BAAI/bge-m3"
     llm_provider: str = "qwen"
