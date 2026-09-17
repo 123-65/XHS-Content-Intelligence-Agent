@@ -155,7 +155,8 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
     params = _params(step)
     account_id = _account_id(step, context)
     db = _db_session(context)
-    report = CompetitorReportService(db).create_report(
+    report_service = CompetitorReportService(db)
+    report = report_service.create_report(
         CompetitorReportCreate(
             account_id=account_id,
             name="Agent Competitor Analysis",
@@ -179,8 +180,9 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
         "note_snapshot_ids": report.note_snapshot_ids,
         "comment_ids": comment_ids,
     }
+    analysis_engine = report.replicability_summary.get("analysis_engine", report_service.analysis_engine)
     metadata = {
-        "analysis_engine": "SEMANTIC_RULE_BASELINE",
+        "analysis_engine": analysis_engine,
         "data_source": "REAL",
         "provider": "XHS_MCP",
         "evidence": evidence,
@@ -201,8 +203,7 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
         "evidence": evidence,
         "evidence_ids": {**evidence, "report_id": report.id},
         "metadata": metadata,
-        "analysis_engine": "SEMANTIC_RULE_BASELINE",
-        "semantic_rule_baseline": "SEMANTIC_RULE_BASELINE",
+        "analysis_engine": analysis_engine,
     }
 
 
