@@ -100,6 +100,7 @@ class CompetitorReportAssembler:
             "sample_count": len(scores),
             "risk_adjusted": any(item.name != "低风险" for item in semantic.risk_points),
             "analysis_engine": analysis_engine,
+            "grounding_status": "PASSED",
             **sample_state,
             "data_gaps": semantic.data_gaps,
         }

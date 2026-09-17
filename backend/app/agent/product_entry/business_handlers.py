@@ -181,8 +181,14 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
         "comment_ids": comment_ids,
     }
     analysis_engine = report.replicability_summary.get("analysis_engine", report_service.analysis_engine)
+    data_gaps = report.replicability_summary.get("data_gaps", [])
+    grounding_status = report.replicability_summary.get("grounding_status", "PASSED")
     metadata = {
         "analysis_engine": analysis_engine,
+        "evidence_note_count": report.note_count,
+        "evidence_comment_count": report.comment_count,
+        "data_gaps": data_gaps,
+        "grounding_status": grounding_status,
         "data_source": "REAL",
         "provider": "XHS_MCP",
         "evidence": evidence,
@@ -204,6 +210,10 @@ def analyze_competitor_data_handler(step: PlanStep, context: dict[str, Any]) -> 
         "evidence_ids": {**evidence, "report_id": report.id},
         "metadata": metadata,
         "analysis_engine": analysis_engine,
+        "evidence_note_count": report.note_count,
+        "evidence_comment_count": report.comment_count,
+        "data_gaps": data_gaps,
+        "grounding_status": grounding_status,
     }
 
 

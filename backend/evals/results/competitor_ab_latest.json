@@ -1,0 +1,457 @@
+{
+  "generated_at": "2026-09-17T07:51:05.019462+00:00",
+  "evidence_summary": {
+    "account_id": 2,
+    "used_account_ids": [
+      1697,
+      1698,
+      1699
+    ],
+    "used_note_ids": [
+      6483,
+      6484,
+      6485,
+      6486,
+      6487,
+      6488,
+      6489,
+      6490,
+      6491,
+      6492,
+      6493,
+      6494
+    ],
+    "used_comment_ids": [
+      6553,
+      6554,
+      6555,
+      6556,
+      6557,
+      6558,
+      6559,
+      6560,
+      6561,
+      6562,
+      6563,
+      6564,
+      6565,
+      6566,
+      6567,
+      6568,
+      6569,
+      6570,
+      6571,
+      6572
+    ],
+    "account_count": 3,
+    "note_count": 12,
+    "comment_count": 20,
+    "mock_records_included": 0,
+    "redacted_titles": [
+      {
+        "note_id": 6483,
+        "title": "真实笔记 01"
+      },
+      {
+        "note_id": 6484,
+        "title": "真实笔记 02"
+      },
+      {
+        "note_id": 6485,
+        "title": "真实笔记 03"
+      },
+      {
+        "note_id": 6486,
+        "title": "真实笔记 04"
+      },
+      {
+        "note_id": 6487,
+        "title": "真实笔记 05"
+      },
+      {
+        "note_id": 6488,
+        "title": "真实笔记 06"
+      },
+      {
+        "note_id": 6489,
+        "title": "真实笔记 07"
+      },
+      {
+        "note_id": 6490,
+        "title": "真实笔记 08"
+      },
+      {
+        "note_id": 6491,
+        "title": "真实笔记 09"
+      },
+      {
+        "note_id": 6492,
+        "title": "真实笔记 10"
+      },
+      {
+        "note_id": 6493,
+        "title": "真实笔记 11"
+      },
+      {
+        "note_id": 6494,
+        "title": "真实笔记 12"
+      }
+    ],
+    "data_gaps": [
+      "没有可用的 OCR 文本，无法分析图片内容"
+    ]
+  },
+  "analysis_a": {
+    "status": "SUCCESS",
+    "result": {
+      "persona": {
+        "positioning": "知识分享号",
+        "expertise": [
+          "综合内容",
+          "避坑复盘",
+          "学习路线"
+        ],
+        "target_audience": [
+          "账号内容的潜在读者"
+        ],
+        "value_proposition": "通过知识内容提供学习或实践参考",
+        "tone_and_style": [
+          "知识分享"
+        ],
+        "confidence": 0.4,
+        "evidence": [
+          {
+            "source_type": "ACCOUNT",
+            "source_id": 1697,
+            "detail": null
+          },
+          {
+            "source_type": "ACCOUNT",
+            "source_id": 1698,
+            "detail": null
+          },
+          {
+            "source_type": "ACCOUNT",
+            "source_id": 1699,
+            "detail": null
+          }
+        ]
+      },
+      "content_pillars": [
+        {
+          "name": "综合内容",
+          "description": "规则关键词命中 10 篇笔记。",
+          "evidence_note_ids": [
+            6483,
+            6486,
+            6487,
+            6488,
+            6489,
+            6490,
+            6491,
+            6492,
+            6493,
+            6494
+          ],
+          "confidence": 0.45
+        },
+        {
+          "name": "避坑复盘",
+          "description": "规则关键词命中 2 篇笔记。",
+          "evidence_note_ids": [
+            6484,
+            6485
+          ],
+          "confidence": 0.45
+        },
+        {
+          "name": "学习路线",
+          "description": "规则关键词命中 1 篇笔记。",
+          "evidence_note_ids": [
+            6484
+          ],
+          "confidence": 0.45
+        },
+        {
+          "name": "项目实战",
+          "description": "规则关键词命中 1 篇笔记。",
+          "evidence_note_ids": [
+            6484
+          ],
+          "confidence": 0.45
+        },
+        {
+          "name": "求职简历",
+          "description": "规则关键词命中 1 篇笔记。",
+          "evidence_note_ids": [
+            6484
+          ],
+          "confidence": 0.45
+        }
+      ],
+      "audience_demands": [
+        {
+          "demand": "UNKNOWN",
+          "user_intent": "规则识别为 UNKNOWN 的评论意图",
+          "representative_comment_ids": [
+            6553,
+            6554,
+            6555
+          ],
+          "confidence": 0.2
+        },
+        {
+          "demand": "ANXIETY",
+          "user_intent": "规则识别为 ANXIETY 的评论意图",
+          "representative_comment_ids": [
+            6561
+          ],
+          "confidence": 0.4
+        }
+      ],
+      "high_performing_patterns": [
+        {
+          "pattern": "普通表达型",
+          "evidence_note_ids": [
+            6483
+          ],
+          "metric_evidence": [
+            {
+              "note_id": 6483,
+              "metric": "engagement_score",
+              "value": 7616.0
+            }
+          ],
+          "confidence": 0.5
+        },
+        {
+          "pattern": "数字清单型",
+          "evidence_note_ids": [
+            6484
+          ],
+          "metric_evidence": [
+            {
+              "note_id": 6484,
+              "metric": "engagement_score",
+              "value": 2055.0
+            }
+          ],
+          "confidence": 0.5
+        },
+        {
+          "pattern": "避坑警示型",
+          "evidence_note_ids": [
+            6492
+          ],
+          "metric_evidence": [
+            {
+              "note_id": 6492,
+              "metric": "engagement_score",
+              "value": 13.0
+            }
+          ],
+          "confidence": 0.5
+        },
+        {
+          "pattern": "高互动内容",
+          "evidence_note_ids": [
+            6491
+          ],
+          "metric_evidence": [
+            {
+              "note_id": 6491,
+              "metric": "engagement_score",
+              "value": 7.0
+            }
+          ],
+          "confidence": 0.5
+        },
+        {
+          "pattern": "高互动内容",
+          "evidence_note_ids": [
+            6494
+          ],
+          "metric_evidence": [
+            {
+              "note_id": 6494,
+              "metric": "engagement_score",
+              "value": 6.0
+            }
+          ],
+          "confidence": 0.5
+        }
+      ],
+      "content_style": {
+        "structure": [
+          "观点说明型",
+          "痛点-避坑-建议",
+          "问题-步骤-总结",
+          "项目-拆解-求职表达"
+        ],
+        "tone": [
+          "知识分享"
+        ],
+        "hooks": [
+          "普通表达型",
+          "数字清单型",
+          "避坑警示型"
+        ],
+        "visual_patterns": [
+          "知识点封面",
+          "痛点警示封面"
+        ],
+        "evidence_note_ids": [
+          6483,
+          6484,
+          6492,
+          6491,
+          6494
+        ]
+      },
+      "follow_recommendation": {
+        "why_follow": "可持续观察高互动主题及评论反馈，但规则结果仅用于基线参考。",
+        "what_to_learn": [
+          "内容结构",
+          "证据组织",
+          "用户问题表达"
+        ],
+        "what_not_to_copy": [
+          "具体标题和正文",
+          "未经验证的转化承诺"
+        ],
+        "confidence": 0.45,
+        "evidence": [
+          {
+            "source_type": "NOTE",
+            "source_id": 6483,
+            "detail": null
+          },
+          {
+            "source_type": "NOTE",
+            "source_id": 6484,
+            "detail": null
+          },
+          {
+            "source_type": "NOTE",
+            "source_id": 6492,
+            "detail": null
+          },
+          {
+            "source_type": "NOTE",
+            "source_id": 6491,
+            "detail": null
+          },
+          {
+            "source_type": "NOTE",
+            "source_id": 6494,
+            "detail": null
+          }
+        ]
+      },
+      "content_opportunities": [
+        {
+          "opportunity": "综合内容 × UNKNOWN 内容机会",
+          "reason": "规则基线同时观察到内容方向「综合内容」和评论需求「UNKNOWN」。",
+          "evidence_note_ids": [
+            6483,
+            6486,
+            6487,
+            6488,
+            6489,
+            6490,
+            6491,
+            6492,
+            6493,
+            6494
+          ],
+          "evidence_comment_ids": [
+            6553,
+            6554,
+            6555
+          ],
+          "confidence": 0.2
+        },
+        {
+          "opportunity": "避坑复盘 × ANXIETY 内容机会",
+          "reason": "规则基线同时观察到内容方向「避坑复盘」和评论需求「ANXIETY」。",
+          "evidence_note_ids": [
+            6484,
+            6485
+          ],
+          "evidence_comment_ids": [
+            6561
+          ],
+          "confidence": 0.4
+        },
+        {
+          "opportunity": "学习路线 × UNKNOWN 内容机会",
+          "reason": "规则基线同时观察到内容方向「学习路线」和评论需求「UNKNOWN」。",
+          "evidence_note_ids": [
+            6484
+          ],
+          "evidence_comment_ids": [
+            6553,
+            6554,
+            6555
+          ],
+          "confidence": 0.2
+        }
+      ],
+      "conversion_signals": [
+        {
+          "name": "弱转化信号",
+          "evidence": [
+            {
+              "source_type": "NOTE",
+              "source_id": 6483,
+              "detail": null
+            }
+          ],
+          "confidence": 0.2
+        }
+      ],
+      "risk_points": [
+        {
+          "name": "低风险",
+          "evidence": [
+            {
+              "source_type": "NOTE",
+              "source_id": 6483,
+              "detail": null
+            }
+          ],
+          "confidence": 0.2
+        }
+      ],
+      "data_gaps": [
+        "没有可用的 OCR 文本，无法分析图片内容",
+        "当前结果来自关键词规则基线，不代表正式语义分析质量"
+      ]
+    },
+    "grounding": {
+      "status": "PASSED",
+      "valid_ref_count": 64,
+      "invalid_ref_count": 0,
+      "invalid_refs": [],
+      "hallucinated_ids": []
+    }
+  },
+  "analysis_b": {
+    "status": "FAILED",
+    "error_code": "ANALYSIS_GROUNDING_FAILED",
+    "result": null,
+    "grounding": {
+      "status": "FAILED",
+      "validation_mode": "fail_fast",
+      "valid_ref_count": null,
+      "invalid_ref_count": 1,
+      "invalid_refs": [
+        "METRIC:0"
+      ],
+      "hallucinated_ids": [
+        "METRIC:0"
+      ]
+    }
+  },
+  "mapping_hidden": true
+}

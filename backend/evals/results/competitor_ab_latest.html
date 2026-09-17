@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>竞品分析盲评 A/B</title>
+  <style>
+    body { margin: 0; background: #f4f6f8; color: #17202a; font: 14px/1.55 system-ui, sans-serif; }
+    main { max-width: 1440px; margin: auto; padding: 24px; }
+    h1 { margin: 0 0 18px; font-size: 24px; }
+    h2 { font-size: 16px; }
+    .band { margin-bottom: 18px; padding: 16px; border: 1px solid #dfe3e8; background: #fff; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    pre { overflow: auto; max-height: 720px; margin: 0; white-space: pre-wrap; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 10px; border: 1px solid #dfe3e8; text-align: left; }
+    input, select { width: 80px; box-sizing: border-box; }
+    @media (max-width: 820px) { .columns { grid-template-columns: 1fr; } main { padding: 12px; } }
+  </style>
+</head>
+<body><main>
+  <h1>竞品分析结果 A/B 盲评</h1>
+  <section class="band"><h2>Evidence Summary</h2><pre>{
+  &quot;account_id&quot;: 2,
+  &quot;used_account_ids&quot;: [
+    1697,
+    1698,
+    1699
+  ],
+  &quot;used_note_ids&quot;: [
+    6483,
+    6484,
+    6485,
+    6486,
+    6487,
+    6488,
+    6489,
+    6490,
+    6491,
+    6492,
+    6493,
+    6494
+  ],
+  &quot;used_comment_ids&quot;: [
+    6553,
+    6554,
+    6555,
+    6556,
+    6557,
+    6558,
+    6559,
+    6560,
+    6561,
+    6562,
+    6563,
+    6564,
+    6565,
+    6566,
+    6567,
+    6568,
+    6569,
+    6570,
+    6571,
+    6572
+  ],
+  &quot;account_count&quot;: 3,
+  &quot;note_count&quot;: 12,
+  &quot;comment_count&quot;: 20,
+  &quot;mock_records_included&quot;: 0,
+  &quot;redacted_titles&quot;: [
+    {
+      &quot;note_id&quot;: 6483,
+      &quot;title&quot;: &quot;真实笔记 01&quot;
+    },
+    {
+      &quot;note_id&quot;: 6484,
+      &quot;title&quot;: &quot;真实笔记 02&quot;
+    },
+    {
+      &quot;note_id&quot;: 6485,
+      &quot;title&quot;: &quot;真实笔记 03&quot;
+    },
+    {
+      &quot;note_id&quot;: 6486,
+      &quot;title&quot;: &quot;真实笔记 04&quot;
+    },
+    {
+      &quot;note_id&quot;: 6487,
+      &quot;title&quot;: &quot;真实笔记 05&quot;
+    },
+    {
+      &quot;note_id&quot;: 6488,
+      &quot;title&quot;: &quot;真实笔记 06&quot;
+    },
+    {
+      &quot;note_id&quot;: 6489,
+      &quot;title&quot;: &quot;真实笔记 07&quot;
+    },
+    {
+      &quot;note_id&quot;: 6490,
+      &quot;title&quot;: &quot;真实笔记 08&quot;
+    },
+    {
+      &quot;note_id&quot;: 6491,
+      &quot;title&quot;: &quot;真实笔记 09&quot;
+    },
+    {
+      &quot;note_id&quot;: 6492,
+      &quot;title&quot;: &quot;真实笔记 10&quot;
+    },
+    {
+      &quot;note_id&quot;: 6493,
+      &quot;title&quot;: &quot;真实笔记 11&quot;
+    },
+    {
+      &quot;note_id&quot;: 6494,
+      &quot;title&quot;: &quot;真实笔记 12&quot;
+    }
+  ],
+  &quot;data_gaps&quot;: [
+    &quot;没有可用的 OCR 文本，无法分析图片内容&quot;
+  ]
+}</pre></section>
+  <div class="columns">
+    <section class="band"><h2>Analysis A</h2><pre>{
+  &quot;status&quot;: &quot;SUCCESS&quot;,
+  &quot;result&quot;: {
+    &quot;persona&quot;: {
+      &quot;positioning&quot;: &quot;知识分享号&quot;,
+      &quot;expertise&quot;: [
+        &quot;综合内容&quot;,
+        &quot;避坑复盘&quot;,
+        &quot;学习路线&quot;
+      ],
+      &quot;target_audience&quot;: [
+        &quot;账号内容的潜在读者&quot;
+      ],
+      &quot;value_proposition&quot;: &quot;通过知识内容提供学习或实践参考&quot;,
+      &quot;tone_and_style&quot;: [
+        &quot;知识分享&quot;
+      ],
+      &quot;confidence&quot;: 0.4,
+      &quot;evidence&quot;: [
+        {
+          &quot;source_type&quot;: &quot;ACCOUNT&quot;,
+          &quot;source_id&quot;: 1697,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;ACCOUNT&quot;,
+          &quot;source_id&quot;: 1698,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;ACCOUNT&quot;,
+          &quot;source_id&quot;: 1699,
+          &quot;detail&quot;: null
+        }
+      ]
+    },
+    &quot;content_pillars&quot;: [
+      {
+        &quot;name&quot;: &quot;综合内容&quot;,
+        &quot;description&quot;: &quot;规则关键词命中 10 篇笔记。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6483,
+          6486,
+          6487,
+          6488,
+          6489,
+          6490,
+          6491,
+          6492,
+          6493,
+          6494
+        ],
+        &quot;confidence&quot;: 0.45
+      },
+      {
+        &quot;name&quot;: &quot;避坑复盘&quot;,
+        &quot;description&quot;: &quot;规则关键词命中 2 篇笔记。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484,
+          6485
+        ],
+        &quot;confidence&quot;: 0.45
+      },
+      {
+        &quot;name&quot;: &quot;学习路线&quot;,
+        &quot;description&quot;: &quot;规则关键词命中 1 篇笔记。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484
+        ],
+        &quot;confidence&quot;: 0.45
+      },
+      {
+        &quot;name&quot;: &quot;项目实战&quot;,
+        &quot;description&quot;: &quot;规则关键词命中 1 篇笔记。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484
+        ],
+        &quot;confidence&quot;: 0.45
+      },
+      {
+        &quot;name&quot;: &quot;求职简历&quot;,
+        &quot;description&quot;: &quot;规则关键词命中 1 篇笔记。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484
+        ],
+        &quot;confidence&quot;: 0.45
+      }
+    ],
+    &quot;audience_demands&quot;: [
+      {
+        &quot;demand&quot;: &quot;UNKNOWN&quot;,
+        &quot;user_intent&quot;: &quot;规则识别为 UNKNOWN 的评论意图&quot;,
+        &quot;representative_comment_ids&quot;: [
+          6553,
+          6554,
+          6555
+        ],
+        &quot;confidence&quot;: 0.2
+      },
+      {
+        &quot;demand&quot;: &quot;ANXIETY&quot;,
+        &quot;user_intent&quot;: &quot;规则识别为 ANXIETY 的评论意图&quot;,
+        &quot;representative_comment_ids&quot;: [
+          6561
+        ],
+        &quot;confidence&quot;: 0.4
+      }
+    ],
+    &quot;high_performing_patterns&quot;: [
+      {
+        &quot;pattern&quot;: &quot;普通表达型&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6483
+        ],
+        &quot;metric_evidence&quot;: [
+          {
+            &quot;note_id&quot;: 6483,
+            &quot;metric&quot;: &quot;engagement_score&quot;,
+            &quot;value&quot;: 7616.0
+          }
+        ],
+        &quot;confidence&quot;: 0.5
+      },
+      {
+        &quot;pattern&quot;: &quot;数字清单型&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484
+        ],
+        &quot;metric_evidence&quot;: [
+          {
+            &quot;note_id&quot;: 6484,
+            &quot;metric&quot;: &quot;engagement_score&quot;,
+            &quot;value&quot;: 2055.0
+          }
+        ],
+        &quot;confidence&quot;: 0.5
+      },
+      {
+        &quot;pattern&quot;: &quot;避坑警示型&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6492
+        ],
+        &quot;metric_evidence&quot;: [
+          {
+            &quot;note_id&quot;: 6492,
+            &quot;metric&quot;: &quot;engagement_score&quot;,
+            &quot;value&quot;: 13.0
+          }
+        ],
+        &quot;confidence&quot;: 0.5
+      },
+      {
+        &quot;pattern&quot;: &quot;高互动内容&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6491
+        ],
+        &quot;metric_evidence&quot;: [
+          {
+            &quot;note_id&quot;: 6491,
+            &quot;metric&quot;: &quot;engagement_score&quot;,
+            &quot;value&quot;: 7.0
+          }
+        ],
+        &quot;confidence&quot;: 0.5
+      },
+      {
+        &quot;pattern&quot;: &quot;高互动内容&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6494
+        ],
+        &quot;metric_evidence&quot;: [
+          {
+            &quot;note_id&quot;: 6494,
+            &quot;metric&quot;: &quot;engagement_score&quot;,
+            &quot;value&quot;: 6.0
+          }
+        ],
+        &quot;confidence&quot;: 0.5
+      }
+    ],
+    &quot;content_style&quot;: {
+      &quot;structure&quot;: [
+        &quot;观点说明型&quot;,
+        &quot;痛点-避坑-建议&quot;,
+        &quot;问题-步骤-总结&quot;,
+        &quot;项目-拆解-求职表达&quot;
+      ],
+      &quot;tone&quot;: [
+        &quot;知识分享&quot;
+      ],
+      &quot;hooks&quot;: [
+        &quot;普通表达型&quot;,
+        &quot;数字清单型&quot;,
+        &quot;避坑警示型&quot;
+      ],
+      &quot;visual_patterns&quot;: [
+        &quot;知识点封面&quot;,
+        &quot;痛点警示封面&quot;
+      ],
+      &quot;evidence_note_ids&quot;: [
+        6483,
+        6484,
+        6492,
+        6491,
+        6494
+      ]
+    },
+    &quot;follow_recommendation&quot;: {
+      &quot;why_follow&quot;: &quot;可持续观察高互动主题及评论反馈，但规则结果仅用于基线参考。&quot;,
+      &quot;what_to_learn&quot;: [
+        &quot;内容结构&quot;,
+        &quot;证据组织&quot;,
+        &quot;用户问题表达&quot;
+      ],
+      &quot;what_not_to_copy&quot;: [
+        &quot;具体标题和正文&quot;,
+        &quot;未经验证的转化承诺&quot;
+      ],
+      &quot;confidence&quot;: 0.45,
+      &quot;evidence&quot;: [
+        {
+          &quot;source_type&quot;: &quot;NOTE&quot;,
+          &quot;source_id&quot;: 6483,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;NOTE&quot;,
+          &quot;source_id&quot;: 6484,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;NOTE&quot;,
+          &quot;source_id&quot;: 6492,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;NOTE&quot;,
+          &quot;source_id&quot;: 6491,
+          &quot;detail&quot;: null
+        },
+        {
+          &quot;source_type&quot;: &quot;NOTE&quot;,
+          &quot;source_id&quot;: 6494,
+          &quot;detail&quot;: null
+        }
+      ]
+    },
+    &quot;content_opportunities&quot;: [
+      {
+        &quot;opportunity&quot;: &quot;综合内容 × UNKNOWN 内容机会&quot;,
+        &quot;reason&quot;: &quot;规则基线同时观察到内容方向「综合内容」和评论需求「UNKNOWN」。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6483,
+          6486,
+          6487,
+          6488,
+          6489,
+          6490,
+          6491,
+          6492,
+          6493,
+          6494
+        ],
+        &quot;evidence_comment_ids&quot;: [
+          6553,
+          6554,
+          6555
+        ],
+        &quot;confidence&quot;: 0.2
+      },
+      {
+        &quot;opportunity&quot;: &quot;避坑复盘 × ANXIETY 内容机会&quot;,
+        &quot;reason&quot;: &quot;规则基线同时观察到内容方向「避坑复盘」和评论需求「ANXIETY」。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484,
+          6485
+        ],
+        &quot;evidence_comment_ids&quot;: [
+          6561
+        ],
+        &quot;confidence&quot;: 0.4
+      },
+      {
+        &quot;opportunity&quot;: &quot;学习路线 × UNKNOWN 内容机会&quot;,
+        &quot;reason&quot;: &quot;规则基线同时观察到内容方向「学习路线」和评论需求「UNKNOWN」。&quot;,
+        &quot;evidence_note_ids&quot;: [
+          6484
+        ],
+        &quot;evidence_comment_ids&quot;: [
+          6553,
+          6554,
+          6555
+        ],
+        &quot;confidence&quot;: 0.2
+      }
+    ],
+    &quot;conversion_signals&quot;: [
+      {
+        &quot;name&quot;: &quot;弱转化信号&quot;,
+        &quot;evidence&quot;: [
+          {
+            &quot;source_type&quot;: &quot;NOTE&quot;,
+            &quot;source_id&quot;: 6483,
+            &quot;detail&quot;: null
+          }
+        ],
+        &quot;confidence&quot;: 0.2
+      }
+    ],
+    &quot;risk_points&quot;: [
+      {
+        &quot;name&quot;: &quot;低风险&quot;,
+        &quot;evidence&quot;: [
+          {
+            &quot;source_type&quot;: &quot;NOTE&quot;,
+            &quot;source_id&quot;: 6483,
+            &quot;detail&quot;: null
+          }
+        ],
+        &quot;confidence&quot;: 0.2
+      }
+    ],
+    &quot;data_gaps&quot;: [
+      &quot;没有可用的 OCR 文本，无法分析图片内容&quot;,
+      &quot;当前结果来自关键词规则基线，不代表正式语义分析质量&quot;
+    ]
+  },
+  &quot;grounding&quot;: {
+    &quot;status&quot;: &quot;PASSED&quot;,
+    &quot;valid_ref_count&quot;: 64,
+    &quot;invalid_ref_count&quot;: 0,
+    &quot;invalid_refs&quot;: [],
+    &quot;hallucinated_ids&quot;: []
+  }
+}</pre></section>
+    <section class="band"><h2>Analysis B</h2><pre>{
+  &quot;status&quot;: &quot;FAILED&quot;,
+  &quot;error_code&quot;: &quot;ANALYSIS_GROUNDING_FAILED&quot;,
+  &quot;result&quot;: null,
+  &quot;grounding&quot;: {
+    &quot;status&quot;: &quot;FAILED&quot;,
+    &quot;validation_mode&quot;: &quot;fail_fast&quot;,
+    &quot;valid_ref_count&quot;: null,
+    &quot;invalid_ref_count&quot;: 1,
+    &quot;invalid_refs&quot;: [
+      &quot;METRIC:0&quot;
+    ],
+    &quot;hallucinated_ids&quot;: [
+      &quot;METRIC:0&quot;
+    ]
+  }
+}</pre></section>
+  </div>
+  <section class="band"><h2>评分</h2><table><thead><tr><th>维度</th><th>A</th><th>B</th></tr></thead><tbody>
+    <tr><td>persona_accuracy</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>audience_accuracy</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>content_pillar_quality</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>comment_demand_accuracy</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>evidence_grounding</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>specificity</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr><tr><td>actionability</td><td><input type='number' min='1' max='5'></td><td><input type='number' min='1' max='5'></td></tr>
+    <tr><td>hallucination (0-2)</td><td><input type="number" min="0" max="2"></td><td><input type="number" min="0" max="2"></td></tr>
+    <tr><td>overall_preference</td><td colspan="2"><select><option></option><option>A</option><option>B</option><option>TIE</option></select></td></tr>
+  </tbody></table></section>
+</main></body></html>

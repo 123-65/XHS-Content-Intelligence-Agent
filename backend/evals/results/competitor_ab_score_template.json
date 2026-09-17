@@ -1,0 +1,37 @@
+{
+  "analysis_a": {
+    "persona_accuracy": null,
+    "audience_accuracy": null,
+    "content_pillar_quality": null,
+    "comment_demand_accuracy": null,
+    "evidence_grounding": null,
+    "specificity": null,
+    "actionability": null,
+    "hallucination": null
+  },
+  "analysis_b": {
+    "persona_accuracy": null,
+    "audience_accuracy": null,
+    "content_pillar_quality": null,
+    "comment_demand_accuracy": null,
+    "evidence_grounding": null,
+    "specificity": null,
+    "actionability": null,
+    "hallucination": null
+  },
+  "overall_preference": null,
+  "constraints": {
+    "quality_score": "1-5",
+    "hallucination": {
+      "0": "none",
+      "1": "minor",
+      "2": "serious"
+    },
+    "overall_preference": [
+      "A",
+      "B",
+      "TIE"
+    ]
+  },
+  "mapping_hidden": true
+}

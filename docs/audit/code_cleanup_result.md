@@ -82,7 +82,7 @@
 | `backend/app/agent/tools/fallback_registry.py` | PRODUCTION_USED | Agent Registry 仍引用；只生成失败/人工补充提示，不生成伪数据成功结果。 |
 | `backend/app/agent/policies/fallback.py` | PRODUCTION_USED | 当前 Agent 降级决策依赖，降级状态显式暴露。 |
 | `backend/scripts/create_demo_agent_trace.py` | TEST_ONLY | 仅被 `test_developer_trace.py` 用作 trace fixture，不从正常 API/UI 自动进入。 |
-| `backend/app/models/trace_retention_policy.py` | UNKNOWN | 当前业务代码无直接引用；本 Sprint 冻结 migration 和删表，保留待数据库瘦身 Sprint 处理。 |
+| `backend/app/models/trace_retention_policy.py` | DEFERRED_LEGACY_TABLE | 当前业务代码无直接引用；本 Sprint 冻结 migration 和删表，保留待统一 schema maintenance 处理。 |
 | `frontend/src/mock/{account,experiments,metrics,notes,strategy,workflow}.ts` | LEGACY_UI | 仍被已注册的辅助页面直接引用，无法满足“无生产引用”删除条件；不在 Agent Workflow 主路径，列为未解决技术债。 |
 
 ## Semantic Rules
@@ -119,5 +119,5 @@
 ## 未解决技术债
 
 - 六个辅助前端页面仍由 `frontend/src/mock` 提供静态数据；它们不影响真实 Agent Workflow，但仍属于 production build 可达的 Legacy UI。
-- `trace_retention_policy` 表模型当前只有 ORM 注册，无业务直接引用；因本 Sprint 禁止删表和 migration，暂列 UNKNOWN。
+- `trace_retention_policy` 表模型当前只有 ORM 注册，无业务直接引用；因本 Sprint 禁止删表和 migration，标记为 `DEFERRED_LEGACY_TABLE`。
 - 前端构建仍有两个约 1 MB 的 chunk，Vite 给出 chunk size warning；本轮未做前端性能重构。

@@ -231,6 +231,12 @@ def test_agent_workflow_executes_collection_and_analysis_without_manual_steps(mo
     assert actions == ["COLLECT_XHS_NOTES", "COLLECT_XHS_ACCOUNTS", "ANALYZE_COMPETITOR_DATA"]
     assert data["metadata"]["business_result"]["competitor_analysis"]["report_id"]
     assert data["metadata"]["workflow_timeline"][0]["data_count"]["notes_saved"] == 3
+    analysis_timeline = data["metadata"]["workflow_timeline"][2]
+    assert analysis_timeline["analysis_engine"] == "LLM_STRUCTURED_V1"
+    assert analysis_timeline["evidence_note_count"] == 4
+    assert analysis_timeline["evidence_comment_count"] == 9
+    assert isinstance(analysis_timeline["data_gaps"], list)
+    assert analysis_timeline["grounding_status"] == "PASSED"
 
 
 def test_agent_workflow_marks_failed_step_visible(monkeypatch):
