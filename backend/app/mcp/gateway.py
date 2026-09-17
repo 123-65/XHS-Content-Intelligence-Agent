@@ -17,12 +17,11 @@ MCP_DEFAULT_BINDINGS = {
 
 
 class MCPToolGateway:
-    """MCP 工具网关；默认不返回 Mock 数据，只有显式 demo/test 才允许模拟结果。"""
+    """MCP 工具网关；未配置真实服务时返回明确失败。"""
 
-    def __init__(self, db: Session, allow_mock: bool = False):
-        """初始化 MCP 工具网关。allow_mock=True 仅用于测试/演示。"""
+    def __init__(self, db: Session):
+        """初始化 MCP 工具网关。"""
         self.repo = AgentRunRepository(db)
-        self.allow_mock = allow_mock
 
     def invoke(self, tool_name: str, payload: dict, agent_run_id: int | None = None, agent_step_id: int | None = None) -> ToolResult:
         """调用 MCP 工具；未接入真实 MCP 时返回结构化失败，不伪装成功。"""
@@ -36,11 +35,6 @@ class MCPToolGateway:
             return result
 
         metadata = self._metadata(tool_name, binding, config)
-        if self.allow_mock:
-            result = ToolResult(True, tool_name, self._mock_payload(tool_name, payload), metadata={**metadata, "mock": True, "mock_used": True, "run_mode": "DEMO"})
-            self._record_call(tool_name, payload, result, started_at, agent_run_id, agent_step_id, result.metadata, binding)
-            return result
-
         result = ToolResult(
             False,
             tool_name,
@@ -78,17 +72,6 @@ class MCPToolGateway:
             "mock_used": False,
             "risk_blocked": True,
         }
-
-    def _mock_payload(self, tool_name: str, payload: dict) -> dict:
-        """生成测试/演示专用的 Mock MCP 工具输出，生产默认链路不会调用。"""
-        builders = {
-            "web_search": lambda item: {"query": item.get("query"), "results": [{"title": "mock result", "url": "mock://web-search", "summary": "Mock search result"}]},
-            "page_reader": lambda item: {"url": item.get("url"), "text": "Mock page reader content"},
-            "ocr": lambda item: {"image_ref": item.get("image_ref"), "text": "Mock OCR text"},
-            "file_parser": lambda item: {"file_ref": item.get("file_ref"), "records": []},
-            "data_query": lambda item: {"query": item.get("query"), "rows": []},
-        }
-        return builders[tool_name](payload)
 
     def _record_call(self, tool_name: str, payload: dict, result: ToolResult, started_at: datetime, agent_run_id: int | None, agent_step_id: int | None, metadata: dict, binding) -> None:
         """记录 MCP 工具调用日志。"""

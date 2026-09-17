@@ -43,7 +43,12 @@ def create_content_opportunities(account_id: int) -> int:
 
     report_response = client.post(
         "/api/competitor/reports",
-        json={"account_id": account_id, "name": "实验前置内容机会", "keyword": "AI Agent"},
+        json={
+            "account_id": account_id,
+            "name": "实验前置内容机会",
+            "keyword": "AI Agent",
+            "analysis_engine": "RULE_BASELINE",
+        },
     )
     assert report_response.status_code == 200
     return report_response.json()["data"]["id"]

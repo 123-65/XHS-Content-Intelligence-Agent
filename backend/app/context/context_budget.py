@@ -216,7 +216,7 @@ def rough_token_count(text: str | None) -> int:
 
 
 def contains_hardcoded_domain_terms(text: str | None) -> bool:
-    """判断上下文文本是否包含当前 demo 赛道硬编码领域词；本阶段只标记，不替换。"""
+    """判断上下文文本是否包含历史赛道硬编码领域词；本阶段只标记，不替换。"""
     if not text:
         return False
     lowered = text.lower()

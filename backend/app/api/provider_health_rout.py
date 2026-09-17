@@ -15,7 +15,7 @@ def provider_health():
 
 @router.get("/llm/health")
 def llm_provider_health():
-    """Return LLM provider health with real/mock and fallback status."""
+    """Return real LLM provider health and fallback status."""
     return success(ProviderHealthService().llm_health())
 
 
@@ -44,4 +44,3 @@ def test_llm_provider_text(prompt: str = Query(...)):
             "error_message": result.error_message,
         }
     )
-

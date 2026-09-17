@@ -28,11 +28,11 @@ class MCPToolRegistry:
                 name=name,
                 tool_type=ToolType.MCP.value,
                 handler=lambda payload, tool_name=name: self.gateway.invoke(tool_name, payload, payload.get("_agent_run_id"), payload.get("_agent_step_id")),
-                description=f"{name} MCP Mock 工具",
+                description=f"{name} MCP 外部工具",
                 risk_level=config["risk_level"],
                 requires_confirmation=config["requires_confirmation"],
                 fallback_tool_name=config["fallback_tool_name"],
-                whitelist_rules={"allowed": True, "mode": "mock"},
+                whitelist_rules={"allowed": True, "mode": "real"},
             )
             for name, config in MCP_DEFAULT_BINDINGS.items()
         }

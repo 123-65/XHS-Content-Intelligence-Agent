@@ -216,7 +216,18 @@ class ExecutionOrchestrator:
                     finished = _step_result(step, ExecutionStatus.SUCCESS, "步骤执行完成。", output, started_at=started, finished_at=utc_now(), dry_run=False)
                     success_steps.add(step.step_no)
             except Exception as exc:
-                finished = _step_result(step, ExecutionStatus.FAILED, str(exc), error_code="HANDLER_FAILED", started_at=started, finished_at=utc_now(), dry_run=False)
+                error_code = getattr(exc, "code", "HANDLER_FAILED")
+                payload = getattr(exc, "payload", None)
+                finished = _step_result(
+                    step,
+                    ExecutionStatus.FAILED,
+                    str(exc),
+                    output=payload if isinstance(payload, dict) else None,
+                    error_code=error_code,
+                    started_at=started,
+                    finished_at=utc_now(),
+                    dry_run=False,
+                )
                 failed = True
             step_results.append(finished)
             result_by_step[step.step_no] = finished

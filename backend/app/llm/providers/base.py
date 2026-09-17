@@ -8,7 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.llm.cost import estimate_cost
-from app.llm.errors import LLMResponseError
+from app.llm.errors import LLMResponseError, LLMSchemaValidationError
 from app.schemas.llm import LLMResult, LLMStructuredResult, LLMUsage
 
 T = TypeVar("T", bound=BaseModel)
@@ -121,7 +121,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         try:
             return schema_model.model_validate(json.loads(text))
         except (json.JSONDecodeError, ValidationError) as exc:
-            raise LLMResponseError(f"LLM JSON parse failed: {exc}; raw output: {text[:500]}") from exc
+            raise LLMSchemaValidationError(f"LLM JSON parse failed: {exc}; raw output: {text[:500]}") from exc
 
     def _usage(self, response) -> LLMUsage:
         """提取 OpenAI-compatible usage。"""

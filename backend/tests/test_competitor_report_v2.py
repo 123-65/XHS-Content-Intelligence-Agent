@@ -202,6 +202,7 @@ def test_create_competitor_report_v2():
             "keyword": "AI Agent",
             "target_metric": "engagement",
             "limit": 20,
+            "analysis_engine": "RULE_BASELINE",
         },
     )
     assert response.status_code == 200
@@ -284,7 +285,12 @@ def test_get_viral_notes_and_opportunities():
     create_manual_competitor_data(account_id)
     report_response = client.post(
         "/api/competitor/reports",
-        json={"account_id": account_id, "name": "内容机会分析", "keyword": "AI Agent"},
+        json={
+            "account_id": account_id,
+            "name": "内容机会分析",
+            "keyword": "AI Agent",
+            "analysis_engine": "RULE_BASELINE",
+        },
     )
     report_id = report_response.json()["data"]["id"]
 

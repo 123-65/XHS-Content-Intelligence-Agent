@@ -19,7 +19,7 @@ def configured_provider_name(provider_name: str | None = None) -> str:
     if provider_name is not None:
         return provider_name.lower()
     configured = (settings.llm_provider or "").lower()
-    return configured or "deepseek"
+    return configured if configured and configured != "mock" else "deepseek"
 
 
 def build_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
@@ -32,7 +32,7 @@ def build_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
 
 
 def get_llm_provider(provider_name: str | None = None) -> BaseLLMProvider:
-    """Select an LLM Provider; no API key automatically falls back to Mock."""
+    """选择真实 LLM Provider；缺少配置或密钥时直接失败。"""
     provider = build_llm_provider(provider_name)
     return provider
 

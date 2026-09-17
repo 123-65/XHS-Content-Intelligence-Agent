@@ -1438,7 +1438,6 @@
           <el-button type="warning" :icon="Search" :loading="draftContextLoading" @click="submitDraftContextPreview">
             预览草稿上下文
           </el-button>
-          <el-button :icon="FileJson" @click="loadLocalDemo">加载本地 Demo 数据</el-button>
         </div>
         <el-alert
           type="info"
@@ -1449,7 +1448,6 @@
           </el-collapse-item>
         </el-collapse>
 
-        <el-alert v-if="demoLoaded" type="info" title="当前展示本地演示数据，未调用接口" show-icon :closable="false" />
         <el-alert v-if="errorMessage" type="error" :title="errorMessage" show-icon :closable="false" />
 
         <section v-if="response?.confirmation_card" class="confirmation-panel">
@@ -1817,7 +1815,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Copy, Download, FileJson, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
+import { Copy, Download, MessageSquareText, Search, Send, ShieldAlert } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import PageHeader from '@/components/PageHeader.vue'
 import {
@@ -1845,7 +1843,6 @@ import { createPublishPackage } from '@/api/publishPackage'
 import { recordManualPublish } from '@/api/manualPublishBackfill'
 import { createPostPublishReview } from '@/api/postPublishReview'
 import { confirmStrategyMemories, listAccountStrategyMemories } from '@/api/strategyMemoryConfirmation'
-import { demoAgentRequest, demoAgentResponse } from '@/mock/agentChatDemo'
 import type {
   AccountProfileBusinessResult,
   AgentChatRequest,
@@ -1920,7 +1917,6 @@ const workflowLoading = ref(false)
 const draftContextLoading = ref(false)
 const conversationLoading = ref(false)
 const errorMessage = ref('')
-const demoLoaded = ref(false)
 const conversation = ref<ConversationResponse | null>(null)
 const conversationMessages = ref<ConversationMessageResponse[]>([])
 const conversationState = ref<ConversationCurrentState | null>(null)
@@ -2077,7 +2073,6 @@ const applyExample = (item: ExampleInput) => {
   form.experiment_id = item.experiment_id || null
   form.current_target_type = item.current_target_type || ''
   form.current_target_id = item.current_target_id || ''
-  demoLoaded.value = false
 }
 
 const buildRequest = (overrides: Partial<AgentChatRequest> = {}): AgentChatRequest => ({
@@ -2096,7 +2091,6 @@ const buildRequest = (overrides: Partial<AgentChatRequest> = {}): AgentChatReque
 const submitPreview = async () => {
   loading.value = true
   errorMessage.value = ''
-  demoLoaded.value = false
   try {
     response.value = await previewAgentChat(buildRequest())
     await refreshConversationData()
@@ -2110,7 +2104,6 @@ const submitPreview = async () => {
 const submitReadonlyExecute = async () => {
   readonlyLoading.value = true
   errorMessage.value = ''
-  demoLoaded.value = false
   try {
     response.value = await executeReadonlyAgentChat(buildRequest())
     await refreshConversationData()
@@ -2134,7 +2127,6 @@ const submitXhsCompetitorWorkflow = async () => {
   }
   workflowLoading.value = true
   errorMessage.value = ''
-  demoLoaded.value = false
   try {
     response.value = await executeWorkflowAgentChat(
       buildRequest({
@@ -2161,7 +2153,6 @@ const submitXhsCompetitorWorkflow = async () => {
 const submitDraftContextPreview = async () => {
   draftContextLoading.value = true
   errorMessage.value = ''
-  demoLoaded.value = false
   try {
     const context: Record<string, unknown> = {}
     if (form.experiment_id) context.experiment_id = form.experiment_id
@@ -2979,24 +2970,6 @@ const splitSourceLines = (value: string) =>
   )
 
 onMounted(loadAccounts)
-
-const loadLocalDemo = () => {
-  Object.assign(form, {
-    session_id: demoAgentRequest.session_id || `workbench-${Date.now()}`,
-    conversation_id: demoAgentRequest.conversation_id || null,
-    account_id: demoAgentRequest.account_id || null,
-    experiment_id: Number(demoAgentRequest.context?.experiment_id || '') || null,
-    text: demoAgentRequest.text || '',
-    current_target_type: demoAgentRequest.current_target_type || '',
-    current_target_id: String(demoAgentRequest.current_target_id || '')
-  })
-  response.value = demoAgentResponse
-  conversation.value = null
-  conversationMessages.value = []
-  conversationState.value = null
-  errorMessage.value = ''
-  demoLoaded.value = true
-}
 
 const statusType = (status?: string) => {
   if (status === 'SUCCESS') return 'success'

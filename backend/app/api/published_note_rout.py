@@ -37,7 +37,7 @@ def list_public_metrics(published_note_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{published_note_id}/collect-metrics")
 def collect_public_metrics(published_note_id: int, data: CollectMetricsRequest, db: Session = Depends(get_db)):
-    """通过手动数据或 Mock 数据回采公开指标。"""
+    """通过人工核对数据回填公开指标。"""
     service = PostPublishService(db)
     try:
         return success(service.collect_public_metrics(published_note_id, data).model_dump(mode="json"))

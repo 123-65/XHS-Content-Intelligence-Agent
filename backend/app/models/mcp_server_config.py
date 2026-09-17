@@ -15,7 +15,7 @@ class MCPServerConfig(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     server_name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, comment="Server name")
     base_url: Mapped[str | None] = mapped_column(String(1024), nullable=True, comment="Base URL")
-    status: Mapped[str] = mapped_column(String(32), default="MOCK", nullable=False, comment="Server status")
+    status: Mapped[str] = mapped_column(String(32), default="DISABLED", nullable=False, comment="Server status")
     auth_type: Mapped[str] = mapped_column(String(32), default="NONE", nullable=False, comment="Auth type")
     allowed_tools: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, comment="Allowed tools")
     risk_level: Mapped[str] = mapped_column(String(32), default="LOW", nullable=False, comment="Risk level")

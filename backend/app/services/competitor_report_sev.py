@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.analysis.competitor.assembler import CompetitorReportAssembler
 from app.analysis.competitor.engine import CompetitorAnalysisEngine
 from app.analysis.competitor.evidence import CompetitorEvidenceBuilder
+from app.analysis.competitor.llm_analyzer import LLMStructuredCompetitorAnalyzer
 from app.analysis.competitor.rule_baseline import RuleBaselineCompetitorAnalyzer
 from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
@@ -32,14 +33,15 @@ class CompetitorReportService:
         assembler: CompetitorReportAssembler | None = None,
     ):
         self.repo = CompetitorReportRepository(db)
-        self.analyzer = analyzer or RuleBaselineCompetitorAnalyzer()
+        self.analyzer = analyzer
+        self._last_analysis_engine = "LLM_STRUCTURED_V1"
         self.evidence_builder = evidence_builder or CompetitorEvidenceBuilder()
         self.assembler = assembler or CompetitorReportAssembler()
 
     @property
     def analysis_engine(self) -> str:
         """返回当前显式选择的分析引擎标识。"""
-        return self.analyzer.analysis_engine
+        return self.analyzer.analysis_engine if self.analyzer else self._last_analysis_engine
 
     def create_report(self, data: CompetitorReportCreate) -> CompetitorAnalysisReport:
         """基于真实证据创建竞品分析报告。"""
@@ -51,7 +53,9 @@ class CompetitorReportService:
             raise DataAvailabilityError(state["message"], state)
         comments = self.repo.list_comments_for_notes(data.account_id, [note.id for note in notes])
         evidence = self.evidence_builder.build(data.account_id, accounts, notes, comments)
-        semantic = self.analyzer.analyze(evidence)
+        analyzer = self._resolve_analyzer(data.analysis_engine)
+        semantic = analyzer.analyze(evidence)
+        self._last_analysis_engine = analyzer.analysis_engine
         report, breakdowns, opportunities = self.assembler.assemble(
             data,
             evidence,
@@ -60,6 +64,13 @@ class CompetitorReportService:
             self._sample_state(notes, comments),
         )
         return self.repo.create_report_bundle(report, breakdowns, opportunities)
+
+    def _resolve_analyzer(self, requested_engine: str) -> CompetitorAnalysisEngine:
+        if self.analyzer:
+            return self.analyzer
+        if requested_engine == "RULE_BASELINE":
+            return RuleBaselineCompetitorAnalyzer()
+        return LLMStructuredCompetitorAnalyzer()
 
     def get_report(self, report_id: int) -> CompetitorAnalysisReport:
         """查询竞品分析报告详情。"""

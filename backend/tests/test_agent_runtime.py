@@ -16,7 +16,6 @@ from app.models.account import AccountProfile
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
 from app.models.content_experiment import ContentExperiment
-from app.models.mcp_tool_call_log import MCPToolCallLog
 from app.models.strategy_memory import StrategyMemory
 from app.models.strategy_memory_usage import StrategyMemoryUsage
 from app.schemas.agent import WorkflowRunRequest, WorkflowStepSpec
@@ -194,22 +193,6 @@ def test_mcp_tool_requires_confirmation_stops_run():
     assert response.steps[0].tool_type == "MCP"
     assert response.steps[0].requires_confirmation is True
     assert response.steps[0].status == "REQUIRES_CONFIRMATION"
-
-
-def test_mcp_mock_tool_records_call_log():
-    """测试 MCP Mock 工具成功调用会写入调用日志。"""
-    with SessionLocal() as db:
-        result = MCPToolGateway(db, allow_mock=True).invoke("web_search", {"query": "AI Agent content experiment"})
-        log = db.query(MCPToolCallLog).filter(MCPToolCallLog.tool_name == "web_search").order_by(MCPToolCallLog.id.desc()).first()
-
-    assert result.ok is True
-    assert result.metadata["mock"] is True
-    assert result.metadata["mock_used"] is True
-    assert result.metadata["run_mode"] == "DEMO"
-    assert result.data["results"][0]["url"] == "mock://web-search"
-    assert log.tool_name == "web_search"
-    assert log.status == "SUCCESS"
-    assert log.output_payload["metadata"]["mock_used"] is True
 
 
 def test_mcp_gateway_default_returns_not_configured_without_mock():

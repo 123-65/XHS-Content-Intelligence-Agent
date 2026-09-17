@@ -11,6 +11,7 @@ from app.models.competitor_note import CompetitorNote
 from app.models.strategy_memory import StrategyMemory
 from app.models.xhs_note import XhsNoteSnapshot
 from tests.test_draft_context_preview_api import _create_account
+from tests.competitor_analysis_fakes import FakeStructuredCompetitorAnalyzer
 
 
 def _client() -> TestClient:
@@ -294,6 +295,10 @@ def test_does_not_call_llm_or_write_strategy_memory(monkeypatch):
 
 def test_r1_data_can_enter_b4_evidence_refresh(monkeypatch):
     _patch_provider(monkeypatch)
+    monkeypatch.setattr(
+        "app.services.competitor_report_sev.LLMStructuredCompetitorAnalyzer",
+        FakeStructuredCompetitorAnalyzer,
+    )
     account_id = _create_account()
     urls = [_valid_url("note-501"), _valid_url("note-502"), _valid_url("note-503")]
     collect = _collect(account_id, urls, max_comments=3)

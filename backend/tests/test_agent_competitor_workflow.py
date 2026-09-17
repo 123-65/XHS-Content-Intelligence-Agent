@@ -18,6 +18,7 @@ from app.models.xhs_note import XhsNoteSnapshot
 from app.services.xhs_collect_import_sev import XhsCollectImportService
 from app.services.xhs_collector_sev import XhsCollectorService
 from tests.test_draft_context_preview_api import _create_account
+from tests.competitor_analysis_fakes import FakeStructuredCompetitorAnalyzer
 
 
 class FailingLLM:
@@ -208,6 +209,10 @@ def test_agent_workflow_executes_collection_and_analysis_without_manual_steps(mo
         return XhsCollectorService(context["db"], provider=FakeXhsProvider(), ocr_provider=FakeOcrProvider())
 
     monkeypatch.setattr("app.agent.product_entry.business_handlers._xhs_collector_service", fake_service)
+    monkeypatch.setattr(
+        "app.services.competitor_report_sev.LLMStructuredCompetitorAnalyzer",
+        FakeStructuredCompetitorAnalyzer,
+    )
     request = {
         "account_id": account_id,
         "text": "分析这些小红书笔记和同行账号，看看他们的人设、内容方向、用户在评论区关心什么",

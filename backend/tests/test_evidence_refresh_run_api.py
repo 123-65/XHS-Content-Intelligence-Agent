@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.database import SessionLocal
@@ -11,6 +12,16 @@ from app.models.content_opportunity import ContentOpportunity
 from app.models.viral_note_breakdown import ViralNoteBreakdown
 from app.schemas.account import AccountProfileCreate
 from app.services.account_sev import AccountProfileService
+from tests.competitor_analysis_fakes import FakeStructuredCompetitorAnalyzer
+
+
+@pytest.fixture(autouse=True)
+def _structured_analyzer_fake(monkeypatch):
+    """证据刷新测试不访问外部 LLM，但仍经过正式结构化分析边界。"""
+    monkeypatch.setattr(
+        "app.services.competitor_report_sev.LLMStructuredCompetitorAnalyzer",
+        FakeStructuredCompetitorAnalyzer,
+    )
 
 
 def _client() -> TestClient:
