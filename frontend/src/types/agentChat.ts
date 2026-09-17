@@ -286,8 +286,11 @@ export interface WorkflowTimelineItem {
   duration_ms: number | null
   input_summary: string | null
   output_summary: string | null
+  provider?: string | null
+  data_source?: string | null
   data_count: Record<string, number>
   evidence_ids: Record<string, unknown>
+  created_ids?: Record<string, unknown>
   warnings: string[]
   error_code: string | null
   error_message: string | null

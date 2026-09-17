@@ -1,8 +1,8 @@
 <template>
   <div class="page agent-workbench">
-    <PageHeader title="Agent 工作台" description="自然语言入口链路 dry-run 预览">
-      <el-tag type="info" effect="plain">POST /agent/chat/preview</el-tag>
-      <el-tag type="warning" effect="plain">DRY_RUN Only</el-tag>
+    <PageHeader title="Agent 工作台" description="真实小红书竞品分析工作流">
+      <el-tag type="success" effect="plain">XHS_MCP</el-tag>
+      <el-tag type="info" effect="plain">REAL</el-tag>
     </PageHeader>
 
     <div class="workbench-layout">
@@ -50,6 +50,69 @@
             :closable="false"
           />
         </section>
+
+        <section class="primary-workflow">
+          <label>
+            <span>工作账号</span>
+            <el-select
+              v-model="form.account_id"
+              filterable
+              clearable
+              placeholder="选择账号画像"
+              :loading="accountLoading"
+            >
+              <el-option
+                v-for="account in accounts"
+                :key="account.id"
+                :label="`${account.account_name} #${account.id}`"
+                :value="account.id"
+              />
+            </el-select>
+          </label>
+          <label>
+            <span>分析需求</span>
+            <el-input
+              v-model="form.text"
+              type="textarea"
+              :rows="4"
+              resize="none"
+              maxlength="240"
+              show-word-limit
+            />
+          </label>
+          <label>
+            <span>笔记 URL</span>
+            <el-input
+              v-model="xhsWorkflowForm.noteUrlsText"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              placeholder="一行一个小红书笔记链接"
+            />
+          </label>
+          <label>
+            <span>同行账号 ID / 主页 URL</span>
+            <el-input
+              v-model="xhsWorkflowForm.competitorAccountsText"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              placeholder="一行一个同行账号主页链接"
+            />
+          </label>
+          <el-button
+            class="full-button"
+            type="primary"
+            :icon="Send"
+            :loading="workflowLoading"
+            @click="submitXhsCompetitorWorkflow"
+          >
+            开始分析
+          </el-button>
+        </section>
+
+        <el-collapse class="developer-tools-collapse">
+          <el-collapse-item name="developer" title="开发调试工具">
 
         <section class="account-setup-box">
           <div class="toolbar">
@@ -1331,50 +1394,6 @@
           </div>
         </section>
 
-        <el-input
-          v-model="form.text"
-          type="textarea"
-          :rows="5"
-          resize="none"
-          maxlength="240"
-          show-word-limit
-        />
-
-        <section class="agent-workflow-card">
-          <div class="toolbar">
-            <strong>Agent 竞品分析 Workflow</strong>
-            <el-tag type="success" effect="plain">Conversation First</el-tag>
-          </div>
-          <div class="form-grid single">
-            <label>
-              <span>note_urls</span>
-              <el-input
-                v-model="xhsWorkflowForm.noteUrlsText"
-                type="textarea"
-                :rows="3"
-                resize="none"
-                placeholder="一行一个小红书笔记链接"
-              />
-            </label>
-            <label>
-              <span>competitor_account_ids_or_urls</span>
-              <el-input
-                v-model="xhsWorkflowForm.competitorAccountsText"
-                type="textarea"
-                :rows="3"
-                resize="none"
-                placeholder="一行一个同行账号 ID 或主页链接"
-              />
-            </label>
-          </div>
-          <el-alert
-            type="info"
-            title="Agent 会自动采集笔记、账号、评论和图片 OCR，再基于真实入库数据生成竞品分析；失败会显示真实错误，不使用 Mock 补齐。"
-            show-icon
-            :closable="false"
-          />
-        </section>
-
         <div class="form-grid">
           <label>
             <span>session_id</span>
@@ -1427,6 +1446,8 @@
           show-icon
           :closable="false"
         />
+          </el-collapse-item>
+        </el-collapse>
 
         <el-alert v-if="demoLoaded" type="info" title="当前展示本地演示数据，未调用接口" show-icon :closable="false" />
         <el-alert v-if="errorMessage" type="error" :title="errorMessage" show-icon :closable="false" />
@@ -1486,11 +1507,14 @@
                   <el-tag :type="statusType(step.status)" effect="plain">{{ step.status }}</el-tag>
                 </div>
                 <div class="slot-meta">
+                  <span v-if="step.provider">{{ step.provider }}</span>
+                  <span v-if="step.data_source">{{ step.data_source }}</span>
                   <span v-for="(value, key) in step.data_count" :key="key">{{ key }} {{ value }}</span>
                   <span v-if="step.error_code">{{ step.error_code }}</span>
                 </div>
-                <p>{{ step.output_summary || step.input_summary || '-' }}</p>
-                <pre v-if="Object.keys(step.evidence_ids || {}).length" class="slot-preview">{{ formatJson(step.evidence_ids) }}</pre>
+                <p v-if="step.input_summary">{{ step.input_summary }}</p>
+                <p>{{ step.output_summary || '-' }}</p>
+                <pre v-if="Object.keys(step.created_ids || {}).length" class="slot-preview">{{ formatJson(step.created_ids) }}</pre>
                 <p v-if="step.error_message">{{ step.error_message }}</p>
                 <p v-if="step.warnings.length">{{ step.warnings.join(' / ') }}</p>
               </div>
@@ -3194,6 +3218,35 @@ const formatJson = (value: unknown) => JSON.stringify(value || {}, null, 2)
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.primary-workflow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.primary-workflow label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.primary-workflow label > span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.developer-tools-collapse {
+  width: 100%;
+}
+
+.developer-tools-collapse :deep(.el-collapse-item__content) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .data-source-box {

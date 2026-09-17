@@ -12,7 +12,7 @@ from app.agent.product_entry.pipeline import (
     build_plan_validation_result,
     merge_param_validation_results,
 )
-from app.agent.product_entry.schemas import Action, AgentChatRequest, AgentChatResponse
+from app.agent.product_entry.schemas import Action, AgentChatRequest, AgentChatResponse, Plan, PlanStep
 from app.agent.product_entry.task_planner import LLMTaskPlanner
 from app.agent.product_entry.trace import AgentEntryTraceRecorder, to_agent_trace_payload
 from app.agent.product_entry.validators import validate_param_sources, validate_plan_params, validate_plan_result
@@ -184,7 +184,7 @@ class AgentChatWorkflowExecuteService:
             **response.metadata,
             "business_result": _workflow_business_result(execution_result),
             "entry_trace": to_agent_trace_payload(recorder.build_trace()),
-            "workflow_timeline": _workflow_timeline(execution_result),
+            "workflow_timeline": _workflow_timeline(execution_result, plan),
             "workflow_registry_actions": [
                 Action.COLLECT_XHS_NOTES.value,
                 Action.COLLECT_XHS_ACCOUNTS.value,
@@ -261,7 +261,8 @@ def _workflow_business_result(execution_result: PlanExecutionResult) -> dict | N
     return result or None
 
 
-def _workflow_timeline(execution_result: PlanExecutionResult) -> list[dict]:
+def _workflow_timeline(execution_result: PlanExecutionResult, plan: Plan | None = None) -> list[dict]:
+    plan_steps = {step.step_no: step for step in plan.steps} if plan else {}
     return [
         {
             "step_order": step.step_order,
@@ -270,16 +271,42 @@ def _workflow_timeline(execution_result: PlanExecutionResult) -> list[dict]:
             "started_at": step.started_at.isoformat() if step.started_at else None,
             "finished_at": step.finished_at.isoformat() if step.finished_at else None,
             "duration_ms": _duration_ms(step.started_at, step.finished_at),
-            "input_summary": "见 plan.steps.input_params",
-            "output_summary": step.output.get("summary") or step.output.get("status") or step.message,
+            "input_summary": _timeline_input_summary(plan_steps.get(step.step_order)),
+            "output_summary": _timeline_output_summary(step.action, step.output, step.message),
+            "provider": step.output.get("provider") or step.output.get("source_type"),
+            "data_source": step.output.get("data_source"),
             "data_count": step.output.get("data_count") or {},
             "evidence_ids": step.output.get("evidence_ids") or (step.output.get("evidence") if isinstance(step.output.get("evidence"), dict) else {}),
+            "created_ids": step.output.get("evidence_ids") or (step.output.get("evidence") if isinstance(step.output.get("evidence"), dict) else {}),
             "warnings": step.output.get("warnings") or [],
             "error_code": step.error_code or step.output.get("error_code"),
             "error_message": step.message if step.status.value == "FAILED" else step.output.get("error_message"),
         }
         for step in execution_result.step_results
     ]
+
+
+def _timeline_input_summary(step: PlanStep | None) -> str | None:
+    if not step:
+        return None
+    if step.action == Action.COLLECT_XHS_NOTES:
+        return f"{len(step.input_params.get('note_urls') or [])} 个笔记链接"
+    if step.action == Action.COLLECT_XHS_ACCOUNTS:
+        return f"{len(step.input_params.get('competitor_account_ids_or_urls') or [])} 个同行账号"
+    if step.action == Action.ANALYZE_COMPETITOR_DATA:
+        return "分析已入库的真实竞品数据"
+    return step.description
+
+
+def _timeline_output_summary(action: Action, output: dict, message: str | None) -> str | None:
+    counts = output.get("data_count") or {}
+    if action == Action.COLLECT_XHS_NOTES:
+        return f"保存 {counts.get('notes_saved', 0)} 篇笔记 / {counts.get('comments_saved', 0)} 条评论 / {counts.get('images', 0)} 个图片 URL"
+    if action == Action.COLLECT_XHS_ACCOUNTS:
+        return f"保存 {counts.get('accounts_saved', 0)} 个账号 / {counts.get('recent_notes_saved', 0)} 篇近期笔记"
+    if action == Action.ANALYZE_COMPETITOR_DATA:
+        return f"分析 {output.get('note_count', 0)} 篇笔记 / {output.get('comment_count', 0)} 条评论，report_id={output.get('report_id', '-')}"
+    return output.get("summary") or output.get("status") or message
 
 
 def _duration_ms(started_at, finished_at) -> int | None:
