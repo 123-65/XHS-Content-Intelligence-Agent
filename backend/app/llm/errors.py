@@ -16,3 +16,9 @@ class LLMOutputParseError(LLMResponseError):
 
 class LLMSchemaValidationError(LLMResponseError):
     """Model output JSON does not match the requested schema."""
+
+
+class LLMTimeoutError(LLMResponseError):
+    """A finite business LLM deadline was exhausted."""
+
+    code = "LLM_TIMEOUT"

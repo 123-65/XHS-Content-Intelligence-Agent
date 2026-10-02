@@ -19,21 +19,12 @@ from evals.runners.draft_safety_runner import evaluate_case as eval_draft
 from evals.runners.experiment_generation_runner import DEFAULT_DATASET as EXPERIMENT_DATASET
 from evals.runners.experiment_generation_runner import EVAL_TYPE as EXPERIMENT_EVAL_TYPE
 from evals.runners.experiment_generation_runner import evaluate_case as eval_experiment
-from evals.runners.guardrail_runner import DEFAULT_DATASET as GUARDRAIL_DATASET
-from evals.runners.guardrail_runner import EVAL_TYPE as GUARDRAIL_EVAL_TYPE
-from evals.runners.guardrail_runner import evaluate_case as eval_guardrail
 from evals.runners.memory_usage_runner import DEFAULT_DATASET as MEMORY_USAGE_DATASET
 from evals.runners.memory_usage_runner import EVAL_TYPE as MEMORY_USAGE_EVAL_TYPE
 from evals.runners.memory_usage_runner import evaluate_case as eval_memory_usage
 from evals.runners.mcp_safety_runner import DEFAULT_DATASET as MCP_DATASET
 from evals.runners.mcp_safety_runner import EVAL_TYPE as MCP_EVAL_TYPE
 from evals.runners.mcp_safety_runner import evaluate_case as eval_mcp
-from evals.runners.prompt_schema_runner import DEFAULT_DATASET as PROMPT_DATASET
-from evals.runners.prompt_schema_runner import EVAL_TYPE as PROMPT_EVAL_TYPE
-from evals.runners.prompt_schema_runner import evaluate_case as eval_prompt
-from evals.runners.tool_fallback_runner import DEFAULT_DATASET as TOOL_FALLBACK_DATASET
-from evals.runners.tool_fallback_runner import EVAL_TYPE as TOOL_FALLBACK_EVAL_TYPE
-from evals.runners.tool_fallback_runner import evaluate_case as eval_tool_fallback
 
 
 def main() -> None:
@@ -42,11 +33,8 @@ def main() -> None:
         (COMMENT_EVAL_TYPE, COMMENT_DATASET, eval_comment),
         (EXPERIMENT_EVAL_TYPE, EXPERIMENT_DATASET, eval_experiment),
         (DRAFT_EVAL_TYPE, DRAFT_DATASET, eval_draft),
-        (PROMPT_EVAL_TYPE, PROMPT_DATASET, eval_prompt),
         (MCP_EVAL_TYPE, MCP_DATASET, eval_mcp),
         (AGENT_TRAJECTORY_EVAL_TYPE, AGENT_TRAJECTORY_DATASET, eval_agent_trajectory),
-        (TOOL_FALLBACK_EVAL_TYPE, TOOL_FALLBACK_DATASET, eval_tool_fallback),
-        (GUARDRAIL_EVAL_TYPE, GUARDRAIL_DATASET, eval_guardrail),
         (MEMORY_USAGE_EVAL_TYPE, MEMORY_USAGE_DATASET, eval_memory_usage),
     ]
     reports = [run_eval(eval_type, dataset, evaluator).model_dump(mode="json") for eval_type, dataset, evaluator in runners]

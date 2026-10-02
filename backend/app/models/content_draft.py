@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,9 +12,24 @@ class ContentDraft(Base):
     """Content draft table."""
 
     __tablename__ = "content_draft"
+    __table_args__ = (
+        CheckConstraint(
+            "experiment_id IS NOT NULL OR (account_id IS NOT NULL AND strategy_artifact_id IS NOT NULL "
+            "AND opportunity_id IS NOT NULL AND content_goal IS NOT NULL)",
+            name="ck_content_draft_agent_identity_complete",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    experiment_id: Mapped[int] = mapped_column(ForeignKey("content_experiment.id"), nullable=False, comment="Experiment ID")
+    experiment_id: Mapped[int | None] = mapped_column(ForeignKey("content_experiment.id"), nullable=True, comment="Legacy Experiment ID")
+    account_id: Mapped[int] = mapped_column(ForeignKey("account_profile.id"), nullable=False, index=True, comment="Draft 所属账号 ID")
+    strategy_artifact_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_strategy_artifact.id"), nullable=True, index=True, comment="New Agent Strategy Artifact ID"
+    )
+    opportunity_id: Mapped[int | None] = mapped_column(
+        ForeignKey("content_opportunity.id"), nullable=True, index=True, comment="New Agent Content Opportunity ID"
+    )
+    content_goal: Mapped[str | None] = mapped_column(Text, nullable=True, comment="New Agent Draft 不可变内容目标")
     title: Mapped[str] = mapped_column(String(512), nullable=False, comment="Legacy note title")
     body: Mapped[str] = mapped_column(Text, nullable=False, comment="Legacy note body")
     tags: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False, comment="Legacy tags")

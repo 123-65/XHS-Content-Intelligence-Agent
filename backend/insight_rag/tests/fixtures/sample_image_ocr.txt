@@ -1,0 +1,1 @@
+OCR image architecture.png: Milvus, PostgreSQL Citus coordinator, two worker nodes, and GraphRAG entities are visible.

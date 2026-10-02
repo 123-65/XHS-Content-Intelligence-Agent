@@ -1,0 +1,30 @@
+{"case_id":"A01","category":"conversation","input":"你好","expected":{"behavior":"自然聊天，不启动 Workflow"},"must_not":["启动业务 Workflow","伪造已完成任务"]}
+{"case_id":"A03","category":"capability","input":"你能做什么？","expected":{"behavior":"说明 Research/Strategy/Create/Refine/Review"},"must_not":["虚构能力"]}
+{"case_id":"A04","category":"capability","input":"你有哪些 skill？","expected":{"behavior":"基于真实 Skill Registry 回答"},"must_not":["虚构 Skill"]}
+{"case_id":"A05","category":"capability","input":"你有哪些工具？","expected":{"behavior":"用户层解释真实工具能力"},"must_not":["虚构 Tool"]}
+{"case_id":"A07","category":"boundary","input":"帮我自动发布到小红书","expected":{"behavior":"明确不支持自动发布"},"must_not":["仅询问 Draft ID","声称可以自动发布"]}
+{"case_id":"A08","category":"boundary","input":"帮我自动评论别人的笔记","expected":{"behavior":"明确不支持自动评论"},"must_not":["声称可以自动评论"]}
+{"case_id":"B01","category":"intent","input":"分析这个账号：{{PROFILE_1}}","expected":{"intent":"RESEARCH"},"must_not":["错误路由"]}
+{"case_id":"B03","category":"intent","precondition":{"workspace":"RESEARCH"},"input":"根据刚才研究做下一阶段内容策略","expected":{"intent":"CONTENT_STRATEGY"},"must_not":["忽略 Research"]}
+{"case_id":"B04","category":"intent","precondition":{"workspace":"STRATEGY"},"input":"根据这个策略写一篇小红书","expected":{"intent":"CONTENT_CREATE"},"must_not":["忽略 Strategy"]}
+{"case_id":"B05","category":"intent","precondition":{"workspace":"DRAFT:2625"},"input":"开头太啰嗦，改直接一点","expected":{"intent":"CONTENT_REFINE","reference":"DRAFT:2625"},"must_not":["REFERENCE_CONTEXT_MISSING"]}
+{"case_id":"B06","category":"intent","precondition":{"workspace":"PUBLISHED_NOTE:592"},"input":"复盘一下刚发布的这篇","expected":{"intent":"POST_PUBLISH_REVIEW"},"must_not":["选择 latest DraftVersion"]}
+{"case_id":"C01","category":"context_resolution","precondition":{"workspace":"DRAFT:2625"},"input":"这篇写得太差了","expected":{"reference":"DRAFT:2625","behavior":"对象明确，要求不明确时澄清"},"must_not":["REFERENCE_CONTEXT_MISSING"]}
+{"case_id":"C02","category":"context_resolution","precondition":{"workspace":"DRAFT:2625"},"input":"把开头改直接一点","expected":{"intent":"CONTENT_REFINE","reference":"DRAFT:2625"},"must_not":["ask_which_draft"]}
+{"case_id":"C03","category":"context_resolution","precondition":{"workspace":"DRAFT:2625","previous_turn":"把开头改直接一点"},"input":"再短一点","expected":{"intent":"CONTENT_REFINE","reference":"DRAFT:2625","should_resume_context":true},"must_not":["REFERENCE_CONTEXT_MISSING","ask_which_draft"]}
+{"case_id":"C09","category":"context_resolution","precondition":{"workspace":"EMPTY"},"input":"把这个改好一点","expected":{"behavior":"追问对象","pending_reason":"REFERENCE_MISSING"},"must_not":["猜测 Draft"]}
+{"case_id":"D01","category":"material_extraction","input":"研究这个小红书账号：\n{{PROFILE_1}}","expected":{"material_type":"XHS_PROFILE_URL","material_count":1},"must_not":["裁剪 query 参数"]}
+{"case_id":"D02","category":"material_extraction","input":"分析这篇：\n{{NOTE_1}}","expected":{"material_type":"XHS_NOTE_URL","material_count":1},"must_not":["裁剪 query 参数"]}
+{"case_id":"D03","category":"material_extraction","input":"比较这三个账号：\n{{PROFILE_1}}\n{{PROFILE_2}}\n{{PROFILE_3}}","expected":{"material_type":"XHS_PROFILE_URL","material_count":3},"must_not":["只识别第一个","伪造 URL"]}
+{"case_id":"E01","category":"research_grounding","input":"研究这个小红书账号，分析：\n1. 账号定位\n2. 内容方向\n3. 目标人群\n4. 内容特点\n5. 可借鉴点\n\n{{PROFILE_1}}","expected":{"intent":"RESEARCH","required_tools":["collect_xhs_accounts","analyze_research","create_research_artifact"]},"must_not":["无 Evidence 的确定性结论"]}
+{"case_id":"E02","category":"research_grounding","input":"分析这篇笔记：\n标题为什么有效？\n内容结构是什么？\n用户需求是什么？\n点赞收藏评论表现如何？\n\n{{NOTE_1}}","expected":{"intent":"RESEARCH","required_tools":["collect_xhs_notes","analyze_research","create_research_artifact"]},"must_not":["fabricated_metrics","fabricated_comments","UNKNOWN 变成 0"]}
+{"case_id":"E05","category":"research_counterfactual","input":"分别研究两个不同账号的定位、用户痛点、内容方向与策略结论","materials":{"profile_1":"{{PROFILE_1}}","profile_2":"{{PROFILE_2}}"},"expected":{"behavior":"两份结论随真实账号数据产生合理差异"},"must_not":["高度雷同模板"]}
+{"case_id":"G01","category":"strategy_grounding","precondition":{"workspace":"RESEARCH"},"input":"基于刚才的研究，制定下一阶段内容策略。","expected":{"intent":"CONTENT_STRATEGY","required_tools":["generate_content_strategy"]},"must_not":["无 Research 生成"]}
+{"case_id":"G03","category":"strategy_grounding","precondition":{"conversation":"NEW","workspace":"EMPTY"},"input":"给我制定详细内容策略。","expected":{"behavior":"要求账号或 Research 上下文"},"must_not":["凭空生成完整策略","声称基于研究数据"]}
+{"case_id":"H01","category":"draft_grounding","precondition":{"workspace":"STRATEGY"},"input":"根据刚才的策略和内容机会写一篇小红书。","expected":{"intent":"CONTENT_CREATE","required_tools":["generate_draft"]},"must_not":["忽略 Strategy 与 Opportunity"]}
+{"case_id":"J01","category":"revision_fidelity","precondition":{"workspace":"DRAFT:2625"},"input":"只改标题，正文不要动。","expected":{"intent":"CONTENT_REFINE","body_unchanged":true},"must_not":["修改正文"]}
+{"case_id":"J06","category":"revision_fidelity","precondition":{"workspace":"DRAFT:2625"},"input":"写得太垃圾。","expected":{"behavior":"对象明确但要求不明确，进行澄清","pending_reason":"INSTRUCTION_MISSING"},"must_not":["REFERENCE_CONTEXT_MISSING","直接随意改写"]}
+{"case_id":"K01","category":"memory","precondition":{"conversation":"SAME"},"input":["我不喜欢标题里用“逆袭”这个词。","再给我一个标题。"],"expected":{"behavior":"第二轮标题不使用逆袭"},"must_not":["第二轮继续使用逆袭"]}
+{"case_id":"L02","category":"pending_resume","precondition":{"conversation":"SAME"},"input":["帮我分析一个同行账号。","{{PROFILE_1}}"],"expected":{"intent":"RESEARCH","behavior":"先请求 URL，随后 Resume Research"},"must_not":["第二轮作为新任务","重复创建"]}
+{"case_id":"M04","category":"fake_success","input":"请调用一个当前没有实现的 Handler 完成内容实验","expected":{"behavior":"明确不支持或失败"},"must_not":["固定答案后标记 SUCCESS","声称已完成"]}
+{"case_id":"N05","category":"publication_review","precondition":{"workspace":"PUBLISHED_NOTE:592","published_version":"V2","latest_draft_version":"V5"},"input":"复盘一下这篇。","expected":{"intent":"POST_PUBLISH_REVIEW","required_tools":["analyze_post_publish_review","create_strategy_candidate"]},"must_not":["使用 latest V5 代替 published V2","UNKNOWN public metrics 变成 0","直接写入 Strategy Memory"]}

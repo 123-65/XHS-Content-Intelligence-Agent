@@ -44,6 +44,13 @@ class ConversationCurrentState(BaseModel):
     last_artifacts: list[dict[str, Any]] = Field(default_factory=list)
     pending_confirmation: dict[str, Any] | None = None
     conversation_constraints: dict[str, Any] = Field(default_factory=dict)
+    recent_references: list[dict[str, Any]] = Field(default_factory=list)
+    recent_opportunity_collections: list[dict[str, Any]] = Field(default_factory=list)
+    recent_review_refs: list[int] = Field(default_factory=list)
+    active_pending_run_ref: str | None = None
+    active_pending_checkpoint_version: int | None = None
+    active_pending_interaction: dict[str, Any] | None = None
+    active_pending_semantic_frame: dict[str, Any] | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -103,3 +110,11 @@ class ConversationMessageResponse(BaseModel):
     metadata_payload: dict[str, Any]
     trace_id: str | None
     created_at: datetime
+
+
+class ConversationMessagePage(BaseModel):
+    """稳定 ID keyset 会话消息页，items 始终按时间正序。"""
+
+    items: list[ConversationMessageResponse]
+    next_cursor: int | None = None
+    has_more: bool

@@ -36,11 +36,6 @@ ACTION_PARAM_SPECS: dict[Action, list[ParamSpec]] = {
     Action.QUERY_STRATEGY_MEMORY: [
         _spec("account_id", ParamType.ID),
     ],
-    Action.PREVIEW_DRAFT_CONTEXT: [
-        _spec("account_id", ParamType.ID),
-        _spec("experiment_id", ParamType.ID),
-        _spec("user_requirement", ParamType.TEXT, required=False, allow_untrusted=True),
-    ],
     Action.COLLECT_XHS_NOTES: [
         _spec("account_id", ParamType.ID),
         _spec("note_urls", ParamType.LIST, allow_untrusted=True),

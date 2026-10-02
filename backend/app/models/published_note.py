@@ -14,8 +14,9 @@ class PublishedNote(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("account_profile.id"), nullable=False, comment="Account ID")
-    experiment_id: Mapped[int] = mapped_column(ForeignKey("content_experiment.id"), nullable=False, comment="Experiment ID")
+    experiment_id: Mapped[int | None] = mapped_column(ForeignKey("content_experiment.id"), nullable=True, comment="Experiment ID")
     draft_id: Mapped[int] = mapped_column(ForeignKey("content_draft.id"), nullable=False, comment="Draft ID")
+    draft_version_id: Mapped[int | None] = mapped_column(ForeignKey("content_draft_version.id"), nullable=True, index=True)
     publish_url: Mapped[str] = mapped_column(String(1024), nullable=False, comment="Published note URL")
     platform: Mapped[str] = mapped_column(String(32), default="xhs", nullable=False, comment="Platform")
     status: Mapped[str] = mapped_column(String(32), default="PUBLISHED", nullable=False, comment="Published note status")

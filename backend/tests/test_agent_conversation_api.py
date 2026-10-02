@@ -3,6 +3,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas.account import AccountProfileCreate
 from app.services.account_sev import AccountProfileService
+from app.services.agent_conversation_sev import AgentConversationService
+from app.schemas.agent_conversation import ConversationMessageCreate, ConversationRole
 from app.core.database import SessionLocal
 
 
@@ -66,7 +68,7 @@ def test_list_conversations_by_account_id():
     """可以按 account_id 查询会话列表。"""
     account_id = _create_account()
     created = _client().post("/agent/conversations", json={"account_id": account_id, "title": "账号会话"}).json()
-    data = _client().get(f"/agent/conversations?account_id={account_id}").json()
+    data = _client().get(f"/agent/conversations?account_ref={account_id}").json()
 
     assert any(item["id"] == created["id"] for item in data)
     assert all(item["account_id"] == account_id for item in data)
@@ -74,8 +76,9 @@ def test_list_conversations_by_account_id():
 
 def test_get_conversation_detail():
     """可以读取 conversation detail。"""
-    created = _client().post("/agent/conversations", json={"title": "详情会话"}).json()
-    data = _client().get(f"/agent/conversations/{created['id']}").json()
+    account_id = _create_account()
+    created = _client().post("/agent/conversations", json={"account_id": account_id, "title": "详情会话"}).json()
+    data = _client().get(f"/agent/conversations/{created['id']}?account_ref={account_id}").json()
 
     assert data["id"] == created["id"]
     assert data["title"] == "详情会话"
@@ -83,16 +86,18 @@ def test_get_conversation_detail():
 
 def test_list_messages_initially_empty():
     """可以读取 messages，初始为空列表。"""
-    created = _client().post("/agent/conversations", json={}).json()
-    data = _client().get(f"/agent/conversations/{created['id']}/messages").json()
+    account_id = _create_account()
+    created = _client().post("/agent/conversations", json={"account_id": account_id}).json()
+    data = _client().get(f"/agent/conversations/{created['id']}/messages?account_ref={account_id}").json()
 
-    assert data == []
+    assert data == {"items": [], "next_cursor": None, "has_more": False}
 
 
 def test_get_state():
     """可以读取 state。"""
-    created = _client().post("/agent/conversations", json={}).json()
-    state = _client().get(f"/agent/conversations/{created['id']}/state").json()
+    account_id = _create_account()
+    created = _client().post("/agent/conversations", json={"account_id": account_id}).json()
+    state = _client().get(f"/agent/conversations/{created['id']}/state?account_ref={account_id}").json()
 
     assert state["last_artifacts"] == []
     assert state["conversation_constraints"] == {}
@@ -101,9 +106,9 @@ def test_get_state():
 def test_patch_state_only_allows_safe_fields():
     """可以 patch state 的受控字段。"""
     account_id = _create_account()
-    created = _client().post("/agent/conversations", json={}).json()
+    created = _client().post("/agent/conversations", json={"account_id": account_id}).json()
     response = _client().patch(
-        f"/agent/conversations/{created['id']}/state",
+        f"/agent/conversations/{created['id']}/state?account_ref={account_id}",
         json={
             "active_account_id": account_id,
             "active_experiment_id": 456,
@@ -123,15 +128,85 @@ def test_patch_state_only_allows_safe_fields():
 
 def test_nonexistent_conversation_returns_404():
     """不存在 conversation_id 返回 404。"""
-    response = _client().get("/agent/conversations/999999999")
+    response = _client().get("/agent/conversations/999999999?account_ref=1")
 
     assert response.status_code == 404
 
 
 def test_message_schema_uses_metadata_payload_not_metadata():
     """ConversationMessage 响应使用 metadata_payload，不使用 SQLAlchemy 保留字段 metadata。"""
-    created = _client().post("/agent/conversations", json={}).json()
-    messages = _client().get(f"/agent/conversations/{created['id']}/messages").json()
+    account_id = _create_account()
+    created = _client().post("/agent/conversations", json={"account_id": account_id}).json()
+    messages = _client().get(f"/agent/conversations/{created['id']}/messages?account_ref={account_id}").json()
 
-    assert messages == []
+    assert messages == {"items": [], "next_cursor": None, "has_more": False}
     assert "metadata" not in created
+
+
+def _owned_conversation(account_id: int) -> dict:
+    return _client().post("/agent/conversations", json={"account_id": account_id, "title": "security-boundary"}).json()
+
+
+def test_sec_conv_001_owner_can_read_and_other_account_is_forbidden():
+    """SEC-CONV-001: canonical owner succeeds; Account B receives 403."""
+    account_a, account_b = _create_account(), _create_account()
+    conversation = _owned_conversation(account_a)
+
+    owner = _client().get(f"/agent/conversations/{conversation['id']}?account_ref={account_a}")
+    denied = _client().get(f"/agent/conversations/{conversation['id']}?account_ref={account_b}")
+
+    assert owner.status_code == 200
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "CONVERSATION_ACCOUNT_MISMATCH"
+
+
+def test_sec_conv_002_other_account_cannot_read_messages():
+    """SEC-CONV-002: Account B cannot read Account A messages."""
+    account_a, account_b = _create_account(), _create_account()
+    conversation = _owned_conversation(account_a)
+
+    denied = _client().get(f"/agent/conversations/{conversation['id']}/messages?account_ref={account_b}")
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "CONVERSATION_ACCOUNT_MISMATCH"
+
+
+def test_sec_conv_003_cursor_does_not_bypass_account_boundary():
+    """SEC-CONV-003: before_id cannot bypass canonical ownership validation."""
+    account_a, account_b = _create_account(), _create_account()
+    conversation = _owned_conversation(account_a)
+
+    denied = _client().get(
+        f"/agent/conversations/{conversation['id']}/messages?account_ref={account_b}&before_id=999999999"
+    )
+
+    assert denied.status_code == 403
+    assert denied.json()["detail"]["code"] == "CONVERSATION_ACCOUNT_MISMATCH"
+
+
+def test_sec_conv_004_owner_cursor_pagination_remains_stable():
+    """SEC-CONV-004: owner still receives stable keyset pages."""
+    account_a = _create_account()
+    conversation = _owned_conversation(account_a)
+    db = SessionLocal()
+    try:
+        service = AgentConversationService(db)
+        model = service._get(conversation["id"])
+        for index in range(5):
+            service.repo.add_message(
+                model,
+                ConversationMessageCreate(role=ConversationRole.USER, content=f"message-{index}"),
+            )
+    finally:
+        db.close()
+
+    first = _client().get(
+        f"/agent/conversations/{conversation['id']}/messages?account_ref={account_a}&limit=3"
+    ).json()
+    second = _client().get(
+        f"/agent/conversations/{conversation['id']}/messages?account_ref={account_a}&limit=3&before_id={first['next_cursor']}"
+    ).json()
+
+    assert [item["content"] for item in first["items"]] == ["message-2", "message-3", "message-4"]
+    assert [item["content"] for item in second["items"]] == ["message-0", "message-1"]
+    assert set(item["id"] for item in first["items"]).isdisjoint(item["id"] for item in second["items"])

@@ -17,8 +17,17 @@
         text-color="#cbd5e1"
         active-text-color="#ffffff"
       >
-        <el-menu-item index="/agent/workbench"><Bot :size="18" /><span>Agent 工作台</span></el-menu-item>
-        <el-menu-item index="/developer/agent-trace"><Bug :size="18" /><span>Trace 控制台</span></el-menu-item>
+        <el-menu-item :index="nav.agentChat"><Bot :size="18" /><span>Agent 对话</span></el-menu-item>
+        <el-menu-item-group title="内容资产">
+          <el-menu-item :index="nav.research"><Search :size="18" /><span>Research</span></el-menu-item>
+          <el-menu-item :index="nav.strategy"><Target :size="18" /><span>Strategy</span></el-menu-item>
+          <el-menu-item :index="nav.draft"><FileText :size="18" /><span>Draft</span></el-menu-item>
+        </el-menu-item-group>
+        <el-menu-item-group title="发布与复盘">
+          <el-menu-item :index="nav.publication"><Send :size="18" /><span>Published Content</span></el-menu-item>
+          <el-menu-item :index="nav.review"><ClipboardCheck :size="18" /><span>Review</span></el-menu-item>
+        </el-menu-item-group>
+        <el-menu-item :index="nav.trace"><Bug :size="18" /><span>Trace 控制台</span></el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -31,110 +40,45 @@
             <span>真实数据采集、分析与运营工作流</span>
           </div>
         </div>
-        <el-tag type="success" effect="light">Real Data</el-tag>
+        <el-tag type="success" effect="light">真实数据</el-tag>
       </el-header>
-      <el-main class="main">
-        <router-view />
-      </el-main>
+      <el-main class="main"><router-view /></el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { Bot, Bug, PanelLeft } from 'lucide-vue-next'
-import { useRoute } from 'vue-router'
+import { Bot, Bug, ClipboardCheck, FileText, PanelLeft, Search, Send, Target } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
+const router = useRouter()
 const app = useAppStore()
+const nav = {
+  agentChat: router.resolve({ name: 'agentChat' }).path,
+  research: router.resolve({ name: 'agentResearchList' }).path,
+  strategy: router.resolve({ name: 'agentStrategyList' }).path,
+  draft: router.resolve({ name: 'agentDraftList' }).path,
+  publication: router.resolve({ name: 'agentPublicationList' }).path,
+  review: router.resolve({ name: 'agentReviewList' }).path,
+  trace: router.resolve({ name: 'developerAgentTrace' }).path
+}
 </script>
 
 <style scoped>
-.app-shell {
-  min-height: 100vh;
-  background: #f5f7fb;
-}
-
-.sidebar {
-  overflow: hidden;
-  background: #101827;
-  transition: width 0.2s ease;
-}
-
-.brand {
-  display: flex;
-  height: 72px;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px;
-  color: #fff;
-}
-
-.brand-mark {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
-  place-items: center;
-  border-radius: 8px;
-  background: #2563eb;
-  font-weight: 800;
-}
-
-.brand strong,
-.brand span {
-  display: block;
-  letter-spacing: 0;
-}
-
-.brand span {
-  margin-top: 2px;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.side-menu {
-  border-right: 0;
-}
-
-.side-menu :deep(.el-menu-item) {
-  gap: 10px;
-  height: 46px;
-}
-
-.side-menu :deep(.is-active) {
-  background: #2563eb;
-}
-
-.topbar {
-  display: flex;
-  height: 72px;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.topbar-left strong {
-  display: block;
-  color: #111827;
-  font-size: 16px;
-}
-
-.topbar-left span {
-  display: block;
-  margin-top: 4px;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.main {
-  padding: 22px;
-}
+.app-shell { min-height: 100vh; background: #f5f7fb; }
+.sidebar { overflow: hidden; background: #101827; transition: width 0.2s ease; }
+.brand { display: flex; height: 72px; align-items: center; gap: 12px; padding: 0 18px; color: #fff; }
+.brand-mark { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 8px; background: #2563eb; font-weight: 800; }
+.brand strong, .brand span { display: block; letter-spacing: 0; }
+.brand span { margin-top: 2px; color: #94a3b8; font-size: 12px; }
+.side-menu { border-right: 0; }
+.side-menu :deep(.el-menu-item) { gap: 10px; height: 46px; }
+.side-menu :deep(.is-active) { background: #2563eb; }
+.topbar { display: flex; height: 72px; align-items: center; justify-content: space-between; border-bottom: 1px solid #e5e7eb; background: #fff; }
+.topbar-left { display: flex; align-items: center; gap: 14px; }
+.topbar-left strong { display: block; color: #111827; font-size: 16px; }
+.topbar-left span { display: block; margin-top: 4px; color: #6b7280; font-size: 13px; }
+.main { padding: 22px; }
 </style>

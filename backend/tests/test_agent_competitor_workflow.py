@@ -15,10 +15,32 @@ from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
 from app.models.strategy_memory import StrategyMemory
 from app.models.xhs_note import XhsNoteSnapshot
+from app.schemas.account import AccountProfileCreate
+from app.services.account_sev import AccountProfileService
 from app.services.xhs_collect_import_sev import XhsCollectImportService
 from app.services.xhs_collector_sev import XhsCollectorService
-from tests.test_draft_context_preview_api import _create_account
 from tests.competitor_analysis_fakes import FakeStructuredCompetitorAnalyzer
+
+
+def _create_account() -> int:
+    """创建正式 workflow 回归测试所需的账号。"""
+    db = SessionLocal()
+    try:
+        account = AccountProfileService(db).create_account(
+            AccountProfileCreate(
+                account_name="Agent workflow test account",
+                platform="xhs",
+                content_domain="competitor research",
+                positioning="workflow integration test",
+                target_audience="operators",
+                primary_goal="lead",
+                tone_preference="direct",
+                monetization_goal="consulting",
+            )
+        )
+        return account.id
+    finally:
+        db.close()
 
 
 class FailingLLM:

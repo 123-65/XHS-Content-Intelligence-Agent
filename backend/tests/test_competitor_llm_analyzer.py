@@ -4,8 +4,8 @@ import pytest
 
 from app.analysis.competitor.engine import CompetitorAnalysisError
 from app.analysis.competitor.llm_analyzer import LLMStructuredCompetitorAnalyzer
-from app.analysis.competitor.rule_baseline import RuleBaselineCompetitorAnalyzer
 from app.analysis.competitor.schemas import CompetitorSemanticResult
+from app.core.config import settings
 from app.llm.errors import LLMError, LLMSchemaValidationError
 from app.schemas.competitor_report import CompetitorReportCreate
 from app.services.competitor_report_sev import CompetitorReportService
@@ -20,6 +20,10 @@ def test_llm_analyzer_uses_unified_client_and_structured_schema():
     assert result.persona.positioning == "企业 AI 落地与交付知识账号"
     assert client.calls[0]["schema_model"] is CompetitorSemanticResult
     assert client.calls[0]["prompt_key"] == "competitor_semantic_analysis"
+    assert client.calls[0]["prompt_version"] == "v1"
+    assert client.calls[0]["model"] == settings.llm_research_analysis_model == "qwen3.7-flash-2026-07-15"
+    assert client.calls[0]["timeout_seconds"] == settings.llm_research_analysis_timeout_seconds == 120
+    assert client.calls[0]["extra_body"] == {"enable_thinking": False}
     assert "不可信证据" in client.calls[0]["system_prompt"]
     assert "没有可用的 OCR" in client.calls[0]["prompt"]
 
@@ -46,14 +50,13 @@ def test_llm_analyzer_maps_provider_failure_without_rule_fallback():
     assert exc_info.value.code == "ANALYSIS_PROVIDER_FAILED"
 
 
-def test_production_default_is_llm_and_rule_baseline_is_explicit():
+def test_production_default_and_resolver_use_only_structured_llm():
     request = CompetitorReportCreate(account_id=1, name="test")
     service = CompetitorReportService(None)
 
     assert request.analysis_engine == "LLM_STRUCTURED_V1"
     assert service.analysis_engine == "LLM_STRUCTURED_V1"
-    assert isinstance(service._resolve_analyzer("RULE_BASELINE"), RuleBaselineCompetitorAnalyzer)
-    assert service._resolve_analyzer("LLM_STRUCTURED_V1").analysis_engine == "LLM_STRUCTURED_V1"
+    assert service._resolve_analyzer().analysis_engine == "LLM_STRUCTURED_V1"
 
 
 def test_business_and_api_modules_do_not_import_provider_sdks():

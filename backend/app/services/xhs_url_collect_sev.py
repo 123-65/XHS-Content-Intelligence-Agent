@@ -1,3 +1,10 @@
+"""Deprecated compatibility service for the legacy SimpleHTTP XHS endpoint.
+
+New Agents, Workflows, and Tools must use ``XhsCollectorService`` instead.
+This module is retained only while external consumers of the old HTTP API are
+being audited; it must not be used as an MCP failure fallback.
+"""
+
 import hashlib
 import re
 from datetime import datetime
@@ -24,7 +31,7 @@ from app.schemas.xhs_url_collect import (
 
 
 class XhsUrlCollectService:
-    """Collect public XHS note URLs and persist real parsed data only."""
+    """DEPRECATED/LEGACY_COMPAT: old SimpleHTTP collection owner."""
 
     def __init__(self, db: Session, provider=None):
         self.db = db

@@ -402,7 +402,6 @@ def _readonly_actions_from_router(router_result: RouterResult) -> list[Action]:
             Action.QUERY_COMPETITOR_EVIDENCE,
             Action.QUERY_COMMENT_INSIGHT,
             Action.QUERY_STRATEGY_MEMORY,
-            Action.PREVIEW_DRAFT_CONTEXT,
         } and action not in actions:
             actions.append(action)
     return actions
@@ -414,14 +413,9 @@ def _readonly_step(step_no: int, action: Action, account_id: int, experiment_id:
         Action.QUERY_COMPETITOR_EVIDENCE: ("查询当前账号的竞品证据，只读读取已有报告和机会。", "竞品证据摘要"),
         Action.QUERY_COMMENT_INSIGHT: ("查询当前账号的评论洞察，只读读取已有评论和报告摘要。", "评论洞察摘要"),
         Action.QUERY_STRATEGY_MEMORY: ("查询当前账号的策略记忆，只读读取已有 memory。", "策略记忆摘要"),
-        Action.PREVIEW_DRAFT_CONTEXT: ("预览草稿生成前的上下文槽位，只读构建 Context Slot 摘要。", "草稿上下文槽位预览"),
     }
     description, expected_output = descriptions[action]
     input_params = {"account_id": account_id}
-    if action == Action.PREVIEW_DRAFT_CONTEXT:
-        input_params["experiment_id"] = experiment_id
-        if user_requirement:
-            input_params["user_requirement"] = user_requirement
     return PlanStep(
         step_no=step_no,
         action=action,

@@ -3,7 +3,6 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.agent.product_entry.draft_context_preview import DraftContextPreviewService
 from app.agent.product_entry.executor import ActionHandlerRegistry
 from app.agent.product_entry.schemas import Action, PlanStep
 from app.context.context_compressor import (
@@ -117,15 +116,6 @@ def query_strategy_memory_handler(step: PlanStep, context: dict[str, Any]) -> di
     }
 
 
-def preview_draft_context_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
-    """预览草稿生成前的上下文槽位，只读，不调用 LLM，不写数据库。"""
-    account_id = _account_id(step, context)
-    experiment_id = _experiment_id(step, context)
-    user_requirement = _params(step).get("user_requirement")
-    service = DraftContextPreviewService(_db_session(context))
-    return service.preview(account_id=account_id, experiment_id=experiment_id, user_requirement=user_requirement)
-
-
 def collect_xhs_notes_handler(step: PlanStep, context: dict[str, Any]) -> dict[str, Any]:
     """Agent Tool: collect real XHS notes through the configured external provider."""
     params = _params(step)
@@ -224,7 +214,6 @@ def build_readonly_action_handler_registry(db: Session) -> ActionHandlerRegistry
     registry.register(Action.QUERY_COMPETITOR_EVIDENCE, query_competitor_evidence_handler)
     registry.register(Action.QUERY_COMMENT_INSIGHT, query_comment_insight_handler)
     registry.register(Action.QUERY_STRATEGY_MEMORY, query_strategy_memory_handler)
-    registry.register(Action.PREVIEW_DRAFT_CONTEXT, preview_draft_context_handler)
     return registry
 
 
@@ -245,17 +234,6 @@ def _account_id(step: PlanStep, context: dict[str, Any]) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError("account_id must be an integer") from exc
-
-
-def _experiment_id(step: PlanStep, context: dict[str, Any]) -> int:
-    request_context = context.get("request_context") or {}
-    value = _params(step).get("experiment_id") or request_context.get("experiment_id")
-    if value is None:
-        raise ValueError("experiment_id is required")
-    try:
-        return int(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("experiment_id must be an integer") from exc
 
 
 def _params(step: PlanStep) -> dict[str, Any]:

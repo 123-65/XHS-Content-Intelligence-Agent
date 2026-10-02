@@ -28,13 +28,13 @@ KEYWORD_GROUPS = {
         "context_budget",
     ],
     "workflow": [
-        "AgentRuntime",
+        "ExecutionOrchestrator",
         "workflow",
         "workflow_name",
         "step_name",
         "step_order",
-        "ToolDefinition",
-        "ToolResult",
+        "ActionHandlerRegistry",
+        "PlanExecutionResult",
         "tool_name",
         "register",
         "execute",
@@ -120,29 +120,19 @@ FUTURE_AGENT_CANDIDATES = [
         "priority": "P1",
     },
     {
-        "candidate_agent": "Opportunity Agent",
-        "current_code": "app/services/content_experiment_v2_sev.py, app/services/competitor_report_sev.py",
-        "current_shape": "普通 service / 规则生成",
-        "why": "负责把分析结果转成可执行选题机会，输出进入实验和草稿。",
-        "input": "竞品报告、账号定位、历史表现",
-        "output": "内容机会、证据、风险和优先级",
-        "needs_llm": "适合引入",
+        "candidate_agent": "Content Strategy Service",
+        "current_code": "app/services/content_strategy_sev.py, app/services/opportunity_assembler.py",
+        "current_shape": "唯一 Canonical Service + 结构组装器",
+        "why": "基于账号上下文和 Research Evidence 生成策略与可创作的内容机会。",
+        "input": "账号上下文、Research Artifact、已验证 Content Opportunity",
+        "output": "Content Strategy、EvidenceRefs、Content Opportunity",
+        "needs_llm": "是，统一经由 LLMClient",
         "priority": "P1",
     },
     {
-        "candidate_agent": "Experiment Planning Agent",
-        "current_code": "app/agent/workflows/content_experiment.py, app/services/content_experiment*_sev.py",
-        "current_shape": "Agent workflow step + 普通 service",
-        "why": "实验设计是明确决策点，有目标、变量和成功标准。",
-        "input": "账号、竞品笔记、内容机会",
-        "output": "内容实验、假设、指标、目标值",
-        "needs_llm": "未来可能需要",
-        "priority": "P0/P1",
-    },
-    {
         "candidate_agent": "Writer Agent",
-        "current_code": "app/services/content_draft_sev.py, app/services/content_draft_v2_sev.py",
-        "current_shape": "直接 LLM caller",
+        "current_code": "app/services/draft_generation_sev.py",
+        "current_shape": "Canonical DraftGenerationService",
         "why": "直接生成用户可见内容，已有 schema、prompt、context 和失败不入库测试。",
         "input": "账号、实验、机会、用户要求、策略记忆",
         "output": "结构化草稿",
@@ -161,12 +151,12 @@ FUTURE_AGENT_CANDIDATES = [
     },
     {
         "candidate_agent": "Post-publish Analytics Agent",
-        "current_code": "app/services/post_publish_sev.py",
-        "current_shape": "普通 service / 指标回采",
-        "why": "复盘需要结合发布后指标和目标，未来适合形成策略建议。",
+        "current_code": "app/services/post_publish_review_v0_sev.py",
+        "current_shape": "Canonical service / 发布后复盘",
+        "why": "复盘结合已绑定笔记与指标快照，生成仍需人工确认的策略候选。",
         "input": "发布后指标、实验目标、审核记录",
         "output": "复盘结论、优化建议",
-        "needs_llm": "未来可能需要",
+        "needs_llm": "是",
         "priority": "P1",
     },
     {
@@ -227,9 +217,9 @@ def classify_file(path: Path, root: Path, text: str, counts: dict[str, dict[str,
         rel_path.startswith("backend/app/agent/")
         or "workflow_name" in text
         or "WorkflowStepSpec" in text
-        or "ToolDefinition" in text
-        or "ToolResult" in text
-        or "AgentRuntime" in text
+        or "ActionHandlerRegistry" in text
+        or "PlanExecutionResult" in text
+        or "ExecutionOrchestrator" in text
         or "step_name" in text
         or "step_order" in text
     )
@@ -279,9 +269,9 @@ def infer_business_module(path: Path, text: str) -> str:
 
     value = f"{path_value} {text}".lower()
     module_patterns = [
-        ("content_draft_v2", ["content_draft_v2", "draftgeneratev2", "xhs_draft_v2"]),
+        ("draft_generation", ["draft_generation", "draftcontent"]),
         ("content_draft", ["content_draft", "draftgenerate", "xhs_writer"]),
-        ("review_report", ["review_report", "draftreview", "content_reviewer"]),
+        ("review_report", ["review_report", "draftreview"]),
         ("competitor_report", ["competitor_report"]),
         ("competitor_analysis", ["competitor_analysis"]),
         ("competitor_account", ["competitor_account"]),
@@ -292,7 +282,7 @@ def infer_business_module(path: Path, text: str) -> str:
         ("content_experiment", ["content_experiment"]),
         ("post_publish", ["post_publish", "publish"]),
         ("strategy_memory", ["strategy_memory", "startup_strategy", "memory"]),
-        ("agent_runtime", ["agent/runtime", "agentruntime"]),
+        ("agent_runtime", ["agent/product_entry", "executionorchestrator"]),
         ("context_engineering", ["app/context", "contextsnapshot", "builtcontext"]),
         ("llm_infra", ["app/llm", "llmclient", "llmresult"]),
         ("crawler_collection", ["crawler_collection", "crawler"]),
@@ -393,14 +383,14 @@ def service_classification(entries: list[dict]) -> dict:
 
 
 def agent_shape_analysis(workflow_entries: list[dict]) -> dict:
-    workflow_files = [entry for entry in workflow_entries if "/workflows/" in entry["file"] and not entry["file"].endswith("__init__.py")]
-    runtime_files = [entry for entry in workflow_entries if entry["file"].endswith("backend/app/agent/runtime.py")]
+    workflow_files = [entry for entry in workflow_entries if "/product_entry/" in entry["file"] and not entry["file"].endswith("__init__.py")]
+    runtime_files = [entry for entry in workflow_entries if entry["file"].endswith("backend/app/agent/product_entry/executor.py")]
     return {
         "independent_agent_classes_detected": 0,
         "agent_runtime_files": [entry["file"] for entry in runtime_files],
         "workflow_files": [entry["file"] for entry in workflow_files],
         "workflow_count_detected": len(workflow_files),
-        "shape": "当前更接近单 AgentRuntime + 多步骤 workflow + 多个 service/tool 的混合形态；不是多个成熟自治 Agent 类。",
+        "shape": "当前为单一 product_entry 控制层 + Action Handler + 多个 service/provider；不是多个成熟自治 Agent 类。",
     }
 
 
@@ -418,7 +408,7 @@ def priority_for_5_2(entries: list[dict], module_map: dict[str, list[dict]]) -> 
             item("llm_infra", "P0", "LLMClient 是所有真实 LLM 调用的统一入口，需要记录解析和 metadata 基线。"),
         ],
         "P1": [
-            item("content_experiment", "P1", "ContentExperimentWorkflow 串联账号、竞品笔记和实验创建，是 workflow step 基线。"),
+            item("content_experiment", "P1", "内容实验服务输出进入草稿链路，应继续统计输入输出，但旧示例 Workflow 已删除。"),
             item("content_experiment_v2", "P1", "实验/机会链路输出进入草稿生成，当前未发现直接 LLM 调用但应统计输入输出。"),
             item("competitor_report", "P1", "竞品报告当前未发现直接 LLM 调用，但输出进入实验和草稿上下文。"),
             item("competitor_analysis", "P1", "竞品分析结果影响后续机会和草稿，需要登记上下游字段。"),
@@ -440,7 +430,7 @@ def manual_checks(entries: list[dict], module_map: dict[str, list[dict]]) -> lis
     checks = [
         "competitor_report / competitor_analysis 当前未发现直接 LLM 调用，但其输出会进入实验和草稿上下文，需人工确认第 5.2 是否纳入 P1 字段基线。",
         "comment_insight 未发现独立成熟 service，可能嵌在竞品报告或评论处理逻辑中。",
-        "content_draft_sev.py 使用 prompt_key，但未记录 ContextSnapshot；content_draft_v2_sev.py 已记录 PromptRunLog 和 ContextSnapshot。",
+        "draft_generation_sev.py 使用结构化 DraftGenerationInput 和 prompt_key。",
         "api/llm.py 与 provider_health_rout.py 是测试/健康检查入口，不应当算入业务 Agent，但应登记为 LLM 调用入口。",
         "当前未发现多个成熟独立 Agent 类；不要在简历中夸大为多个自治 Agent。",
     ]
@@ -486,7 +476,7 @@ def module_note(module: str, direct_llm: bool) -> str:
         "content_experiment": "Agent workflow 使用的实验创建工具之一。",
         "post_publish": "发布后指标和复盘基础，未来可接 analytics agent。",
         "strategy_memory": "策略沉淀/检索，未来是上下文来源。",
-        "agent_runtime": "统一 runtime，不是多个独立 Agent。",
+        "agent_runtime": "当前统一 product_entry 控制层，不是多个独立 Agent。",
         "context_engineering": "上下文构建、预算、压缩、日志基础设施。",
         "llm_infra": "LLM provider/client 基础设施，不是业务 Agent。",
     }
@@ -636,7 +626,7 @@ def write_report(root: Path, result: dict) -> Path:
             "",
             "## 9. 结论",
             "",
-            "- 当前不是多个成熟独立 Agent 类，而是 1 个 AgentRuntime + 1 个已发现 workflow + 多个 tool/service 的形态。",
+            "- 当前不是多个成熟独立 Agent 类，而是单一 product_entry 控制层 + Action Handler + 多个 service/provider 的形态。",
             "- 第 5.2 P0 建议优先统计 content_draft、content_draft_v2、review_report、LLMClient / LLM infra。",
             "- 第 5.2 P1 建议登记 content_experiment workflow、competitor_report / competitor_analysis、comment_insight、post_publish、context_engineering、strategy_memory。",
             "- 第 5.3 建议从 SYSTEM_RULES、TASK_INSTRUCTION、ACCOUNT_PROFILE、WORKFLOW_STATE、USER_INPUT、OUTPUT_SCHEMA、STRATEGY_MEMORY 这些 Context Slot 开始设计。",

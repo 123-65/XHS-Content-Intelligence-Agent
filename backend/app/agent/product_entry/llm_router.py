@@ -119,8 +119,6 @@ class LLMUserInputRouter:
         missing_params = []
         if account_id is None:
             missing_params.append("account_id")
-        if Action.PREVIEW_DRAFT_CONTEXT in actions and experiment_id is None:
-            missing_params.append("experiment_id")
         extracted_params = {"readonly_actions": [action.value for action in actions]}
         if account_id is not None:
             extracted_params["account_id"] = account_id
@@ -344,8 +342,6 @@ def _readonly_actions_for_text(text: str) -> list[Action]:
     if not text:
         return []
     actions: list[Action] = []
-    if _contains_any(text, ["预览草稿上下文", "查看草稿上下文", "生成草稿前会用哪些资料", "prompt 上下文", "draft context preview", "context preview"]):
-        actions.append(Action.PREVIEW_DRAFT_CONTEXT)
     if _contains_any(text, ["查看账号画像", "当前账号画像", "账号信息", "账号定位", "查询账号"]):
         actions.append(Action.QUERY_ACCOUNT_PROFILE)
     if _contains_any(text, ["上下文证据"]):

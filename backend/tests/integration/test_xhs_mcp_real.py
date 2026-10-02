@@ -20,7 +20,8 @@ def test_real_xhs_mcp_contract() -> None:
 
     provider = XiaohongshuMcpProvider()
     login = provider.check_login_status()
-    assert login["status"] == "SUCCESS"
+    assert login["status"] == "LOGGED_IN"
+    assert login["auth_state"] == "LOGGED_IN"
     assert login["is_logged_in"] is True
     assert login["provider_name"] == "xiaohongshu_mcp"
     assert login["is_mock"] is False

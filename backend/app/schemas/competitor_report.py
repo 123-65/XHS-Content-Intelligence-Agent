@@ -12,7 +12,7 @@ class CompetitorReportCreate(BaseModel):
     keyword: str | None = Field(default=None, max_length=128)
     target_metric: str = Field(default="engagement", max_length=32)
     limit: int = Field(default=30, ge=1, le=100)
-    analysis_engine: Literal["LLM_STRUCTURED_V1", "RULE_BASELINE"] = "LLM_STRUCTURED_V1"
+    analysis_engine: Literal["LLM_STRUCTURED_V1"] = "LLM_STRUCTURED_V1"
 
 
 class CompetitorReportResponse(BaseModel):

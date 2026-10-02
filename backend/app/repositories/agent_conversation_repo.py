@@ -66,14 +66,12 @@ class AgentConversationRepository:
         self.db.refresh(conversation)
         return message
 
-    def list_messages(self, conversation_id: int, limit: int = 30) -> list[AgentConversationMessage]:
+    def list_messages(self, conversation_id: int, limit: int = 30, before_id: int | None = None) -> list[AgentConversationMessage]:
         """查询最近消息，按时间正序返回。"""
-        stmt = (
-            select(AgentConversationMessage)
-            .where(AgentConversationMessage.conversation_id == conversation_id)
-            .order_by(AgentConversationMessage.created_at.desc(), AgentConversationMessage.id.desc())
-            .limit(limit)
-        )
+        stmt = select(AgentConversationMessage).where(AgentConversationMessage.conversation_id == conversation_id)
+        if before_id is not None:
+            stmt = stmt.where(AgentConversationMessage.id < before_id)
+        stmt = stmt.order_by(AgentConversationMessage.id.desc()).limit(limit)
         messages = list(self.db.execute(stmt).scalars().all())
         return list(reversed(messages))
 

@@ -12,3 +12,4 @@ loguru
 playwright
 openai
 tenacity
+pydantic-ai==2.51.0

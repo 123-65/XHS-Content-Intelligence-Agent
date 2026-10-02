@@ -6,6 +6,7 @@ from app.models.account_operation_run import AccountOperationRun
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
 from app.models.agent_conversation import AgentConversation, AgentConversationMessage
+from app.models.agent_turn import AgentTurn
 from app.models.competitors_analysis import CompetitorAnalysisReport
 from app.models.competitor_account import CompetitorAccount
 from app.models.competitor_comment import CompetitorComment
@@ -20,6 +21,7 @@ from app.models.content_optimization_plan import ContentOptimizationPlan
 from app.models.context_snapshot import ContextSnapshot
 from app.models.context_slot_log import ContextSlotLog
 from app.models.content_opportunity import ContentOpportunity
+from app.models.content_strategy_artifact import ContentStrategyArtifact
 from app.models.crawl_task import CrawlTask
 from app.models.draft_generation_context import DraftGenerationContext
 from app.models.draft_revision_plan import DraftRevisionPlan
@@ -42,10 +44,13 @@ from app.models.published_note import PublishedNote
 from app.models.review_report import ReviewReport
 from app.models.startup_strategy import StartupStrategy
 from app.models.strategy_memory import StrategyMemory
+from app.models.strategy_candidate import StrategyCandidate
 from app.models.strategy_memory_usage import StrategyMemoryUsage
 from app.models.trace_retention_policy import TraceRetentionPolicy
 from app.models.viral_note_breakdown import ViralNoteBreakdown
 from app.models.xhs_note import XhsNoteSnapshot
+from app.models.workflow_run import WorkflowRun
+from app.models.workflow_operation import WorkflowOperation
 
 __all__ = [
     "AccountProfile",
@@ -57,6 +62,7 @@ __all__ = [
     "AgentStep",
     "AgentConversation",
     "AgentConversationMessage",
+    "AgentTurn",
     "XhsNoteSnapshot",
     "CompetitorAnalysisReport",
     "CrawlTask",
@@ -83,11 +89,13 @@ __all__ = [
     "KeywordSeed",
     "ViralNoteBreakdown",
     "ContentOpportunity",
+    "ContentStrategyArtifact",
     "ExperimentVariable",
     "ExperimentMetricTarget",
     "EvalCase",
     "EvalRun",
     "StrategyMemory",
+    "StrategyCandidate",
     "MemoryEvidence",
     "MCPServerConfig",
     "MCPToolBinding",
@@ -97,4 +105,5 @@ __all__ = [
     "ContextSnapshot",
     "ContextSlotLog",
     "TraceRetentionPolicy",
+    "WorkflowRun",
 ]

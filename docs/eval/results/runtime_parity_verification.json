@@ -1,0 +1,231 @@
+{
+  "report_title": "Runtime Parity Verification Report",
+  "phase": "A.1",
+  "generated_at": "2026-09-28T17:39:58.9837904+08:00",
+  "scope": "Runtime / Worktree parity and browser-only D01/D02 material-normalization verification",
+  "1_browser_backend_target": {
+    "browser_origin": "http://127.0.0.1:5173",
+    "frontend_api_base_url": "/",
+    "browser_request": "POST http://127.0.0.1:5173/api/agent/turns",
+    "vite_proxy_rule": "/api -> http://backend:8000",
+    "resolved_compose_service": "backend",
+    "resolved_container": "xhs_growth_backend",
+    "published_backend_port": "127.0.0.1/host:8000 -> container:8000",
+    "evidence": [
+      "frontend/src/api/client.ts::apiClient",
+      "frontend/src/api/unifiedAgent.ts::sendAgentTurn",
+      "frontend/vite.config.ts::server.proxy",
+      "docker compose ps",
+      "Browser Network.requestWillBeSent for D01 and D02"
+    ]
+  },
+  "2_backend_runtime": {
+    "container_name": "xhs_growth_backend",
+    "image": "xhs-growth-agent-backend",
+    "container_created_utc": "2026-09-28T05:23:12.664089624Z",
+    "container_started_utc": "2026-09-28T05:23:14.433180890Z",
+    "working_directory": "/app/backend",
+    "command": "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "reload_worker_started_utc": "2026-09-28T08:51:54Z",
+    "secrets_or_environment_values_recorded": false,
+    "evidence": [
+      "docker inspect xhs_growth_backend (selected non-secret fields)",
+      "docker top xhs_growth_backend -eo pid,lstart,args"
+    ]
+  },
+  "3_deployment_mode": {
+    "classification": "A_BIND_MOUNT",
+    "compose_declaration": "./backend:/app/backend",
+    "running_mount_type": "bind",
+    "running_mount_source": "<workspace>/xhs-growth-agent/backend",
+    "running_mount_destination": "/app/backend",
+    "running_mount_read_write": true,
+    "dockerfile_also_contains_copy": true,
+    "effective_runtime_reason": "The running container mount overlays the image COPY at /app/backend.",
+    "evidence": [
+      "docker-compose.yml::services.backend.volumes",
+      "backend/Dockerfile::WORKDIR/COPY",
+      "docker inspect xhs_growth_backend .Mounts"
+    ]
+  },
+  "4_source_hash_comparison": {
+    "overall": "MATCH",
+    "algorithm": "SHA256",
+    "files": [
+      {
+        "path": "backend/app/services/unified_agent_sev.py",
+        "host_sha256": "9e4a063b21c17591ea370b15dda108c5cc9c796240d8fd36d9cbcba1fa7fcc0f",
+        "runtime_sha256": "9e4a063b21c17591ea370b15dda108c5cc9c796240d8fd36d9cbcba1fa7fcc0f",
+        "result": "MATCH"
+      },
+      {
+        "path": "backend/app/agent/control/current_turn_materials.py",
+        "host_sha256": "55917576605336c3d84c020819226b1145252ee5daf0e29f92d855a561ef46db",
+        "runtime_sha256": "55917576605336c3d84c020819226b1145252ee5daf0e29f92d855a561ef46db",
+        "result": "MATCH"
+      },
+      {
+        "path": "backend/app/agent/control/orchestrator.py",
+        "host_sha256": "6661a54b70b47188b95b422fae6c2dddf56c712954935a27097e79c2721d53ce",
+        "runtime_sha256": "6661a54b70b47188b95b422fae6c2dddf56c712954935a27097e79c2721d53ce",
+        "result": "MATCH"
+      },
+      {
+        "path": "backend/app/agent/context/resolver.py",
+        "host_sha256": "63ecd748c5559df0e456e8301a1829c207c18b3b4336bdbe248d4ec8a073c8be",
+        "runtime_sha256": "63ecd748c5559df0e456e8301a1829c207c18b3b4336bdbe248d4ec8a073c8be",
+        "result": "MATCH"
+      }
+    ]
+  },
+  "5_required_symbols": {
+    "overall": "PRESENT",
+    "stale_runtime": false,
+    "symbols": [
+      {
+        "name": "CurrentTurnMaterialNormalizer",
+        "runtime_location": "/app/backend/app/agent/control/current_turn_materials.py:14",
+        "present": true
+      },
+      {
+        "name": "_resume_preworkflow_research_material",
+        "runtime_location": "/app/backend/app/agent/control/orchestrator.py:282",
+        "present": true
+      },
+      {
+        "name": "_exclude_external_material_references",
+        "runtime_location": "/app/backend/app/agent/control/orchestrator.py:262",
+        "present": true
+      },
+      {
+        "name": "_authoritative_current_turn_note_urls",
+        "runtime_location": "/app/backend/app/agent/control/orchestrator.py:253",
+        "present": true
+      }
+    ],
+    "normalizer_call_present": "/app/backend/app/services/unified_agent_sev.py:59"
+  },
+  "6_process_start_vs_file_modification": {
+    "container_started_utc": "2026-09-28T05:23:14.433180890Z",
+    "active_reload_worker_started_utc": "2026-09-28T08:51:54Z",
+    "files": [
+      {
+        "path": "backend/app/services/unified_agent_sev.py",
+        "modified_utc": "2026-09-28T07:10:12.199683300Z",
+        "modified_after_container_start": true,
+        "modified_before_active_reload_worker": true
+      },
+      {
+        "path": "backend/app/agent/control/current_turn_materials.py",
+        "modified_utc": "2026-09-28T07:09:54.287171500Z",
+        "modified_after_container_start": true,
+        "modified_before_active_reload_worker": true
+      },
+      {
+        "path": "backend/app/agent/control/orchestrator.py",
+        "modified_utc": "2026-09-28T07:11:56.153437400Z",
+        "modified_after_container_start": true,
+        "modified_before_active_reload_worker": true
+      },
+      {
+        "path": "backend/app/agent/context/resolver.py",
+        "modified_utc": "2026-09-24T09:08:04.200261100Z",
+        "modified_after_container_start": false,
+        "modified_before_active_reload_worker": true
+      }
+    ],
+    "conclusion": "The container predates three changed files, but the currently active Uvicorn reload worker started after all four file modification times. Together with matching runtime hashes, the evidence does not support an unreloaded stale worker."
+  },
+  "7_environment_action": {
+    "action": "NONE",
+    "backend_restarted": false,
+    "backend_rebuilt": false,
+    "other_services_touched": false,
+    "reason": "Environment repair is permitted only when HOST != RUNTIME. All required hashes matched and all symbols were present."
+  },
+  "health_verification": {
+    "health_endpoint": "http://127.0.0.1:8000/health",
+    "checked_in_real_browser": true,
+    "response_body_reported_status_ok": true,
+    "api_agent_turns_accessible": true,
+    "api_evidence": "D01 and D02 each received HTTP 200 from the browser POST to /api/agent/turns.",
+    "test_business_data_created_for_health_check": false
+  },
+  "8_d01_browser_result": {
+    "case_id": "D01",
+    "input_kind": "raw chat text plus authorized XHS Profile URL from xhs链接.md",
+    "account_selected_via_ui": true,
+    "account_label": "E2E 考公考编验收 20260923",
+    "browser_request_observed": true,
+    "request_url": "http://127.0.0.1:5173/api/agent/turns",
+    "frontend_typed_material_counts": {
+      "note_urls": 0,
+      "profile_urls": 0
+    },
+    "observation_ms": 3334,
+    "http_status": 200,
+    "intent": "RESEARCH",
+    "action": "EXECUTE_PLAN",
+    "workflow_status": "FAILED",
+    "run_ref_present": true,
+    "reference_context_missing": false,
+    "material_normalization_result": "PASS",
+    "scope_note": "The Run was created, proving the raw Profile URL crossed the pre-Workflow material gate. The later FAILED status is outside this parity check and was not debugged or modified."
+  },
+  "9_d02_browser_result": {
+    "case_id": "D02",
+    "input_kind": "raw chat text plus authorized XHS Note URL from xhs链接.md",
+    "account_selected_via_ui": true,
+    "account_label": "E2E 考公考编验收 20260923",
+    "browser_request_observed": true,
+    "request_url": "http://127.0.0.1:5173/api/agent/turns",
+    "frontend_typed_material_counts": {
+      "note_urls": 0,
+      "profile_urls": 0
+    },
+    "observation_ms": 3322,
+    "http_status": 200,
+    "intent": "POST_PUBLISH_REVIEW",
+    "action": "CLARIFY",
+    "workflow_status": "WAITING_USER",
+    "run_ref_present": false,
+    "required_fields": [
+      "published_note_ref"
+    ],
+    "reference_context_missing": false,
+    "material_normalization_result": "PASS_FOR_REFERENCE_ERROR_REMOVAL",
+    "research_entry_result": "NOT_ACHIEVED",
+    "scope_note": "The prior REFERENCE_CONTEXT_MISSING did not recur. The current semantic model routed the phrase '分析这篇' to POST_PUBLISH_REVIEW, so the request waited for a canonical PublishedNote instead of starting Research. This is an intent-routing observation, not Host/Runtime source mismatch. No code fix was made."
+  },
+  "10_root_cause_classification": {
+    "classification": "BASELINE_SNAPSHOT_MISMATCH",
+    "stale_runtime": false,
+    "current_code_runtime_defect_reference_context_missing": false,
+    "basis": [
+      "HOST and RUNTIME hashes match for all four required files.",
+      "The running backend contains all required normalization and resume symbols.",
+      "D01 and D02 no longer produce REFERENCE_CONTEXT_MISSING.",
+      "D01 crosses the Research material gate and creates a Run."
+    ],
+    "classification_caveat": "The frozen A/B/C matrix has no explicit mixed case for MATCH + no REFERENCE_CONTEXT_MISSING + D02 routed to POST_PUBLISH_REVIEW. The parity question is nevertheless resolved against STALE_RUNTIME and against the specific reference-context defect. D02's current intent divergence is recorded separately and is not rewritten as a Research PASS."
+  },
+  "11_architecture_benchmark_impact": {
+    "current_turn_material_normalizer_runtime_verified": true,
+    "architecture_benchmark_static_finding_upheld": true,
+    "historical_baseline_preserved": true,
+    "benchmark_interpretation": "The earlier D01/D02 REFERENCE_CONTEXT_MISSING evidence belongs to a different effective code/runtime snapshot than the one verified here. Current Host and Runtime are in parity. The separate D02 semantic classification behavior remains a current fact for future audit work, but Phase A.1 made no product change."
+  },
+  "12_git": {
+    "product_code_modified": 0,
+    "test_files_left_modified": 0,
+    "database_direct_or_schema_modification": 0,
+    "migration": 0,
+    "dependencies_installed": 0,
+    "commit": false,
+    "git_add": false,
+    "reset_restore_clean_stash": false,
+    "new_file": "docs/eval/results/runtime_parity_verification.json",
+    "baseline_files_modified": false,
+    "application_side_effect_disclosure": "The required browser D01/D02 POSTs use the normal product path, which persists ordinary Conversation/Turn/Run application records. No direct SQL, Repository call, manual database edit, schema change, or health-check business record was performed."
+  }
+}

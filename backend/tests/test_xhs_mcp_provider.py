@@ -10,6 +10,142 @@ def _mcp_response(payload: dict, *, is_error: bool = False) -> httpx.Response:
     return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"content": content, "isError": is_error}})
 
 
+def _mcp_text_response(text: str, *, is_error: bool = False) -> httpx.Response:
+    content = [{"type": "text", "text": text}]
+    return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"content": content, "isError": is_error}})
+
+
+def test_v240_logged_in_text_response_is_logged_in() -> None:
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(lambda request: _mcp_text_response("\u2705 \u5df2\u767b\u5f55\n\u5f53\u524d\u4f1a\u8bdd\u53ef\u7528")),
+    )
+
+    result = provider.check_login_status()
+
+    assert result["status"] == "LOGGED_IN"
+    assert result["auth_state"] == "LOGGED_IN"
+    assert result["is_logged_in"] is True
+    assert result["status_source"] == "normalized_text"
+
+
+def test_structured_login_state_takes_priority_over_text() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        result = {
+            "structuredContent": {"isLoggedIn": True},
+            "content": [{"type": "text", "text": "\u672a\u767b\u5f55"}],
+        }
+        return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": result})
+
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = provider.check_login_status()
+
+    assert result["status"] == "LOGGED_IN"
+    assert result["status_source"] == "structured_content"
+
+
+def test_explicit_logged_out_response_is_login_required() -> None:
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(lambda request: _mcp_text_response("\u672a\u767b\u5f55\uff0c\u8bf7\u5148\u767b\u5f55")),
+    )
+
+    result = provider.check_login_status()
+
+    assert result["status"] == "LOGIN_REQUIRED"
+    assert result["auth_state"] == "LOGIN_REQUIRED"
+    assert result["is_logged_in"] is False
+
+
+def test_unknown_response_remains_unknown_without_probe() -> None:
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(lambda request: _mcp_text_response("status could not be determined")),
+    )
+
+    result = provider.check_login_status(probe_on_unknown=False)
+
+    assert result["status"] == "UNKNOWN"
+    assert result["auth_state"] == "UNKNOWN"
+    assert result["is_logged_in"] is None
+
+
+def test_unknown_response_with_authenticated_probe_success_is_logged_in() -> None:
+    tool_names: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        tool_name = json.loads(request.content)["params"]["name"]
+        tool_names.append(tool_name)
+        if tool_name == "check_login_status":
+            return _mcp_text_response("status could not be determined")
+        return _mcp_text_response("profile available")
+
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = provider.authentication_preflight()
+
+    assert result["status"] == "LOGGED_IN"
+    assert result["status_source"] == "authenticated_probe"
+    assert tool_names == ["check_login_status", "get_my_profile"]
+
+
+def test_unknown_response_with_authentication_failure_is_login_required() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        tool_name = json.loads(request.content)["params"]["name"]
+        if tool_name == "check_login_status":
+            return _mcp_text_response("status could not be determined")
+        return _mcp_text_response("login required", is_error=True)
+
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = provider.authentication_preflight()
+
+    assert result["status"] == "LOGIN_REQUIRED"
+    assert result["auth_state"] == "LOGIN_REQUIRED"
+    assert result["status_source"] == "authenticated_probe"
+
+
+def test_network_failure_is_env_blocked_not_login_required() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = provider.authentication_preflight()
+
+    assert result["status"] == "ENV_BLOCKED"
+    assert result["auth_state"] == "UNKNOWN"
+    assert result["is_logged_in"] is None
+
+
+def test_logged_in_state_never_invokes_login_executable() -> None:
+    invocation_count = 0
+    provider = XiaohongshuMcpProvider(
+        base_url="http://collector:18060",
+        transport=httpx.MockTransport(lambda request: _mcp_text_response("\u5df2\u767b\u5f55")),
+    )
+
+    authentication = provider.authentication_preflight()
+    if provider.should_start_login(authentication):
+        invocation_count += 1
+
+    assert authentication["status"] == "LOGGED_IN"
+    assert invocation_count == 0
+
+
 def test_collect_note_uses_real_mcp_tool_contract_and_normalizes_payload() -> None:
     captured: dict = {}
 

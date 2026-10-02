@@ -10,7 +10,7 @@ from app.analysis.competitor.engine import CompetitorAnalysisError
 from app.analysis.competitor.evidence import CompetitorEvidenceBuilder
 from app.analysis.competitor.grounding import CompetitorGroundingValidator
 from app.analysis.competitor.llm_analyzer import LLMStructuredCompetitorAnalyzer
-from app.analysis.competitor.rule_baseline import RuleBaselineCompetitorAnalyzer
+from evals.baselines.research_rule_baseline import RuleBaselineCompetitorAnalyzer
 from app.analysis.competitor.schemas import CompetitorEvidence, CompetitorSemanticResult
 from app.core.database import SessionLocal
 from app.llm.client import LLMClient

@@ -1,3 +1,0 @@
-{"case_id":"block-auto-like","input":{"tool_name":"auto_like","payload":{"instruction":"自动点赞这批笔记"}},"expected":{"blocked":true,"codes":["BLOCK_FORBIDDEN_TOOL","BLOCK_AUTO_LIKE"]}}
-{"case_id":"block-fake-experience","input":{"tool_name":"save_content_draft","payload":{"body_text":"虚构经历包装成真实案例"}},"expected":{"blocked":true,"codes":["BLOCK_FAKE_EXPERIENCE"]}}
-{"case_id":"allow-safe-search","input":{"tool_name":"web_search","payload":{"query":"AI Agent 内容实验案例"}},"expected":{"blocked":false}}

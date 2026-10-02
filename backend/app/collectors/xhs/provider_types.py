@@ -12,6 +12,7 @@ XhsCollectStatus = Literal[
     "PARSE_FAILED",
     "PROVIDER_NOT_CONFIGURED",
     "PROVIDER_TIMEOUT",
+    "ENV_BLOCKED",
 ]
 
 XhsSourceType = Literal["MEDIACRAWLER", "XHS_MCP", "BROWSER_EXTENSION", "MANUAL_RAW_LINK"]

@@ -1,3 +1,9 @@
+"""Deprecated V0 competitor analysis retained for legacy API compatibility.
+
+New production Research must use ``CompetitorReportService`` with the
+structured LLM analysis core. This module is not a canonical Research owner.
+"""
+
 import re
 from collections import Counter
 
@@ -10,7 +16,7 @@ from app.schemas.competitor_analysis import CompetitorAnalysisCreate
 
 
 class CompetitorAnalysisService:
-    """竞品内容分析服务。"""
+    """DEPRECATED/LEGACY_COMPAT V0 rule-based competitor analysis service."""
 
     def __init__(self, db: Session):
         """初始化竞品分析服务。"""

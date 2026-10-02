@@ -23,6 +23,18 @@ class CompetitorReportRepository:
         """查询账号配置。"""
         return self.db.get(AccountProfile, account_id)
 
+    def get_competitor_account(self, object_id: int) -> CompetitorAccount | None:
+        """按标识查询同行账号证据。"""
+        return self.db.get(CompetitorAccount, object_id)
+
+    def get_competitor_note(self, object_id: int) -> CompetitorNote | None:
+        """按标识查询竞品笔记证据。"""
+        return self.db.get(CompetitorNote, object_id)
+
+    def get_competitor_comment(self, object_id: int) -> CompetitorComment | None:
+        """按标识查询评论证据。"""
+        return self.db.get(CompetitorComment, object_id)
+
     def list_competitor_accounts(self, account_id: int) -> list[CompetitorAccount]:
         """查询账号下的同行账号快照。"""
         stmt = (
@@ -105,13 +117,26 @@ class CompetitorReportRepository:
         for item in [*breakdowns, *opportunities]:
             item.report_id = report.id
         self.db.add_all([*breakdowns, *opportunities])
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(report)
         return report
 
     def get_report(self, report_id: int) -> CompetitorAnalysisReport | None:
         """查询竞品分析报告。"""
         return self.db.get(CompetitorAnalysisReport, report_id)
+
+    def list_reports_by_account(self, account_id: int, offset: int, limit: int) -> tuple[list[CompetitorAnalysisReport], int]:
+        """按账号分页读取轻量研究报告索引。"""
+        total = self.db.execute(
+            select(func.count()).select_from(CompetitorAnalysisReport).where(CompetitorAnalysisReport.account_id == account_id)
+        ).scalar_one()
+        statement = (
+            select(CompetitorAnalysisReport)
+            .where(CompetitorAnalysisReport.account_id == account_id)
+            .order_by(CompetitorAnalysisReport.updated_at.desc(), CompetitorAnalysisReport.id.desc())
+            .offset(offset).limit(limit)
+        )
+        return list(self.db.execute(statement).scalars().all()), int(total)
 
     def list_viral_breakdowns(self, report_id: int) -> list[ViralNoteBreakdown]:
         """查询报告下的爆款笔记拆解。"""

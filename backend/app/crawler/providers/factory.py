@@ -1,11 +1,13 @@
+"""DEPRECATED/LEGACY_COMPAT factory for the old crawler provider chain."""
+
 from app.crawler.providers.base import BaseCrawlerProvider
 from app.crawler.providers.manual_snapshot_provider import ManualSnapshotProvider
 from app.crawler.providers.mcp_xhs_provider import MCPXhsProvider
 from app.crawler.providers.readonly_xhs_provider import ReadOnlyXhsProvider
 
 
-PRODUCTION_PROVIDER_ORDER = ("mcp_xhs", "readonly_xhs", "manual_snapshot")
-PROVIDER_ORDER = PRODUCTION_PROVIDER_ORDER
+LEGACY_PROVIDER_ORDER = ("mcp_xhs", "readonly_xhs", "manual_snapshot")
+PROVIDER_ORDER = LEGACY_PROVIDER_ORDER
 PROVIDERS: dict[str, BaseCrawlerProvider] = {
     ReadOnlyXhsProvider.name: ReadOnlyXhsProvider(),
     MCPXhsProvider.name: MCPXhsProvider(),

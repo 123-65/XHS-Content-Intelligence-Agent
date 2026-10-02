@@ -4,7 +4,6 @@ from app.analysis.competitor.assembler import CompetitorReportAssembler
 from app.analysis.competitor.engine import CompetitorAnalysisEngine
 from app.analysis.competitor.evidence import CompetitorEvidenceBuilder
 from app.analysis.competitor.llm_analyzer import LLMStructuredCompetitorAnalyzer
-from app.analysis.competitor.rule_baseline import RuleBaselineCompetitorAnalyzer
 from app.models.competitor_comment import CompetitorComment
 from app.models.competitor_note import CompetitorNote
 from app.models.competitors_analysis import CompetitorAnalysisReport
@@ -32,6 +31,7 @@ class CompetitorReportService:
         evidence_builder: CompetitorEvidenceBuilder | None = None,
         assembler: CompetitorReportAssembler | None = None,
     ):
+        self.db = db
         self.repo = CompetitorReportRepository(db)
         self.analyzer = analyzer
         self._last_analysis_engine = "LLM_STRUCTURED_V1"
@@ -53,7 +53,7 @@ class CompetitorReportService:
             raise DataAvailabilityError(state["message"], state)
         comments = self.repo.list_comments_for_notes(data.account_id, [note.id for note in notes])
         evidence = self.evidence_builder.build(data.account_id, accounts, notes, comments)
-        analyzer = self._resolve_analyzer(data.analysis_engine)
+        analyzer = self._resolve_analyzer()
         semantic = analyzer.analyze(evidence)
         self._last_analysis_engine = analyzer.analysis_engine
         report, breakdowns, opportunities = self.assembler.assemble(
@@ -63,13 +63,18 @@ class CompetitorReportService:
             self.analysis_engine,
             self._sample_state(notes, comments),
         )
-        return self.repo.create_report_bundle(report, breakdowns, opportunities)
+        try:
+            persisted = self.repo.create_report_bundle(report, breakdowns, opportunities)
+            self.db.commit()
+            return persisted
+        except Exception:
+            self.db.rollback()
+            raise
 
-    def _resolve_analyzer(self, requested_engine: str) -> CompetitorAnalysisEngine:
+    def _resolve_analyzer(self) -> CompetitorAnalysisEngine:
+        """Return the only production research analyzer: structured LLM."""
         if self.analyzer:
             return self.analyzer
-        if requested_engine == "RULE_BASELINE":
-            return RuleBaselineCompetitorAnalyzer()
         return LLMStructuredCompetitorAnalyzer()
 
     def get_report(self, report_id: int) -> CompetitorAnalysisReport:

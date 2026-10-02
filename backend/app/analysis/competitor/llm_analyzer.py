@@ -3,8 +3,9 @@ from pydantic import ValidationError
 from app.analysis.competitor.engine import CompetitorAnalysisError
 from app.analysis.competitor.grounding import CompetitorGroundingValidator
 from app.analysis.competitor.schemas import CompetitorEvidence, CompetitorSemanticResult
+from app.core.config import settings
 from app.llm.client import LLMClient
-from app.llm.errors import LLMError, LLMSchemaValidationError
+from app.llm.errors import LLMError, LLMSchemaValidationError, LLMTimeoutError
 
 
 SYSTEM_PROMPT = """你是竞品内容分析器。只分析用户消息中提供的 evidence JSON。
@@ -41,12 +42,17 @@ class LLMStructuredCompetitorAnalyzer:
                 prompt,
                 CompetitorSemanticResult,
                 system_prompt=SYSTEM_PROMPT,
+                model=settings.llm_research_analysis_model,
                 prompt_key="competitor_semantic_analysis",
                 prompt_version="v1",
+                extra_body={"enable_thinking": settings.llm_research_analysis_enable_thinking},
+                timeout_seconds=settings.llm_research_analysis_timeout_seconds,
             )
             result = CompetitorSemanticResult.model_validate(response.data)
         except (ValidationError, LLMSchemaValidationError) as exc:
             raise CompetitorAnalysisError("ANALYSIS_SCHEMA_INVALID", str(exc)) from exc
+        except LLMTimeoutError:
+            raise
         except LLMError as exc:
             raise CompetitorAnalysisError("ANALYSIS_PROVIDER_FAILED", str(exc)) from exc
         except CompetitorAnalysisError:

@@ -1,0 +1,87 @@
+{
+  "evaluation": "Black-Box Frontend Agent Evaluation v1",
+  "environment": {
+    "product_entry": "http://127.0.0.1:5173",
+    "account_display": "E2E 考公考编验收 20260923",
+    "account_ref_contract": 8456,
+    "evidence_source": "UI only",
+    "screenshots": false
+  },
+  "case_count": 30,
+  "pass": 6,
+  "fail": 24,
+  "blocked": 0,
+  "metrics": {
+    "intent_recognition": {
+      "passed": 20,
+      "evaluated": 30,
+      "unknown": 0,
+      "accuracy": 0.6667
+    },
+    "material_extraction": {
+      "passed": 0,
+      "evaluated": 8,
+      "unknown": 22, 
+      "accuracy": 0
+    },
+    "context_resolution": {
+      "passed": 6,
+      "evaluated": 16,
+      "unknown": 14,
+      "accuracy": 0.375
+    },
+    "workflow_routing": {
+      "passed": 15,
+      "evaluated": 30,
+      "unknown": 0,
+      "accuracy": 0.5
+    },
+    "tool_selection": {
+      "passed": 0,
+      "evaluated": 15,
+      "unknown": 15,
+      "accuracy": 0
+    },
+    "tool_execution": {
+      "passed": 4,
+      "evaluated": 19,
+      "unknown": 11,
+      "accuracy": 0.2105
+    },
+    "grounding": {
+      "passed": 1,
+      "evaluated": 7,
+      "unknown": 23,
+      "accuracy": 0.1429
+    },
+    "final_action": {
+      "passed": 6,
+      "evaluated": 30,
+      "unknown": 0,
+      "accuracy": 0.2
+    }
+  },
+  "response_quality_average": 1.43,
+  "fake_success": {
+    "count": 3,
+    "evaluated": 30,
+    "rate": 0.1
+  },
+  "trace_observability": {
+    "cases_with_new_trace": 0,
+    "note": "Trace 控制台未为本批前端 Turn 提供可关联的新 Run；相关字段保持 UNKNOWN，不按 PASS 计算。"
+  },
+  "mutations_via_ui": {
+    "draft_2625_versions_observed_during_run": "V5 → V10",
+    "direct_database_writes": 0
+  },
+  "generated_at": "2026-09-28T06:54:48.099Z",
+  "d03_retest": {
+    "verdict": "FAIL",
+    "conversation_id": 1572,
+    "latency_seconds": 14.17,
+    "url_count": 3,
+    "query_parameters_preserved": true,
+    "reason": "三条授权 Profile URL 均被完整读取，但全部被解释为 REFERENCE_CONTEXT_MISSING，没有抽取为 XHS_PROFILE_URL，也没有进入 Research。"
+  }
+}

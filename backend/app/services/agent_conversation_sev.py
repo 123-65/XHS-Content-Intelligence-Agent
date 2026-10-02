@@ -17,6 +17,10 @@ from app.schemas.agent_conversation import (
 )
 
 
+class ConversationAccountMismatchError(ValueError):
+    """当前 Account 不是 canonical Conversation owner。"""
+
+
 class AgentConversationService:
     """Agent 会话与 Current State 业务服务。"""
 
@@ -34,22 +38,43 @@ class AgentConversationService:
         """查询最近 Agent 会话。"""
         return [self._conversation_response(item) for item in self.repo.list_recent(account_id=account_id, limit=limit)]
 
-    def get_conversation(self, conversation_id: int) -> ConversationResponse:
+    def get_conversation(self, conversation_id: int, account_ref: int | None = None) -> ConversationResponse:
         """读取 Agent 会话详情。"""
-        return self._conversation_response(self._get(conversation_id))
+        return self._conversation_response(self._get_owned(conversation_id, account_ref))
 
-    def list_messages(self, conversation_id: int, limit: int = 30) -> list[ConversationMessageResponse]:
-        """读取会话最近消息。"""
-        self._get(conversation_id)
-        return [ConversationMessageResponse.model_validate(item) for item in self.repo.list_messages(conversation_id, limit=limit)]
+    def list_messages(self, conversation_id: int, limit: int = 30, account_ref: int | None = None) -> list[ConversationMessageResponse]:
+        """兼容内部调用：读取最近消息列表。"""
+        self._get_owned(conversation_id, account_ref)
+        return [
+            ConversationMessageResponse.model_validate(item)
+            for item in self.repo.list_messages(conversation_id, limit=limit)
+        ]
 
-    def get_state(self, conversation_id: int) -> ConversationCurrentState:
+    def list_message_page(self, conversation_id: int, limit: int = 30, before_id: int | None = None, account_ref: int | None = None):
+        """以稳定 Message ID cursor 读取会话消息页。"""
+        from app.schemas.agent_conversation import ConversationMessagePage
+
+        self._get_owned(conversation_id, account_ref)
+        rows = self.repo.list_messages(conversation_id, limit=limit + 1, before_id=before_id)
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[1:]
+        items = [ConversationMessageResponse.model_validate(item) for item in rows]
+        return ConversationMessagePage(
+            items=items,
+            next_cursor=items[0].id if has_more and items else None,
+            has_more=has_more,
+        )
+
+    def get_state(self, conversation_id: int, account_ref: int | None = None) -> ConversationCurrentState:
         """读取会话 Current State。"""
-        return _state_from_model(self._get(conversation_id))
+        return _state_from_model(self._get_owned(conversation_id, account_ref))
 
-    def patch_state(self, conversation_id: int, data: ConversationPatchState) -> ConversationCurrentState:
+    def patch_state(self, conversation_id: int, data: ConversationPatchState, account_ref: int | None = None) -> ConversationCurrentState:
         """受控更新会话 Current State。"""
-        conversation = self._get(conversation_id)
+        conversation = self._get_owned(conversation_id, account_ref)
+        if account_ref is not None and data.active_account_id not in (None, account_ref):
+            raise ConversationAccountMismatchError("conversation ownership cannot be transferred")
         state = _state_from_model(conversation)
         update = data.model_dump(exclude_unset=True)
         for field, value in update.items():
@@ -124,6 +149,13 @@ class AgentConversationService:
         conversation = self.repo.get(conversation_id)
         if not conversation:
             raise ValueError("conversation does not exist")
+        return conversation
+
+    def _get_owned(self, conversation_id: int, account_ref: int | None) -> AgentConversation:
+        """从 canonical Conversation 验证请求 Account ownership。"""
+        conversation = self._get(conversation_id)
+        if account_ref is not None and conversation.account_id != account_ref:
+            raise ConversationAccountMismatchError("conversation does not belong to current account")
         return conversation
 
     def _conversation_response(self, conversation: AgentConversation) -> ConversationResponse:

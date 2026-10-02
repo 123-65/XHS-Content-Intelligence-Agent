@@ -1,0 +1,112 @@
+{
+  "evaluation": "Functional Baseline v1.1 — Current Snapshot",
+  "phase": "Phase A.2",
+  "status": "COMPLETE / PRE-MIGRATION CURRENT SNAPSHOT BASELINE FROZEN",
+  "generated_at": "2026-09-28T18:16:27.6695839+08:00",
+  "environment": {
+    "product_entry": "http://127.0.0.1:5173",
+    "execution_mode": "real browser UI",
+    "browser": "Microsoft Edge via DevTools Protocol",
+    "account_display": "E2E 考公考编验收 20260923",
+    "account_ref_contract": 8456,
+    "account_selected_via_ui": true,
+    "xhs_urls_source": "xhs链接.md",
+    "direct_backend_api": false,
+    "sql_or_repository_access": false,
+    "fixture_usage": false
+  },
+  "snapshot_identity": {
+    "git_head": "ec101d4e7ce6484ee4617e0d334a60757b532014",
+    "worktree_state": "DIRTY_PREEXISTING",
+    "runtime_equals_worktree": true,
+    "runtime_parity_report": "docs/eval/results/runtime_parity_verification.json",
+    "source_hashes": {
+      "backend/app/services/unified_agent_sev.py": "9e4a063b21c17591ea370b15dda108c5cc9c796240d8fd36d9cbcba1fa7fcc0f",
+      "backend/app/agent/control/current_turn_materials.py": "55917576605336c3d84c020819226b1145252ee5daf0e29f92d855a561ef46db",
+      "backend/app/agent/control/orchestrator.py": "6661a54b70b47188b95b422fae6c2dddf56c712954935a27097e79c2721d53ce",
+      "backend/app/agent/context/resolver.py": "63ecd748c5559df0e456e8301a1829c207c18b3b4336bdbe248d4ec8a073c8be"
+    }
+  },
+  "case_count": 30,
+  "verdicts": {
+    "PASS": 4,
+    "FAIL": 24,
+    "BLOCKED": 0,
+    "UNVERIFIED": 2
+  },
+  "executed_pass_rate": 0.1333,
+  "metric_denominator_policy": "All 30 cases remain in each metric denominator. UNKNOWN is reported separately and is not excluded from accuracy.",
+  "metrics": {
+    "intent_recognition": { "passed": 17, "failed": 10, "unknown": 3, "total": 30, "accuracy": 0.5667 },
+    "material_extraction": { "passed": 6, "failed": 0, "unknown": 24, "total": 30, "accuracy": 0.2 },
+    "context_resolution": { "passed": 6, "failed": 7, "unknown": 17, "total": 30, "accuracy": 0.2 },
+    "workflow_routing": { "passed": 19, "failed": 8, "unknown": 3, "total": 30, "accuracy": 0.6333 },
+    "tool_selection": { "passed": 0, "failed": 0, "unknown": 30, "total": 30, "accuracy": 0.0 },
+    "tool_execution": { "passed": 4, "failed": 12, "unknown": 14, "total": 30, "accuracy": 0.1333 },
+    "grounding": { "passed": 1, "failed": 6, "unknown": 23, "total": 30, "accuracy": 0.0333 },
+    "final_action": { "passed": 5, "failed": 25, "unknown": 0, "total": 30, "accuracy": 0.1667 }
+  },
+  "required_metrics": {
+    "intent_accuracy": 0.5667,
+    "material_extraction_accuracy": 0.2,
+    "context_resolution_accuracy": 0.2,
+    "workflow_routing_accuracy": 0.6333,
+    "final_action_completion": 0.1667,
+    "average_response_quality": 1.4,
+    "fake_success_count": 7,
+    "fake_success_rate": 0.2333,
+    "unknown_score_count": 114
+  },
+  "latency_seconds": {
+    "total": 663.558,
+    "average": 22.119,
+    "median": 4.491,
+    "p95_nearest_rank": 150.512,
+    "minimum": 2.203,
+    "maximum": 150.519,
+    "timeouts_at_protocol_limit": 3,
+    "timeout_cases": ["B03", "B06", "G01"]
+  },
+  "category_summary": {
+    "Conversation": { "PASS": 1, "FAIL": 0, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Capability": { "PASS": 0, "FAIL": 3, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Boundary": { "PASS": 0, "FAIL": 2, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Intent": { "PASS": 0, "FAIL": 5, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Context": { "PASS": 2, "FAIL": 2, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Material": { "PASS": 0, "FAIL": 2, "BLOCKED": 0, "UNVERIFIED": 1, "UNKNOWN": 0 },
+    "Research": { "PASS": 0, "FAIL": 3, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Strategy": { "PASS": 1, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Draft": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Revision": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 1, "UNKNOWN": 0 },
+    "Memory": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Pending Resume": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Fake Success": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 },
+    "Publication Review": { "PASS": 0, "FAIL": 1, "BLOCKED": 0, "UNVERIFIED": 0, "UNKNOWN": 0 }
+  },
+  "pass_cases": ["A01", "C03", "C09", "G03"],
+  "fail_cases": ["A03", "A04", "A05", "A07", "A08", "B01", "B03", "B04", "B05", "B06", "C01", "C02", "D01", "D02", "E01", "E02", "E05", "G01", "H01", "J06", "K01", "L02", "M04", "N05"],
+  "blocked_cases": [],
+  "unverified_cases": ["D03", "J01"],
+  "trace_observability": {
+    "cases_with_correlated_trace": 0,
+    "tool_selection_unknown_cases": 30,
+    "observed_trace_run": 1185,
+    "observed_trace_workflow": "DemoDeveloperTraceWorkflow",
+    "reason": "Business turns returned string wfr_* run_ref values, while the Trace UI remained on unrelated numeric Run #1185; no correlation was possible."
+  },
+  "fake_success_cases": ["A03", "A04", "A05", "B05", "C02", "C03", "K01"],
+  "ui_business_mutations": {
+    "conversations_created": 27,
+    "draft_2625_version_progression": "V11 → V16",
+    "draft_versions_created_by_cases": ["B05:V12", "C02:V13", "C03:V14", "C03:V15", "J01:V16"],
+    "direct_database_or_repository_writes": 0,
+    "migration": 0
+  },
+  "baseline_v1_comparison": {
+    "v1": { "PASS": 6, "FAIL": 24, "BLOCKED": 0, "UNVERIFIED": 0, "executed_pass_rate": 0.2 },
+    "v1_1": { "PASS": 4, "FAIL": 24, "BLOCKED": 0, "UNVERIFIED": 2, "executed_pass_rate": 0.1333 },
+    "material_normalization_improvement": "B01/D01/E01 raw Profile URLs now reach RESEARCH; D02/E02 raw Note URLs no longer fail normalization but expose intent misrouting.",
+    "strict_regressions": ["B05 and C02 now expose no-op revision fake success"],
+    "reclassified_unverified": ["D03 exact three-URL extraction count", "J01 UI-visible body fidelity"]
+  }
+}

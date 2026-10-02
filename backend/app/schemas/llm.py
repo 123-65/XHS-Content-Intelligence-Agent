@@ -46,3 +46,4 @@ class LLMStructuredResult(BaseModel):
     prompt_key: str | None = None
     prompt_version: str | None = None
     error_message: str | None = None
+    attempt_evidence: list[dict[str, Any]] = Field(default_factory=list, exclude=True)

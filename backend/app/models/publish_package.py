@@ -15,6 +15,8 @@ class PublishPackage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("account_profile.id"), nullable=False, index=True)
     draft_id: Mapped[int] = mapped_column(ForeignKey("content_draft.id"), nullable=False, index=True)
+    draft_version_id: Mapped[int | None] = mapped_column(ForeignKey("content_draft_version.id"), nullable=True, index=True)
+    version_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     review_report_id: Mapped[int | None] = mapped_column(ForeignKey("review_report.id"), nullable=True, index=True)
     revision_plan_id: Mapped[int | None] = mapped_column(ForeignKey("draft_revision_plan.id"), nullable=True, index=True)
     source_type: Mapped[str] = mapped_column(String(32), default="ORIGINAL_DRAFT", nullable=False, index=True)

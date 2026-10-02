@@ -11,9 +11,8 @@ from app.context.context_usage_logger import ContextUsageLogger
 from app.core.database import SessionLocal
 from app.enums.agent import AgentStepStatus
 from app.repositories.agent_run_repo import AgentRunRepository
-from app.repositories.content_draft_v2_repo import ContentDraftV2Repository
+from app.models.prompt_run_log import PromptRunLog
 from app.schemas.agent import AgentRunCreate, AgentStepCreate
-from app.schemas.content_draft_v2 import PromptRunLogCreate
 
 
 def create_demo_agent_trace() -> int:
@@ -78,8 +77,7 @@ def create_demo_agent_trace() -> int:
                 input_payload={"generate_from_experiment": True, "experiment_id": "demo"},
             )
         )
-        prompt_log = ContentDraftV2Repository(db).create_prompt_run_log(
-            PromptRunLogCreate(
+        prompt_log = PromptRunLog(
                 prompt_template_id=None,
                 prompt_name="demo_draft_generation",
                 prompt_version="v1",
@@ -98,8 +96,10 @@ def create_demo_agent_trace() -> int:
                 estimated_cost=0,
                 is_mock=True,
                 raw_response_id="mock-demo-response",
-            )
         )
+        db.add(prompt_log)
+        db.commit()
+        db.refresh(prompt_log)
         built_context = (
             ContextManager(task_name="demo_developer_trace", token_budget=600)
             .extend(

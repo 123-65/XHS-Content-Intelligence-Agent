@@ -1,231 +1,116 @@
-from decimal import Decimal
-from typing import Any
+import json
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.llm.client import LLMClient
-from app.llm.errors import LLMError
-from app.models.account import AccountProfile
-from app.models.content_draft import ContentDraft
-from app.models.content_experiment import ContentExperiment
-from app.models.review_report import ReviewReport
-from app.prompts.content_reviewer import CONTENT_REVIEWER_SYSTEM_PROMPT, build_content_reviewer_prompt
-from app.schemas.draft_review import DraftReviewLLMResult, DraftReviewRequest, DraftReviewResponse
-from app.schemas.provider_status import ProviderErrorCode
+from app.repositories.draft_repo import DraftRepository
+from app.schemas.content_strategy import EvidenceRef
+from app.schemas.draft import DraftReviewInput, DraftReviewLLMResult, DraftReviewResult
 
 
-class DraftReviewNotFound(ValueError):
-    """Resource needed for B9 draft review was not found."""
+DRAFT_REVIEW_PROMPT_VERSION = "v2"
 
 
 class DraftReviewService:
-    """Controlled B9 draft review that persists ReviewReport without mutating drafts."""
+    """CAP-DRAFT-REVIEW 的唯一正式 Owner；只检查，不修改 Draft。"""
 
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db: Session, llm_client: LLMClient | None = None, repository: DraftRepository | None = None):
+        """初始化 Draft Review 服务。"""
+        self.repo = repository or DraftRepository(db)
+        self._llm_client = llm_client
 
-    def review(self, draft_id: int, request: DraftReviewRequest) -> DraftReviewResponse:
-        if not request.confirmed:
-            return DraftReviewResponse(
-                status="WAITING_CONFIRMATION",
-                account_id=request.account_id,
-                draft_id=draft_id,
-                confirmation={
-                    "requires_confirmation": True,
-                    "confirmed": False,
-                    "message": "Please confirm before running draft review. This may call the configured LLM provider.",
+    def review(self, data: DraftReviewInput) -> DraftReviewResult:
+        """审核并持久化兼容业务 Review。"""
+        account = self.repo.get_account(data.account_id)
+        if not account:
+            raise ValueError("账号配置不存在")
+        draft = self.repo.get_draft(data.draft_ref)
+        if not draft:
+            raise ValueError("Draft 不存在")
+        lineage = draft.generation_context or {}
+        if lineage.get("strategy_ref") != data.strategy_ref or lineage.get("opportunity_ref") != data.opportunity_ref:
+            raise ValueError("Draft 的 Strategy / Opportunity identity 不匹配")
+        allowed_refs = {
+            (item.kind, item.id) for item in data.evidence_refs
+        } | {
+            (item["kind"], item["id"]) for item in lineage.get("evidence_refs", [])
+        }
+        client = self._client()
+        llm_result = client.generate_structured(
+            prompt=json.dumps({
+                "draft": self._snapshot(draft),
+                "account_context": {
+                    "positioning": account.positioning,
+                    "target_audience": account.target_audience,
+                    "tone_preference": account.tone_preference,
+                    "forbidden_topics": account.forbidden_topics,
                 },
-            )
-
-        draft = self._get_draft_or_raise(draft_id)
-        experiment = self._get_experiment_or_raise(draft.experiment_id)
-        account = self._get_account_or_raise(request.account_id)
-        if experiment.account_id != request.account_id or account.id != experiment.account_id:
-            raise ValueError("draft account_id does not match")
-
-        context = self._build_review_context(account, experiment, draft, request)
-        try:
-            llm_result = LLMClient().generate_structured(
-                prompt=build_content_reviewer_prompt(context),
-                schema_model=DraftReviewLLMResult,
-                system_prompt=CONTENT_REVIEWER_SYSTEM_PROMPT,
-                prompt_key="draft_review_b9",
-                prompt_version="v1",
-            )
-        except LLMError as exc:
-            return self._llm_error(draft_id, request, exc)
-
-        result: DraftReviewLLMResult = llm_result.data
-        report = self._create_review_report(draft, experiment, account, result, llm_result)
-        return DraftReviewResponse(
-            status="REVIEWED",
-            account_id=request.account_id,
-            draft_id=draft_id,
-            review_report_id=report.id,
-            can_enter_publish_preparation=result.can_enter_publish_preparation,
-            risk_level=result.risk_level,
-            score=result.score,
-            issues=result.issues,
-            suggestions=result.suggestions,
-            warnings=result.warnings,
-            summary=result.summary,
-            block_reasons=result.block_reasons,
-            must_fix_before_publish=result.must_fix_before_publish,
-            optional_improvements=result.optional_improvements,
-            confirmation={"requires_confirmation": True, "confirmed": True, "review_mode": request.review_mode},
+                "strategy_ref": data.strategy_ref,
+                "opportunity_ref": data.opportunity_ref,
+                "evidence_refs": [item.model_dump() for item in data.evidence_refs],
+                "user_style_constraints": data.user_style_constraints,
+            }, ensure_ascii=False),
+            schema_model=DraftReviewLLMResult,
+            system_prompt=(
+                "你是结构化 Draft Reviewer。检查策略对齐、证据支撑、风格、结构和风险。"
+                "不得重写或保存 Draft，不得预测点赞、爆款或成交。"
+            ),
+            prompt_key="draft_review",
+            prompt_version=DRAFT_REVIEW_PROMPT_VERSION,
+            **self._execution_policy(),
         )
+        result = DraftReviewLLMResult.model_validate(llm_result.data)
+        invalid = [(item.kind, item.id) for item in result.cited_evidence_refs if (item.kind, item.id) not in allowed_refs]
+        if invalid:
+            raise ValueError(f"Review 包含无效 EvidenceRefs: {invalid}")
+        report = self.repo.create_review(draft, data.account_id, result, llm_result)
+        return DraftReviewResult(review_result_ref=report.id, draft_ref=draft.id, **result.model_dump())
 
-    def _create_review_report(
-        self,
-        draft: ContentDraft,
-        experiment: ContentExperiment,
-        account: AccountProfile,
-        result: DraftReviewLLMResult,
-        llm_result,
-    ) -> ReviewReport:
-        report = ReviewReport(
-            draft_id=draft.id,
-            account_id=account.id,
-            experiment_id=experiment.id,
-            review_type="DRAFT_REVIEW_B9",
-            passed=result.can_enter_publish_preparation and result.risk_level != "HIGH",
-            score=result.score,
-            quality_score=result.score,
-            conversion_score=max(0, result.score - 5),
-            evidence_usage_score=max(0, result.score - 10),
-            risk_level=result.risk_level,
-            issues=[issue.model_dump() for issue in result.issues],
-            suggestions=result.suggestions,
-            data_facts=self._data_facts(result),
-            inferences=self._inferences(result),
-            action_suggestions=self._action_suggestions(result),
-            summary=result.summary,
-            status="SUCCESS",
-            prompt_tokens=llm_result.usage.prompt_tokens,
-            completion_tokens=llm_result.usage.completion_tokens,
-            total_tokens=llm_result.usage.total_tokens,
-            estimated_cost=Decimal(str(llm_result.estimated_cost)),
-            raw_response_id=llm_result.raw_response_id,
+    def review_semantic(self, payload: dict) -> DraftReviewLLMResult:
+        """仅评价已准备 Draft，不修改或持久化任何内容。"""
+        llm_result = self._client().generate_structured(
+            prompt=(
+                "请审核以下 Draft。cited_evidence_refs 只能逐项复制 evidence_refs 中的引用；"
+                "Strategy、Opportunity 和 Research identity 只有出现在 evidence_refs 时才可引用。\n"
+                + json.dumps(payload, ensure_ascii=False)
+            ),
+            schema_model=DraftReviewLLMResult,
+            system_prompt=(
+                "仅评价 Draft 的策略对齐、证据、风格和风险；不得重写、搜索或保存 Draft。"
+                "不得创造 EvidenceRef，cited_evidence_refs 必须是输入 evidence_refs 的子集。"
+            ),
+            prompt_key="draft_review_semantic",
+            prompt_version=DRAFT_REVIEW_PROMPT_VERSION,
+            **self._execution_policy(),
         )
-        self.db.add(report)
-        self.db.commit()
-        self.db.refresh(report)
-        return report
+        result = DraftReviewLLMResult.model_validate(llm_result.data)
+        allowed = {(item["kind"], item["id"]) for item in payload.get("evidence_refs", [])}
+        invalid = [(item.kind, item.id) for item in result.cited_evidence_refs if (item.kind, item.id) not in allowed]
+        if invalid:
+            raise ValueError(f"Review 包含无效 EvidenceRefs: {invalid}")
+        return result
 
-    def _build_review_context(
-        self,
-        account: AccountProfile,
-        experiment: ContentExperiment,
-        draft: ContentDraft,
-        request: DraftReviewRequest,
-    ) -> dict[str, Any]:
+    @staticmethod
+    def _execution_policy() -> dict:
+        """Use the task-specific structured model without altering timeout or retry ownership."""
         return {
-            "review_controls": {
-                "review_mode": request.review_mode,
-                "check_ai_tone": request.check_ai_tone,
-                "check_risk": request.check_risk,
-                "check_evidence_consistency": request.check_evidence_consistency,
-                "do_not_rewrite_draft": True,
-                "do_not_publish": True,
-                "do_not_comment": True,
-            },
-            "account": {
-                "account_id": account.id,
-                "account_name": account.account_name,
-                "positioning": account.positioning,
-                "target_audience": account.target_audience,
-                "primary_goal": account.primary_goal,
-                "tone_preference": account.tone_preference,
-                "forbidden_topics": account.forbidden_topics,
-            },
-            "experiment": {
-                "experiment_id": experiment.id,
-                "experiment_name": experiment.experiment_name,
-                "hypothesis": experiment.hypothesis,
-                "target_metric": experiment.target_metric,
-                "expected_result": experiment.expected_result,
-                "topic_angle": experiment.topic_angle,
-                "selected_topic": experiment.selected_topic,
-                "target_values": experiment.target_values,
-            },
-            "draft": {
-                "draft_id": draft.id,
-                "title": draft.recommended_title or draft.title,
-                "body": draft.body_text or draft.body,
-                "tags": draft.tag_list or draft.tags,
-                "cover_text": draft.cover_text,
-                "image_scripts": draft.image_script or draft.image_scripts,
-                "cta": draft.cta_text or draft.cta,
-                "status": draft.status,
-                "generation_context": draft.generation_context,
-            },
-            "review_dimensions": [
-                "safety_compliance",
-                "ai_tone_readability",
-                "evidence_consistency",
-                "publish_preparation_readiness",
-            ],
+            "model": settings.llm_draft_review_model,
+            "timeout_seconds": settings.llm_draft_review_timeout_seconds,
         }
 
-    def _data_facts(self, result: DraftReviewLLMResult) -> list[dict[str, Any]]:
-        return [
-            {
-                "type": "draft_review_b9",
-                "risk_level": result.risk_level,
-                "score": result.score,
-                "can_enter_publish_preparation": result.can_enter_publish_preparation,
-                "evidence_consistency": result.evidence_consistency,
-                "ai_tone_feedback": result.ai_tone_feedback,
-            }
-        ]
+    def _client(self):
+        """延迟创建统一 LLMClient。"""
+        if self._llm_client is None:
+            self._llm_client = LLMClient()
+        return self._llm_client
 
-    def _inferences(self, result: DraftReviewLLMResult) -> list[dict[str, Any]]:
-        return [
-            {"type": "block_reason", "content": item}
-            for item in result.block_reasons
-        ]
-
-    def _action_suggestions(self, result: DraftReviewLLMResult) -> list[dict[str, Any]]:
-        return [
-            {"type": "must_fix_before_publish", "content": item}
-            for item in result.must_fix_before_publish
-        ] + [
-            {"type": "optional_improvement", "content": item}
-            for item in result.optional_improvements
-        ]
-
-    def _llm_error(self, draft_id: int, request: DraftReviewRequest, exc: LLMError) -> DraftReviewResponse:
-        text = str(exc)
-        if ProviderErrorCode.LLM_CONFIG_MISSING.value in text or ProviderErrorCode.LLM_PROVIDER_UNAVAILABLE.value in text:
-            return DraftReviewResponse(
-                status="PROVIDER_NOT_CONFIGURED",
-                account_id=request.account_id,
-                draft_id=draft_id,
-                error_code=ProviderErrorCode.LLM_CONFIG_MISSING.value,
-                error_message=text,
-            )
-        return DraftReviewResponse(
-            status="FAILED",
-            account_id=request.account_id,
-            draft_id=draft_id,
-            error_code=ProviderErrorCode.LLM_OUTPUT_FAILED.value,
-            error_message=text,
-        )
-
-    def _get_draft_or_raise(self, draft_id: int) -> ContentDraft:
-        draft = self.db.get(ContentDraft, draft_id)
-        if not draft:
-            raise DraftReviewNotFound("draft not found")
-        return draft
-
-    def _get_experiment_or_raise(self, experiment_id: int) -> ContentExperiment:
-        experiment = self.db.get(ContentExperiment, experiment_id)
-        if not experiment:
-            raise DraftReviewNotFound("experiment not found")
-        return experiment
-
-    def _get_account_or_raise(self, account_id: int) -> AccountProfile:
-        account = self.db.get(AccountProfile, account_id)
-        if not account:
-            raise DraftReviewNotFound("account not found")
-        return account
+    def _snapshot(self, draft) -> dict:
+        """提取 Draft 审核快照。"""
+        return {
+            "draft_ref": draft.id,
+            "title": draft.recommended_title or draft.title,
+            "body": draft.body_text or draft.body,
+            "tags": draft.tag_list or draft.tags,
+            "cta": draft.cta_text or draft.cta,
+        }

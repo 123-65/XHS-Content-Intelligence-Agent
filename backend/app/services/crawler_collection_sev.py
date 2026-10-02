@@ -1,3 +1,10 @@
+"""Deprecated compatibility service for the old crawler-provider chain.
+
+New Agents, Workflows, and Tools must use ``XhsCollectorService`` instead.
+The registered legacy APIs remain temporarily available for external-consumer
+compatibility and must not become fallback paths for the canonical MCP owner.
+"""
+
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -11,7 +18,7 @@ from app.schemas.crawler_collection import CrawlTaskCreate
 
 
 class CrawlerCollectionService:
-    """采集任务业务服务。"""
+    """DEPRECATED/LEGACY_COMPAT: old crawler task and provider owner."""
 
     def __init__(self, db: Session):
         """初始化采集任务服务。"""

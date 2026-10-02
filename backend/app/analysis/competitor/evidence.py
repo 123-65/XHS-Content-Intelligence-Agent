@@ -34,27 +34,37 @@ class CompetitorEvidenceBuilder:
         account_evidence = [self._account(item) for item in real_accounts]
         note_evidence = [self._note(item) for item in real_notes]
         comment_evidence = [self._comment(item) for item in real_comments]
-        ranked_notes = sorted((self._metric(item) for item in note_evidence), key=lambda item: item.engagement_score, reverse=True)
-        gaps = self._data_gaps(account_evidence, note_evidence, comment_evidence)
-        ocr_note_ids = [item.id for item in note_evidence if item.ocr_texts]
+        return self.build_from_typed(account_id, account_evidence, note_evidence, comment_evidence)
+
+    def build_from_typed(
+        self,
+        account_id: int,
+        accounts: list[AccountEvidence],
+        notes: list[NoteEvidence],
+        comments: list[CommentEvidence],
+    ) -> CompetitorEvidence:
+        """从已校验的 typed evidence 统一计算 metrics、ID 集合和数据缺口。"""
+        ranked_notes = sorted((self._metric(item) for item in notes), key=lambda item: item.engagement_score, reverse=True)
+        gaps = self._data_gaps(accounts, notes, comments)
+        ocr_note_ids = [item.id for item in notes if item.ocr_texts]
 
         return CompetitorEvidence(
             account_id=account_id,
-            accounts=account_evidence,
-            notes=note_evidence,
-            comments=comment_evidence,
+            accounts=accounts,
+            notes=notes,
+            comments=comments,
             computed_metrics=ComputedMetrics(
-                note_count=len(note_evidence),
-                comment_count=len(comment_evidence),
-                account_count=len(account_evidence),
-                average_likes=self._average(item.like_count for item in note_evidence),
-                average_collects=self._average(item.collect_count for item in note_evidence),
-                average_comments=self._average(item.comment_count for item in note_evidence),
+                note_count=len(notes),
+                comment_count=len(comments),
+                account_count=len(accounts),
+                average_likes=self._average(item.like_count for item in notes),
+                average_collects=self._average(item.collect_count for item in notes),
+                average_comments=self._average(item.comment_count for item in notes),
                 ranked_notes=ranked_notes,
             ),
-            used_account_ids=[item.id for item in account_evidence],
-            used_note_ids=[item.id for item in note_evidence],
-            used_comment_ids=[item.id for item in comment_evidence],
+            used_account_ids=[item.id for item in accounts],
+            used_note_ids=[item.id for item in notes],
+            used_comment_ids=[item.id for item in comments],
             ocr_note_ids=ocr_note_ids,
             data_gaps=gaps,
         )

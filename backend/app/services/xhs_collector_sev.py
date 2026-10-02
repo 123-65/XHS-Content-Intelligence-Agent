@@ -142,12 +142,39 @@ class XhsCollectorService:
                         input_value=provider_result.source_url,
                         status=provider_result.status,
                         warnings=list(dict.fromkeys([*provider_result.warnings, *collected.warnings])),
-                    ids={"competitor_account_id": account.id},
+                    ids={
+                        "competitor_account_id": account.id,
+                        "competitor_note_ids": [
+                            result["competitor_note"].id for result in note_results
+                        ],
+                    },
                     data_count={"accounts_saved": 1, "recent_notes_saved": len(note_results)},
                     nickname=account.nickname,
                 )
             )
         return self._summary("COLLECT_XHS_ACCOUNTS", outcomes)
+
+    def collect_public_note_metrics(self, note_url: str) -> dict[str, Any]:
+        """只读采集单个用户明确提供的笔记 URL，用于发布绑定和公开指标快照。"""
+        value = note_url.strip()
+        if not value:
+            raise ValueError("note_url is required")
+        result = self.provider.collect_note(value, collect_comments=False, max_comments=0)
+        if result.status not in SUCCESS_STATUSES or not result.parsed_note:
+            raise ValueError(f"XHS note is not accessible: {result.error_code or result.status}")
+        note = result.parsed_note
+        return {
+            "platform_note_id": note.note_id,
+            "note_url": note.note_url,
+            "source": self.provider_name,
+            "provenance": "MEASURED",
+            "metrics": {
+                "like_count": int(note.like_count or 0),
+                "collect_count": int(note.collect_count or 0),
+                "comment_count": int(note.comment_count or 0),
+                "share_count": int(note.share_count or 0),
+            },
+        }
 
     def _apply_ocr(self, note: XhsCollectedNote, *, enable_ocr: bool) -> list[str]:
         if not enable_ocr:

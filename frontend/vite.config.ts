@@ -14,7 +14,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/accounts': 'http://backend:8000',
-      '/agent/chat': 'http://backend:8000',
+      '/agent/conversations': 'http://backend:8000',
       '/api': 'http://backend:8000',
       '/business-metrics': 'http://backend:8000',
       '/metrics': 'http://backend:8000',

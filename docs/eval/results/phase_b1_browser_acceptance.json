@@ -1,0 +1,26 @@
+{
+  "phase": "B1",
+  "executed_at": "2026-09-28",
+  "browser": "Microsoft Edge, headed, UI submission via Playwright",
+  "account_ref": 8456,
+  "account_selection": "UI dropdown",
+  "case_count": 10,
+  "pass": 10,
+  "fail": 0,
+  "cases": [
+    {"case_id": "A01", "result": "PASS", "intent": "GENERAL_CHAT", "action": "RESPOND", "status": "SUCCESS", "evidence": "Natural self-introduction; not the legacy canned greeting."},
+    {"case_id": "A03", "result": "PASS", "intent": "GENERAL_CHAT", "action": "RESPOND", "status": "SUCCESS", "evidence": "Explained all five frozen capabilities and unsupported boundaries without a workflow call."},
+    {"case_id": "A04", "result": "PASS", "intent": "GENERAL_CHAT", "action": "RESPOND", "status": "SUCCESS", "evidence": "Explained the five real user-facing skills without inventing capabilities."},
+    {"case_id": "A05", "result": "PASS", "intent": "GENERAL_CHAT", "action": "RESPOND", "status": "SUCCESS", "evidence": "Explained the five high-level tool capabilities and identity boundaries."},
+    {"case_id": "A07", "result": "PASS", "intent": "UNKNOWN", "action": "RESPOND", "status": "SUCCESS", "warnings": ["UNSUPPORTED_CAPABILITY"], "evidence": "Explicitly rejected automatic publishing and offered human-publish preparation."},
+    {"case_id": "A08", "result": "PASS", "intent": "UNKNOWN", "action": "RESPOND", "status": "SUCCESS", "warnings": ["UNSUPPORTED_CAPABILITY"], "evidence": "Explicitly rejected automatic comments and other account interaction automation."},
+    {"case_id": "C01", "result": "PASS", "intent": "UNKNOWN", "action": "CLARIFY", "status": "WAITING_USER", "run_ref": null, "required_fields": ["revision_direction"], "evidence": "Recognized selected Draft 2625 and asked for a concrete revision direction; no Workflow run was created."},
+    {"case_id": "D02", "result": "PASS", "intent": "RESEARCH", "action": "EXECUTE_PLAN", "status": "FAILED", "run_ref": "wfr_2cf3676c20be47a2be1005403d0098c7", "selected_high_level_tool": "run_research", "evidence": "External Note URL routed to Research, not Post Publish Review; provider/workflow failure remained FAILED."},
+    {"case_id": "K01", "result": "PASS", "intent": "GENERAL_CHAT", "action": "RESPOND", "status": "SUCCESS", "evidence": "Second turn generated alternative titles and did not use the disallowed term ‘逆袭’."},
+    {"case_id": "L02", "result": "PASS", "intent": "RESEARCH", "action": "EXECUTE_PLAN", "status": "FAILED", "run_ref": "wfr_4c26027cab5549de970def608e101245", "selected_high_level_tool": "run_research", "evidence": "Turn 1 requested research material; Turn 2 Profile URL selected Research and did not return QUERY_PROFILE or CONTROL_QUERY_HANDLER_UNAVAILABLE."}
+  ],
+  "notes": [
+    "D02 and L02 satisfy the B1 routing criterion despite downstream provider/workflow failure.",
+    "Only the specified B1 browser cases were exercised; the frozen 30-case baseline was not rerun or modified."
+  ]
+}

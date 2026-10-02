@@ -1,0 +1,142 @@
+[
+{
+"question": "GraphRAG 是如何使用实体的？",
+"expected_keywords": ["GraphRAG", "实体", "关系", "entities", "relations"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "graph",
+"mode": "graphrag"
+},
+{
+"question": "混合检索使用了哪个向量数据库？",
+"expected_keywords": ["Milvus", "混合检索", "hybrid", "BM25"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "哪种融合方法用于结合稀疏检索和稠密检索？",
+"expected_keywords": ["RRF", "稠密检索", "dense", "BM25"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "哪个组件用于存储对话历史？",
+"expected_keywords": ["Asyncpg", "对话", "消息", "conversation", "message"],
+"expected_source_file": "conversation_policy.docx",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "用户可以继续之前的聊天吗？",
+"expected_keywords": ["继续", "对话", "聊天", "continue", "conversation", "chat"],
+"expected_source_file": "conversation_policy.docx",
+"expected_answer_type": "boolean",
+"mode": "rag"
+},
+{
+"question": "用户可以创建新的聊天吗？",
+"expected_keywords": ["创建", "新的", "聊天", "create", "new", "chat"],
+"expected_source_file": "conversation_policy.docx",
+"expected_answer_type": "boolean",
+"mode": "rag"
+},
+{
+"question": "哪个工作表包含 ARR 数据？",
+"expected_keywords": ["Revenue", "ARR", "行", "row"],
+"expected_source_file": "revenue.xlsx",
+"expected_answer_type": "table",
+"mode": "multimodal"
+},
+{
+"question": "哪一行包含 ACME 的收入数据？",
+"expected_keywords": ["ACME", "收入", "revenue", "行", "row"],
+"expected_source_file": "revenue.xlsx",
+"expected_answer_type": "table",
+"mode": "multimodal"
+},
+{
+"question": "架构图片展示了什么内容？",
+"expected_keywords": ["图片", "架构", "Milvus", "Citus", "image"],
+"expected_source_file": "architecture.png",
+"expected_answer_type": "image",
+"mode": "multimodal"
+},
+{
+"question": "哪张图片提到了 worker 节点？",
+"expected_keywords": ["architecture", "worker", "节点", "diagram", "架构图"],
+"expected_source_file": "architecture.png",
+"expected_answer_type": "image",
+"mode": "multimodal"
+},
+{
+"question": "预期有多少个 Citus worker？",
+"expected_keywords": ["两个", "two", "worker", "节点", "nodes"],
+"expected_source_file": "notes.md",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "PostgreSQL 使用的分布式扩展是什么？",
+"expected_keywords": ["PostgreSQL", "Citus", "协调节点", "coordinator"],
+"expected_source_file": "notes.md",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "哪种图关系表示数据被分发到 worker？",
+"expected_keywords": ["Citus", "DISTRIBUTES_TO", "worker", "分发"],
+"expected_source_file": "notes.md",
+"expected_answer_type": "graph",
+"mode": "graphrag"
+},
+{
+"question": "哪个文档是检索策略的最新版本？",
+"expected_keywords": ["最新", "上传", "Milvus", "latest", "uploaded"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "文档中描述了什么重排序工作流？",
+"expected_keywords": ["重排序", "rerank", "工作流", "workflow", "Word"],
+"expected_source_file": "conversation_policy.docx",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "哪个来源提到了 GraphRAG 摘要？",
+"expected_keywords": ["摘要", "summaries", "GraphRAG", "ACME"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "graph",
+"mode": "graphrag"
+},
+{
+"question": "查找表格中的留存率信息。",
+"expected_keywords": ["Retention", "留存率", "churn", "流失率", "Revenue"],
+"expected_source_file": "revenue.xlsx",
+"expected_answer_type": "table",
+"mode": "multimodal"
+},
+{
+"question": "查找架构图中的 OCR 内容。",
+"expected_keywords": ["OCR", "architecture", "架构", "GraphRAG"],
+"expected_source_file": "architecture.png",
+"expected_answer_type": "image",
+"mode": "multimodal"
+},
+{
+"question": "哪种检索模式同时使用 BM25 和稠密向量？",
+"expected_keywords": ["BM25", "dense", "稠密向量", "hybrid", "混合检索"],
+"expected_source_file": "latest_graphrag.pdf",
+"expected_answer_type": "fact",
+"mode": "rag"
+},
+{
+"question": "哪些关系信息可以帮助 GraphRAG 回答 worker 相关问题？",
+"expected_keywords": ["关系", "relations", "Citus", "worker"],
+"expected_source_file": "notes.md",
+"expected_answer_type": "graph",
+"mode": "graphrag"
+}
+]

@@ -71,14 +71,6 @@ ACTION_REGISTRY: dict[str, ActionCapability] = {
         ["account_id"],
         AllowedEffect.READ_ONLY,
     ),
-    Action.PREVIEW_DRAFT_CONTEXT.value: _capability(
-        Action.PREVIEW_DRAFT_CONTEXT,
-        "预览草稿生成前会注入的上下文槽位，不调用 LLM，不生成草稿。",
-        ["account_id", "experiment_id"],
-        AllowedEffect.READ_ONLY,
-        optional_params=["user_requirement"],
-        risk_flags=[RiskFlag.UNTRUSTED_EXTERNAL_INPUT],
-    ),
     Action.COLLECT_XHS_NOTES.value: _capability(
         Action.COLLECT_XHS_NOTES,
         "通过已配置的外部小红书采集工具读取用户提供的真实笔记链接，并写入现有业务表。",

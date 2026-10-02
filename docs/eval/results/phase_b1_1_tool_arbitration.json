@@ -1,0 +1,60 @@
+{
+  "phase": "B1.1",
+  "evaluation": "Conversation / Workflow Tool Arbitration Hardening",
+  "execution_gate": {
+    "modes": ["CONVERSATION", "BUSINESS_ACTION"],
+    "confidence_threshold": 0.75,
+    "model": "qwen3.8-flash",
+    "thinking": false,
+    "timeout_seconds": 15
+  },
+  "chat_dataset": {
+    "case_count": 12,
+    "conversation_mode_count": 12,
+    "workflow_tool_call_count": 0,
+    "unnecessary_tool_call_count": 0,
+    "unnecessary_tool_call_rate": 0.0,
+    "target_rate": 0.0,
+    "status": "PASS"
+  },
+  "minimal_pairs": {
+    "pair_count": 4,
+    "conversation_side_correct": 4,
+    "business_action_side_correct": 4,
+    "expected_business_tool_calls": 4,
+    "correct_business_tool_calls": 4,
+    "false_positive_tool_calls": 0,
+    "tool_call_precision": 1.0,
+    "status": "PASS"
+  },
+  "real_browser_chat": {
+    "browser": "Microsoft Edge headed via Playwright",
+    "turn_count": 7,
+    "workflow_run_count": 0,
+    "forbidden_marker_count": 0,
+    "status": "PASS"
+  },
+  "business_regression": {
+    "D02": {
+      "routing": "run_research",
+      "routing_status": "PASS",
+      "workflow_status": "FAILED",
+      "workflow_error_code": "ANALYSIS_GROUNDING_FAILED"
+    },
+    "L02": {
+      "turn_1": "WAITING_USER_RESEARCH_MATERIAL",
+      "turn_2_routing": "run_research",
+      "turn_2_material_type": "PROFILE",
+      "routing_and_collection_status": "PASS",
+      "workflow_status": "WAITING_USER"
+    },
+    "C01": {
+      "workspace_object_type": "DRAFT",
+      "action": "CLARIFY",
+      "required_field": "revision_direction",
+      "workflow_run_created": false,
+      "status": "PASS"
+    }
+  },
+  "migration_count": 0
+}

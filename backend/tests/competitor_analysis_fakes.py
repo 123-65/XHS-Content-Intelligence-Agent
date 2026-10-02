@@ -17,7 +17,7 @@ from app.analysis.competitor.schemas import (
     PersonaAnalysis,
 )
 from app.schemas.llm import LLMStructuredResult, LLMUsage
-from app.analysis.competitor.rule_baseline import RuleBaselineCompetitorAnalyzer
+from evals.baselines.research_rule_baseline import RuleBaselineCompetitorAnalyzer
 
 
 def make_evidence() -> CompetitorEvidence:
